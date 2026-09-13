@@ -36,7 +36,9 @@ Nếu có bất kỳ thắc mắc hoặc cần hỗ trợ về dự án, vui lò
 - **Sinh viên:** Lê Quang Kiệt (MSSV: 3123410180)
 
 
-
+```mermaid
+sequenceDiagram
+    Khach->>BE: Quét mã
 sequenceDiagram
     autonumber
     actor Khach as 📱 Khách Hàng

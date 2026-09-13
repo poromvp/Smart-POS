@@ -34,3 +34,41 @@ Dự án được tổ chức thành các thư mục chính sau:
 Nếu có bất kỳ thắc mắc hoặc cần hỗ trợ về dự án, vui lòng liên hệ:
 - **Email:** quangkietle382@gmail.com / 3123410180@sv.sgu.edu.vn
 - **Sinh viên:** Lê Quang Kiệt (MSSV: 3123410180)
+
+
+
+sequenceDiagram
+    autonumber
+    actor Khach as 📱 Khách Hàng
+    participant POS as 💻 Web POS (Thu Ngân)
+    participant KDS as 🍳 KDS (Bếp)
+    participant BE as ⚙️ Backend (Node/C#)
+    participant DB as 🗄️ Database
+
+    Khach->>BE: Quét mã QR, yêu cầu Menu
+    BE-->>Khach: Trả về danh sách món ăn thời gian thực
+    Khach->>BE: Tùy chỉnh món và gửi đơn trực tiếp
+    BE->>DB: Lưu Order & OrderDetail
+    DB-->>BE: Xác nhận đã lưu
+    
+    rect rgb(255, 230, 204)
+    Note over BE, KDS: Giao tiếp Realtime (Socket)
+    BE-)KDS: Truyền đơn tức thời xuống trạm bếp
+    end
+
+    KDS->>KDS: Hiển thị đếm giờ & Cảnh báo màu trễ hạn
+    KDS->>BE: Bếp bấm "Hoàn thành" để báo phục vụ
+    
+    rect rgb(230, 255, 230)
+    Note over BE, DB: Logic Trừ kho tự động (BOM)
+    BE->>DB: Đọc công thức thành phần & Trừ nguyên liệu thô
+    DB-->>BE: Khấu trừ thành công
+    end
+
+    BE-)POS: Cập nhật trạng thái nhận món lên Web POS
+    
+    POS->>BE: Yêu cầu mã thanh toán VietQR động
+    BE-->>POS: Trả về mã VietQR
+    Khach->>POS: Quét mã thanh toán
+    BE-)POS: Nhận diện giao dịch thành công tự động
+    BE->>DB: Cập nhật trạng thái Order hoàn thành

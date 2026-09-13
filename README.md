@@ -11,7 +11,7 @@ Dự án **Hệ thống Quản lý Chuỗi Nhà hàng, Gọi món Không chạm 
 
 ## 🛠️ Công nghệ sử dụng (Tech Stack)
 * **Frontend:** React.js (Web POS và giao diện KDS) .
-* **Backend:** Node.js (NestJS) hoặc C# .NET 8 Web API .
+* **Backend:** Node.js (NestJS) hoặc Spring Boot .
 * **Realtime Communication:** Socket.io hoặc SignalR .
 * **Database:** MySQL hoặc PostgreSQL .
 * **Phần cứng hỗ trợ:** Máy in hóa đơn ESC/POS mạng LAN/Bluetooth, Thiết bị Sunmi POS cảm ứng .

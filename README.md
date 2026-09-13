@@ -42,7 +42,7 @@ sequenceDiagram
     actor Khach as 📱 Khách Hàng
     participant POS as 💻 Web POS (Thu Ngân)
     participant KDS as 🍳 KDS (Bếp)
-    participant BE as ⚙️ Backend (Node/C#)
+    participant BE as ⚙️ Backend 
     participant DB as 🗄️ Database
 
     Khach->>BE: Quét mã QR, yêu cầu Menu

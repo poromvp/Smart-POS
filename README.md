@@ -25,10 +25,11 @@ Dự án được tổ chức thành các thư mục chính sau:
 
 ## 👥 Đội ngũ phát triển (Contributors)
 * **Lê Quang Kiệt (Team Leader / Frontend)**
-* **Thành viên 2 (Tên)**: BA / Tài liệu & UI Design
-* **Thành viên 3 (Tên)**: Backend / CSDL
-* **Thành viên 4 (Tên)**: Backend / Database Schema & BOM logic
-* **Thành viên 5 (Tên)**: Infrastructure / Realtime & KDS Integration
+* **Nguyễn Trọng Nhân**: BA / Tài liệu & UI Design
+* **Nguyễn Hoàng Lập**: Backend / CSDL
+* **Lý Hiếu Nghĩa**: Backend / CSDL & BOM logic
+* **Đỗ Trần Huy Bảo**: Backend / Database Schema 
+* **Lâm Tuấn Kiệt**: Infrastructure / Realtime & KDS Integration
 
 ## 📞 Thông tin liên hệ (Contact)
 Nếu có bất kỳ thắc mắc hoặc cần hỗ trợ về dự án, vui lòng liên hệ:
@@ -56,7 +57,7 @@ sequenceDiagram
     BE-)KDS: Truyền đơn tức thời xuống trạm bếp
     end
 
-    KDS->>KDS: Hiển thị đếm giờ & Cảnh báo màu trễ hạn
+    KDS->>KDS: Hiển thị đếm giờ & Cảnh báo trễ hạn
     KDS->>BE: Bếp bấm "Hoàn thành" để báo phục vụ
     
     rect rgb(230, 255, 230)

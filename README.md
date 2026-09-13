@@ -38,8 +38,6 @@ Nếu có bất kỳ thắc mắc hoặc cần hỗ trợ về dự án, vui lò
 
 ```mermaid
 sequenceDiagram
-    Khach->>BE: Quét mã
-sequenceDiagram
     autonumber
     actor Khach as 📱 Khách Hàng
     participant POS as 💻 Web POS (Thu Ngân)

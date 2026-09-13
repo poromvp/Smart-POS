@@ -1,20 +1,20 @@
 # 🍽️ Smart Multi-Branch POS & Realtime KDS
 
 ## 📖 Giới thiệu (Introduction)
-Dự án **Hệ thống Quản lý Chuỗi Nhà hàng, Gọi món Không chạm & Điều phối Bếp Thông minh** được phát triển nhằm hiện đại hóa quy trình vận hành F&B[cite: 1]. Hệ thống giúp xóa bỏ tình trạng chậm trễ trong giờ cao điểm thông qua tính năng gọi món bằng mã QR tại bàn, truyền đơn hàng tức thời đến trạm bếp và tự động hóa việc khấu trừ nguyên liệu tồn kho[cite: 1].
+Dự án **Hệ thống Quản lý Chuỗi Nhà hàng, Gọi món Không chạm & Điều phối Bếp Thông minh** được phát triển nhằm hiện đại hóa quy trình vận hành F&B. Hệ thống giúp xóa bỏ tình trạng chậm trễ trong giờ cao điểm thông qua tính năng gọi món bằng mã QR tại bàn, truyền đơn hàng tức thời đến trạm bếp và tự động hóa việc khấu trừ nguyên liệu tồn kho.
 
 ## ✨ Các tính năng chính (Core Features)
-1. **📱 Gọi món không chạm (QR Ordering):** Khách hàng quét mã QR tại bàn để xem thực đơn thời gian thực, tùy chỉnh món (topping, ghi chú) và gửi đơn trực tiếp mà không cần cài ứng dụng[cite: 1].
-2. **🍳 Màn hình điều phối bếp (KDS):** Hiển thị đơn hàng theo thời gian thực cho từng trạm (Bếp nóng, Bếp lạnh, Pha chế), có bộ đếm thời gian chờ, cảnh báo trễ hạn và nút xác nhận hoàn thành[cite: 1].
-3. **📦 Quản lý kho định lượng (BOM):** Cấu hình công thức thành phần cho từng món ăn, hệ thống tự động trừ kho nguyên liệu thô theo thời gian thực khi bếp bắt đầu chế biến[cite: 1].
-4. **💳 Thu ngân & Thanh toán:** Hỗ trợ tính tiền, gộp/tách bàn, chia hóa đơn (split-bill), và thanh toán qua mã VietQR động với khả năng tự nhận diện giao dịch[cite: 1].
+1. **📱 Gọi món không chạm (QR Ordering):** Khách hàng quét mã QR tại bàn để xem thực đơn thời gian thực, tùy chỉnh món (topping, ghi chú) và gửi đơn trực tiếp mà không cần cài ứng dụng.
+2. **🍳 Màn hình điều phối bếp (KDS):** Hiển thị đơn hàng theo thời gian thực cho từng trạm (Bếp nóng, Bếp lạnh, Pha chế), có bộ đếm thời gian chờ, cảnh báo trễ hạn và nút xác nhận hoàn thành .
+3. **📦 Quản lý kho định lượng (BOM):** Cấu hình công thức thành phần cho từng món ăn, hệ thống tự động trừ kho nguyên liệu thô theo thời gian thực khi bếp bắt đầu chế biến .
+4. **💳 Thu ngân & Thanh toán:** Hỗ trợ tính tiền, gộp/tách bàn, chia hóa đơn (split-bill), và thanh toán qua mã VietQR động với khả năng tự nhận diện giao dịch .
 
 ## 🛠️ Công nghệ sử dụng (Tech Stack)
-* **Frontend:** React.js (Web POS và giao diện KDS)[cite: 1].
-* **Backend:** Node.js (NestJS) hoặc C# .NET 8 Web API[cite: 1].
-* **Realtime Communication:** Socket.io hoặc SignalR[cite: 1].
-* **Database:** MySQL hoặc PostgreSQL[cite: 1].
-* **Phần cứng hỗ trợ:** Máy in hóa đơn ESC/POS mạng LAN/Bluetooth, Thiết bị Sunmi POS cảm ứng[cite: 1].
+* **Frontend:** React.js (Web POS và giao diện KDS) .
+* **Backend:** Node.js (NestJS) hoặc C# .NET 8 Web API .
+* **Realtime Communication:** Socket.io hoặc SignalR .
+* **Database:** MySQL hoặc PostgreSQL .
+* **Phần cứng hỗ trợ:** Máy in hóa đơn ESC/POS mạng LAN/Bluetooth, Thiết bị Sunmi POS cảm ứng .
 
 ## 📂 Cấu trúc thư mục (Folder Structure)
 Dự án được tổ chức thành các thư mục chính sau:

@@ -1,225 +1,209 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import TableMap, {
-  type RestaurantTable,
-} from "@/components/pos/TableMap";
-
+import { CircleDollarSign, Flame, LayoutGrid, ReceiptText } from "lucide-react";
 import InvoicePanel, {
+  type MenuItem,
   type OrderItem,
 } from "@/components/pos/InvoicePanel";
-
 import PaymentQRModal from "@/components/pos/PaymentQRModal";
+import TableMap, { type RestaurantTable } from "@/components/pos/TableMap";
 
-const INITIAL_TABLES: RestaurantTable[] = [
-  {
-    id: "t01",
-    name: "Bàn 01",
-    status: "empty",
-  },
-  {
-    id: "t02",
-    name: "Bàn 02",
-    status: "occupied",
-  },
-  {
-    id: "t03",
-    name: "Bàn 03",
-    status: "empty",
-  },
-  {
-    id: "t04",
-    name: "Bàn 04",
-    status: "occupied",
-  },
-  {
-    id: "t05",
-    name: "Bàn 05",
-    status: "empty",
-  },
-  {
-    id: "t06",
-    name: "Bàn 06",
-    status: "empty",
-  },
-  {
-    id: "t07",
-    name: "Bàn 07",
-    status: "occupied",
-  },
-  {
-    id: "t08",
-    name: "Bàn 08",
-    status: "empty",
-  },
-  {
-    id: "t09",
-    name: "Bàn 09",
-    status: "empty",
-  },
-  {
-    id: "t10",
-    name: "Bàn 10",
-    status: "empty",
-  },
+export const SPICY_LEVELS = Array.from({ length: 8 }, (_, index) => `Cấp ${index}`);
+
+export const MENU_ITEMS: MenuItem[] = [
+  { id: "spicy-beef-noodles", name: "Mì cay bò", price: 75000, spicyLevels: SPICY_LEVELS },
+  { id: "spicy-seafood-noodles", name: "Mì cay hải sản", price: 85000, spicyLevels: SPICY_LEVELS },
+  { id: "peach-lemongrass-tea", name: "Trà đào cam sả", price: 25000 },
+  { id: "pepsi", name: "Pepsi", price: 15000 },
 ];
 
-const ORDERS: Record<string, OrderItem[]> = {
-  t02: [
+export const INITIAL_TABLES: RestaurantTable[] = Array.from({ length: 12 }, (_, index) => {
+  const tableNumber = index + 1;
+  const occupiedTableNumbers = [1, 3, 6, 9];
+
+  return {
+    id: `table-${tableNumber}`,
+    name: `Bàn ${tableNumber}`,
+    status: occupiedTableNumbers.includes(tableNumber) ? "occupied" : "empty",
+  };
+});
+
+export const INITIAL_ORDERS: Record<string, OrderItem[]> = {
+  "table-1": [
     {
-      id: "o01",
-      name: "Cơm chiên hải sản",
-      quantity: 1,
-      price: 65000,
-    },
-    {
-      id: "o02",
-      name: "Coca Cola",
+      id: "spicy-beef-noodles-cap-3",
+      menuItemId: "spicy-beef-noodles",
+      name: "Mì cay bò",
+      price: 75000,
       quantity: 2,
-      price: 15000,
+      spicyLevel: "Cấp 3",
     },
     {
-      id: "o03",
-      name: "Gà sốt cay Hàn Quốc",
+      id: "peach-lemongrass-tea",
+      menuItemId: "peach-lemongrass-tea",
+      name: "Trà đào cam sả",
+      price: 25000,
+      quantity: 2,
+    },
+  ],
+  "table-3": [
+    {
+      id: "spicy-seafood-noodles-cap-1",
+      menuItemId: "spicy-seafood-noodles",
+      name: "Mì cay hải sản",
+      price: 85000,
       quantity: 1,
-      price: 89000,
+      spicyLevel: "Cấp 1",
+    },
+  ],
+  "table-6": [
+    { id: "pepsi", menuItemId: "pepsi", name: "Pepsi", price: 15000, quantity: 3 },
+  ],
+  "table-9": [
+    {
+      id: "spicy-beef-noodles-cap-5",
+      menuItemId: "spicy-beef-noodles",
+      name: "Mì cay bò",
+      price: 75000,
+      quantity: 1,
+      spicyLevel: "Cấp 5",
     },
   ],
 };
 
 export default function CashierPage() {
-  const [tables, setTables] =
-    useState<RestaurantTable[]>(INITIAL_TABLES);
-
-  const [selectedTableId, setSelectedTableId] =
-    useState<string | null>(null);
-
-  const [isPaymentModalOpen, setIsPaymentModalOpen] =
-    useState(false);
+  const [tables, setTables] = useState<RestaurantTable[]>(INITIAL_TABLES);
+  const [ordersByTable, setOrdersByTable] = useState<Record<string, OrderItem[]>>(INITIAL_ORDERS);
+  const [selectedTableId, setSelectedTableId] = useState("table-1");
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   const selectedTable = useMemo(
-    () =>
-      tables.find(
-        (table) => table.id === selectedTableId
-      ) ?? null,
-    [tables, selectedTableId]
+    () => tables.find((table) => table.id === selectedTableId) ?? null,
+    [selectedTableId, tables],
+  );
+  const selectedOrder = ordersByTable[selectedTableId] ?? [];
+  const selectedTotal = selectedOrder.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0,
   );
 
-  const selectedOrder =
-    selectedTableId !== null
-      ? ORDERS[selectedTableId] ?? []
-      : [];
+  const handleAddItem = (menuItem: MenuItem, spicyLevel?: string) => {
+    const orderItemId = `${menuItem.id}${spicyLevel ? `-${spicyLevel.toLowerCase().replace(" ", "-")}` : ""}`;
 
-  const handleSelectTable = (
-    table: RestaurantTable
-  ) => {
-    if (table.status !== "occupied") {
-      setSelectedTableId(null);
-      return;
-    }
+    setOrdersByTable((currentOrders) => {
+      const currentTableOrder = currentOrders[selectedTableId] ?? [];
+      const existingItem = currentTableOrder.find((item) => item.id === orderItemId);
+      const nextTableOrder = existingItem
+        ? currentTableOrder.map((item) =>
+            item.id === orderItemId ? { ...item, quantity: item.quantity + 1 } : item,
+          )
+        : [
+            ...currentTableOrder,
+            {
+              id: orderItemId,
+              menuItemId: menuItem.id,
+              name: menuItem.name,
+              price: menuItem.price,
+              quantity: 1,
+              spicyLevel,
+            },
+          ];
 
-    setSelectedTableId(table.id);
-  };
+      return { ...currentOrders, [selectedTableId]: nextTableOrder };
+    });
 
-  const handleSplitTable = () => {
-    if (!selectedTable) return;
-
-    alert(
-      `Đang mô phỏng chức năng Tách bàn cho ${selectedTable.name}`
+    // Thêm món cho bàn trống sẽ chuyển bàn sang trạng thái đang dùng.
+    setTables((currentTables) =>
+      currentTables.map((table) =>
+        table.id === selectedTableId ? { ...table, status: "occupied" } : table,
+      ),
     );
   };
 
-  const handleOpenPayment = () => {
-    if (!selectedTable || selectedOrder.length === 0) {
-      return;
-    }
+  const handleChangeQuantity = (orderItemId: string, quantity: number) => {
+    setOrdersByTable((currentOrders) => {
+      const nextTableOrder = (currentOrders[selectedTableId] ?? [])
+        .map((item) => (item.id === orderItemId ? { ...item, quantity } : item))
+        .filter((item) => item.quantity > 0);
 
-    setIsPaymentModalOpen(true);
+      return { ...currentOrders, [selectedTableId]: nextTableOrder };
+    });
   };
 
   const handlePaymentSuccess = () => {
-    if (!selectedTableId) return;
+    const paidTableId = selectedTableId;
 
-    setTables((prevTables) =>
-      prevTables.map((table) =>
-        table.id === selectedTableId
-          ? {
-              ...table,
-              status: "empty",
-            }
-          : table
-      )
+    // Webhook mô phỏng đã xác nhận: xóa hóa đơn và trả bàn về trống.
+    setOrdersByTable((currentOrders) => ({ ...currentOrders, [paidTableId]: [] }));
+    setTables((currentTables) =>
+      currentTables.map((table) =>
+        table.id === paidTableId ? { ...table, status: "empty" } : table,
+      ),
     );
-
-    setSelectedTableId(null);
     setIsPaymentModalOpen(false);
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
-      {/* Header */}
-      <header className="border-b border-slate-200 bg-white">
-        <div className="flex h-16 items-center justify-between px-5 lg:px-6">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-600">
-              SmartPOS
-            </p>
-
-            <h1 className="text-xl font-bold text-slate-900">
-              Màn hình thu ngân
-            </h1>
-          </div>
-
+    <main className="flex h-dvh flex-col overflow-hidden bg-slate-50 text-slate-900">
+      <header className="border-b border-orange-100 bg-white px-5 py-4 shadow-sm lg:px-7">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-semibold text-slate-900">
-                Thu ngân
-              </p>
-
-              <p className="text-xs text-slate-500">
-                Ca sáng
-              </p>
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg shadow-orange-200">
+              <Flame size={23} aria-hidden="true" />
             </div>
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">
-              TN
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-500">Mì Cay POS</p>
+              <h1 className="text-xl font-bold tracking-tight">Màn hình thu ngân</h1>
             </div>
+          </div>
+          <div className="hidden items-center gap-2 rounded-xl bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 sm:flex">
+            <CircleDollarSign size={18} aria-hidden="true" />
+            Ca đang hoạt động
           </div>
         </div>
       </header>
 
-      {/* POS Layout */}
-      <section className="h-[calc(100vh-4rem)] p-3 md:p-4 lg:p-5">
-        <div className="grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-[3fr_2fr]">
-          {/* LEFT - TABLE MAP */}
-          <section className="min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <TableMap
-              tables={tables}
-              selectedTableId={selectedTableId}
-              onSelectTable={handleSelectTable}
-            />
-          </section>
+      <section className="mx-auto flex w-full max-w-[1600px] flex-1 min-h-0 flex-col p-3.5 lg:p-4">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="h-[117.65%] w-[117.65%] origin-top-left scale-[0.85]">
+            <div className="grid h-full min-h-0 gap-3.5 lg:grid-cols-[3fr_2fr] lg:gap-4">
+              <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2.5 text-[13px] font-semibold text-slate-500 lg:px-5 lg:py-3 lg:text-sm">
+                  <LayoutGrid size={18} className="text-orange-500" aria-hidden="true" />
+                  Khu vực phục vụ
+                </div>
+                <TableMap
+                  tables={tables}
+                  selectedTableId={selectedTableId}
+                  onSelectTable={(table) => setSelectedTableId(table.id)}
+                />
+              </section>
 
-          {/* RIGHT - INVOICE */}
-          <section className="min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <InvoicePanel
-              table={selectedTable}
-              orderItems={selectedOrder}
-              onSplitTable={handleSplitTable}
-              onPayment={handleOpenPayment}
-            />
-          </section>
+              <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2.5 text-[13px] font-semibold text-slate-500 lg:px-5 lg:py-3 lg:text-sm">
+                  <ReceiptText size={18} className="text-orange-500" aria-hidden="true" />
+                  Đơn hàng hiện tại
+                </div>
+                <InvoicePanel
+                  table={selectedTable}
+                  orderItems={selectedOrder}
+                  menuItems={MENU_ITEMS}
+                  onAddItem={handleAddItem}
+                  onChangeQuantity={handleChangeQuantity}
+                  onPayment={() => setIsPaymentModalOpen(true)}
+                />
+              </section>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* PAYMENT MODAL */}
       <PaymentQRModal
-        open={isPaymentModalOpen}
+        key={isPaymentModalOpen ? "payment-open" : "payment-closed"}
+        isOpen={isPaymentModalOpen}
         table={selectedTable}
-        total={selectedOrder.reduce(
-          (sum, item) => sum + item.price * item.quantity,
-          0
-        )}
+        total={selectedTotal}
         onClose={() => setIsPaymentModalOpen(false)}
         onPaymentSuccess={handlePaymentSuccess}
       />

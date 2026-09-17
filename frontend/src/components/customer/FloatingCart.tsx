@@ -1,18 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-export interface CartItem {
-  id: string;
-  itemId: string;
-  name: string;
-  basePrice: number;
-  modifierTotal: number;
-  toppings: string[];
-  sweetness: string;
-  note: string;
-  quantity: number;
-}
+import type { CartItem } from "./guestCartStore";
 
 interface FloatingCartProps {
   items: CartItem[];

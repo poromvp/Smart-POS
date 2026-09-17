@@ -34,11 +34,8 @@ export default function PaymentQRModal({
 
   useEffect(() => {
     if (!open) {
-      setStatus("waiting");
       return;
     }
-
-    setStatus("waiting");
 
     const timer = setTimeout(() => {
       setStatus("success");

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ReceiptText, ShoppingCart } from "lucide-react";
 
 import MenuItem, {
   type MenuItemData,
@@ -10,9 +12,8 @@ import ModifierModal, {
   type ModifierSelection,
 } from "@/components/customer/ModifierModal";
 
-import FloatingCart, {
-  type CartItem,
-} from "@/components/customer/FloatingCart";
+import FloatingCart from "@/components/customer/FloatingCart";
+import { useGuestCart } from "@/components/customer/guestCartStore";
 
 const MENU_ITEMS: MenuItemData[] = [
   {
@@ -64,8 +65,9 @@ const STATION_LABEL: Record<MenuItemData["stationId"], string> = {
 };
 
 export default function MenuPage() {
+  const router = useRouter();
   const [selectedItem, setSelectedItem] = useState<MenuItemData | null>(null);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const { cartItems, addItem, clearCart } = useGuestCart();
 
   const handleAddToCart = (selection: ModifierSelection) => {
     if (!selectedItem) return;
@@ -75,8 +77,7 @@ export default function MenuPage() {
       0
     );
 
-    const cartItem: CartItem = {
-      id: `${selectedItem.id}-${Date.now()}`,
+    addItem({
       itemId: selectedItem.id,
       name: selectedItem.name,
       basePrice: selectedItem.price,
@@ -84,10 +85,7 @@ export default function MenuPage() {
       toppings: selection.toppings.map((item) => item.label),
       sweetness: selection.sweetness,
       note: selection.note,
-      quantity: 1,
-    };
-
-    setCartItems((prev) => [...prev, cartItem]);
+    });
     setSelectedItem(null);
   };
 
@@ -95,7 +93,7 @@ export default function MenuPage() {
     if (cartItems.length === 0) return;
 
     alert("Đã gửi đơn xuống bếp thành công");
-    setCartItems([]);
+    clearCart();
   };
 
   return (
@@ -118,9 +116,23 @@ export default function MenuPage() {
               </p>
             </div>
 
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xl">
-              🍽️
-            </div>
+            <button
+              type="button"
+              onClick={() => router.push("/cashier")}
+              className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+            >
+              <ReceiptText size={18} aria-hidden="true" />
+              Thu ngân
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.push("/cart")}
+              className="ml-2 inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700"
+            >
+              <ShoppingCart size={18} aria-hidden="true" />
+              Giỏ hàng
+            </button>
           </div>
         </div>
       </header>

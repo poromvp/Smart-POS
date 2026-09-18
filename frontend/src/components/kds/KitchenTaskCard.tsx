@@ -127,4 +127,75 @@ export default function KitchenTaskCard({
           #{task.orderId}
         </span>
 
- 
+        <span
+          className={[
+            "rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide",
+            statusStyle.badge,
+          ].join(" ")}
+        >
+          {statusStyle.label}
+        </span>
+      </div>
+
+      {/* Product */}
+      <div className="mt-4">
+        <h3 className="text-xl font-bold leading-tight text-slate-900">
+          {task.productName}
+        </h3>
+
+        <p className="mt-2 min-h-[40px] text-sm leading-5 text-slate-600">
+          {task.modifiers || "Không có ghi chú"}
+        </p>
+      </div>
+
+      {/* Timer */}
+      <div className="mt-5 rounded-xl bg-white/80 p-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Thời gian chờ
+          </span>
+
+          <span
+            className={[
+              "font-mono text-2xl font-black tabular-nums",
+              statusStyle.timer,
+            ].join(" ")}
+          >
+            {elapsedTime}
+          </span>
+        </div>
+
+        <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+          <span>
+            Mục tiêu: {task.targetTime} phút
+          </span>
+
+          <span
+            className={
+              isOverTarget
+                ? "font-bold text-red-600"
+                : "font-medium"
+            }
+          >
+            {isOverTarget
+              ? `Trễ ${formatElapsedTime(
+                  Math.abs(remainingSeconds)
+                )}`
+              : `Còn ${formatElapsedTime(
+                  remainingSeconds
+                )}`}
+          </span>
+        </div>
+      </div>
+
+      {/* Action */}
+      <button
+        type="button"
+        onClick={() => onComplete(task.id)}
+        className="mt-4 min-h-12 w-full rounded-xl bg-slate-900 px-4 text-sm font-bold text-white transition hover:bg-slate-800 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
+      >
+        ✓ Hoàn thành
+      </button>
+    </article>
+  );
+}

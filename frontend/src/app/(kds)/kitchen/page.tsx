@@ -114,7 +114,10 @@ const STATIONS = [
 ];
 
 export default function KitchenPage() {
-  
+  const [tasks, setTasks] =
+    useState<KitchenTask[]>(
+      INITIAL_TASKS
+    );
 
   const [currentTime, setCurrentTime] =
     useState<number>(Date.now());

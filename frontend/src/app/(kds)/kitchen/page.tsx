@@ -182,3 +182,119 @@ export default function KitchenPage() {
                 SmartPOS
               </p>
 
+              <h1 className="text-xl font-black text-slate-900">
+                Điều phối bếp
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="hidden text-right sm:block">
+              <p className="text-xs text-slate-400">
+                Đang xử lý
+              </p>
+
+              <p className="font-bold text-slate-900">
+                {tasks.length} món
+              </p>
+            </div>
+
+            <div className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-emerald-100 px-3 text-sm font-black text-emerald-700">
+              LIVE
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* MAIN */}
+      <section className="h-[calc(100vh-4rem)] p-3 md:p-4 lg:p-5">
+        <div className="mx-auto h-full max-w-[1600px]">
+          <div className="grid h-full min-h-0 grid-cols-1 gap-4 md:grid-cols-3">
+            {STATIONS.map((station) => {
+              const stationTasks =
+                tasks.filter(
+                  (task) =>
+                    task.stationId ===
+                    station.id
+                );
+
+              return (
+                <section
+                  key={station.id}
+                  className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                >
+                  {/* Station header */}
+                  <div className="shrink-0 border-b border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-2xl">
+                          {station.icon}
+                        </div>
+
+                        <div>
+                          <h2 className="text-lg font-black text-slate-900">
+                            {station.title}
+                          </h2>
+
+                          <p className="text-xs text-slate-400">
+                            {station.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex h-9 min-w-9 items-center justify-center rounded-full bg-slate-900 px-2 text-sm font-black text-white">
+                        {
+                          taskCountByStation[
+                            station.id
+                          ]
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tasks */}
+                  <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
+                    {stationTasks.length === 0 ? (
+                      <div className="flex h-full min-h-48 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50">
+                        <div className="text-center">
+                          <div className="text-3xl">
+                            ✓
+                          </div>
+
+                          <p className="mt-2 font-bold text-slate-500">
+                            Không có món chờ
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            Khu vực đang rảnh
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {stationTasks.map(
+                          (task) => (
+                            <KitchenTaskCard
+                              key={task.id}
+                              task={task}
+                              currentTime={
+                                currentTime
+                              }
+                              onComplete={
+                                handleCompleteTask
+                              }
+                            />
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}

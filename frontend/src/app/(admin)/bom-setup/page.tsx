@@ -37,6 +37,13 @@ const INITIAL_INGREDIENTS: Ingredient[] = [
   },
 ];
 
+const PRODUCTS: Product[] = [
+  {
+    id: "product-001",
+    name: "Tô Ramen",
+    category: "Món chính",
+  },
+];
 
 const INITIAL_RECIPES: Record<string, RecipeItem[]> = {
   "product-001": [

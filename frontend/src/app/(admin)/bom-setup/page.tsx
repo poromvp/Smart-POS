@@ -16,15 +16,27 @@ interface Product {
   category: string;
 }
 
-
-
-const PRODUCTS: Product[] = [
+const INITIAL_INGREDIENTS: Ingredient[] = [
   {
-    id: "product-001",
-    name: "Tô Ramen",
-    category: "Món chính",
+    id: "ing-001",
+    name: "Mì",
+    unit: "g",
+    stock: 2500,
+  },
+  {
+    id: "ing-002",
+    name: "Thịt bò",
+    unit: "g",
+    stock: 5000,
+  },
+  {
+    id: "ing-003",
+    name: "Nước dùng",
+    unit: "ml",
+    stock: 10000,
   },
 ];
+
 
 const INITIAL_RECIPES: Record<string, RecipeItem[]> = {
   "product-001": [

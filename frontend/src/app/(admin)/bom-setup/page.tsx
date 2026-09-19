@@ -45,28 +45,7 @@ const PRODUCTS: Product[] = [
   },
 ];
 
-const INITIAL_RECIPES: Record<string, RecipeItem[]> = {
-  "product-001": [
-    {
-      ingredientId: "ing-001",
-      ingredientName: "Mì",
-      quantity: 200,
-      unit: "g",
-    },
-    {
-      ingredientId: "ing-002",
-      ingredientName: "Thịt bò",
-      quantity: 100,
-      unit: "g",
-    },
-    {
-      ingredientId: "ing-003",
-      ingredientName: "Nước dùng",
-      quantity: 500,
-      unit: "ml",
-    },
-  ],
-};
+
 
 export default function BomSetupPage() {
   const [selectedProductId, setSelectedProductId] =

@@ -16,26 +16,7 @@ interface Product {
   category: string;
 }
 
-const INITIAL_INGREDIENTS: Ingredient[] = [
-  {
-    id: "ing-001",
-    name: "Mì",
-    unit: "g",
-    stock: 2500,
-  },
-  {
-    id: "ing-002",
-    name: "Thịt bò",
-    unit: "g",
-    stock: 5000,
-  },
-  {
-    id: "ing-003",
-    name: "Nước dùng",
-    unit: "ml",
-    stock: 10000,
-  },
-];
+
 
 const PRODUCTS: Product[] = [
   {
@@ -45,7 +26,28 @@ const PRODUCTS: Product[] = [
   },
 ];
 
-
+const INITIAL_RECIPES: Record<string, RecipeItem[]> = {
+  "product-001": [
+    {
+      ingredientId: "ing-001",
+      ingredientName: "Mì",
+      quantity: 200,
+      unit: "g",
+    },
+    {
+      ingredientId: "ing-002",
+      ingredientName: "Thịt bò",
+      quantity: 100,
+      unit: "g",
+    },
+    {
+      ingredientId: "ing-003",
+      ingredientName: "Nước dùng",
+      quantity: 500,
+      unit: "ml",
+    },
+  ],
+};
 
 export default function BomSetupPage() {
   const [selectedProductId, setSelectedProductId] =

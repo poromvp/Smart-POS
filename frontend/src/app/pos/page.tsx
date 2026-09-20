@@ -1,1 +1,1 @@
-export { default } from "../(pos)/cashier/page";
+export { default } from "../cashier/page";

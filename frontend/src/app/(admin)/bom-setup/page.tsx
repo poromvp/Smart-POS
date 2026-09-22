@@ -72,7 +72,10 @@ export default function BomSetupPage() {
   const [selectedProductId, setSelectedProductId] =
     useState(PRODUCTS[0].id);
 
-  
+  const [recipes, setRecipes] =
+    useState<Record<string, RecipeItem[]>>(
+      INITIAL_RECIPES
+    );
 
   const [saved, setSaved] = useState(false);
 

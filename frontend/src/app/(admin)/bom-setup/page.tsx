@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
+import RecipeEditor, {
+  type RecipeItem,
+} from "@/components/admin/RecipeEditor";
 
+import IngredientList, {
+  type Ingredient,
+} from "@/components/admin/IngredientList";
 
 interface Product {
   id: string;
@@ -66,10 +72,7 @@ export default function BomSetupPage() {
   const [selectedProductId, setSelectedProductId] =
     useState(PRODUCTS[0].id);
 
-  const [recipes, setRecipes] =
-    useState<Record<string, RecipeItem[]>>(
-      INITIAL_RECIPES
-    );
+  
 
   const [saved, setSaved] = useState(false);
 

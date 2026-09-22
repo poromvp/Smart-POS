@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 
-import RecipeEditor, {
-  type RecipeItem,
-} from "@/components/admin/RecipeEditor";
 
-import IngredientList, {
-  type Ingredient,
-} from "@/components/admin/IngredientList";
 
 interface Product {
   id: string;

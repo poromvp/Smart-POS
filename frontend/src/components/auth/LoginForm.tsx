@@ -20,7 +20,7 @@ export default function LoginForm() {
 
     const result = await mockLogin({ email, password });
 
-    if (!result.ok) {
+    if (result.ok === false) {
       setError(result.message);
       setIsLoading(false);
       return;

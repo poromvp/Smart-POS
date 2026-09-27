@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ReceiptText, ShoppingCart } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 
 import MenuItem, {
   type MenuItemData,
@@ -116,23 +116,16 @@ export default function MenuPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => router.push("/cashier")}
-              className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
-            >
-              <ReceiptText size={18} aria-hidden="true" />
-              Thu ngân
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push("/cart")}
-              className="ml-2 inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700"
-            >
-              <ShoppingCart size={18} aria-hidden="true" />
-              Giỏ hàng
-            </button>
+            <div className="ml-auto flex justify-end">
+              <button
+                type="button"
+                onClick={() => router.push("/cart")}
+                className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700"
+              >
+                <ShoppingCart size={18} aria-hidden="true" />
+                Giỏ hàng
+              </button>
+            </div>
           </div>
         </div>
       </header>

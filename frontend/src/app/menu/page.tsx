@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShoppingCart } from "lucide-react";
+import { MapPin, ShoppingCart } from "lucide-react";
 
 import MenuItem, {
   type MenuItemData,
@@ -67,7 +67,7 @@ const STATION_LABEL: Record<MenuItemData["stationId"], string> = {
 export default function MenuPage() {
   const router = useRouter();
   const [selectedItem, setSelectedItem] = useState<MenuItemData | null>(null);
-  const { cartItems, addItem, clearCart } = useGuestCart();
+  const { cartItems, addItem } = useGuestCart();
 
   const handleAddToCart = (selection: ModifierSelection) => {
     if (!selectedItem) return;
@@ -89,13 +89,6 @@ export default function MenuPage() {
     setSelectedItem(null);
   };
 
-  const handleSubmitOrder = () => {
-    if (cartItems.length === 0) return;
-
-    alert("Đã gửi đơn xuống bếp thành công");
-    clearCart();
-  };
-
   return (
     <main className="min-h-screen bg-slate-50 pb-32">
       {/* Header */}
@@ -111,9 +104,10 @@ export default function MenuPage() {
                 Thực đơn
               </h1>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Bàn #A12 • Quét QR thành công
-              </p>
+              <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700">
+                <MapPin size={15} aria-hidden="true" />
+                Đang gọi món cho bàn A12
+              </div>
             </div>
 
             <div className="ml-auto flex justify-end">
@@ -123,7 +117,7 @@ export default function MenuPage() {
                 className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700"
               >
                 <ShoppingCart size={18} aria-hidden="true" />
-                Giỏ hàng
+                Xem giỏ
               </button>
             </div>
           </div>
@@ -173,7 +167,7 @@ export default function MenuPage() {
       {/* Floating Cart */}
       <FloatingCart
         items={cartItems}
-        onSubmitOrder={handleSubmitOrder}
+        onViewCart={() => router.push("/cart")}
       />
     </main>
   );

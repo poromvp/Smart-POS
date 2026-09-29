@@ -1,6 +1,9 @@
 "use client";
 
-import { formatElapsedTime } from "@/lib/utils/timeFormat";
+import {
+  formatElapsedTime,
+  getKdsTaskTiming,
+} from "@/lib/utils/timeFormat";
 
 export interface KitchenTask {
   id: string;
@@ -19,18 +22,8 @@ interface KitchenTaskCardProps {
   onComplete: (taskId: string) => void;
 }
 
-type TaskStatus = "safe" | "warning" | "danger";
-
-function getTaskStatus(elapsedSeconds: number): TaskStatus {
-  const elapsedMinutes = elapsedSeconds / 60;
-
-  if (elapsedMinutes < 5) return "safe";
-  if (elapsedMinutes <= 10) return "warning";
-  return "danger";
-}
-
 const STATUS_STYLES: Record<
-  TaskStatus,
+  "safe" | "warning" | "danger",
   {
     container: string;
     badge: string;
@@ -63,14 +56,15 @@ export default function KitchenTaskCard({
   currentTime,
   onComplete,
 }: KitchenTaskCardProps) {
-  const startTimestamp = new Date(task.startTime).getTime();
-  const elapsedSeconds = Math.max(0, Math.floor((currentTime - startTimestamp) / 1000));
-  const elapsedTime = formatElapsedTime(elapsedSeconds);
-  const taskStatus = getTaskStatus(elapsedSeconds);
+  const timing = getKdsTaskTiming(
+    task.startTime,
+    task.targetTime,
+    currentTime
+  );
+  const elapsedTime = formatElapsedTime(timing.totalSeconds);
+  const taskStatus = timing.status;
   const statusStyle = STATUS_STYLES[taskStatus];
-  const targetSeconds = task.targetTime * 60;
-  const remainingSeconds = targetSeconds - elapsedSeconds;
-  const isOverTarget = remainingSeconds < 0;
+  const isOverTarget = timing.remainingSeconds < 0;
   const quantity = task.quantity ?? 1;
 
   return (
@@ -102,7 +96,7 @@ export default function KitchenTaskCard({
         <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
           <span>Mục tiêu: {task.targetTime} phút</span>
           <span className={isOverTarget ? 'font-bold text-red-600' : 'font-medium'}>
-            {isOverTarget ? `Trễ ${formatElapsedTime(Math.abs(remainingSeconds))}` : `Còn ${formatElapsedTime(remainingSeconds)}`}
+            {isOverTarget ? `Trễ ${formatElapsedTime(Math.abs(timing.remainingSeconds))}` : `Còn ${formatElapsedTime(timing.remainingSeconds)}`}
           </span>
         </div>
       </div>

@@ -5,12 +5,12 @@ import type { CartItem } from "./guestCartStore";
 
 interface FloatingCartProps {
   items: CartItem[];
-  onSubmitOrder: () => void;
+  onViewCart: () => void;
 }
 
 export default function FloatingCart({
   items,
-  onSubmitOrder,
+  onViewCart,
 }: FloatingCartProps) {
   const [open, setOpen] = useState(false);
 
@@ -121,10 +121,10 @@ export default function FloatingCart({
 
               <button
                 type="button"
-                onClick={onSubmitOrder}
+                onClick={onViewCart}
                 className="min-h-14 w-full rounded-2xl bg-emerald-600 px-5 font-semibold text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98] hover:bg-emerald-700"
               >
-                Gửi đơn xuống bếp
+                Xem và xác nhận đơn
               </button>
             </div>
           </div>

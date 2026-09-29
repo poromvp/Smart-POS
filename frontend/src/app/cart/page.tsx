@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeft, CreditCard, MessageCircleMore, Minus, Plus, QrCode, ShoppingBag } from "lucide-react";
+import { ArrowLeft, CheckCircle2, LoaderCircle, MapPin, MessageCircleMore, Minus, Plus, ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useGuestCart } from "@/components/customer/guestCartStore";
 
 const formatCurrency = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`;
@@ -9,16 +10,51 @@ const formatCurrency = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`
 export default function GuestCartPage() {
   const router = useRouter();
   const { cartItems, totalPrice, updateNote, updateQuantity: changeQuantity, clearCart } = useGuestCart();
+  const [submissionState, setSubmissionState] = useState<"idle" | "submitting" | "success">("idle");
 
-  const handleCashPayment = () => {
-    alert("Đã chọn thanh toán tiền mặt");
-    clearCart();
+  const handleSubmitOrder = () => {
+    if (cartItems.length === 0 || submissionState !== "idle") return;
+
+    setSubmissionState("submitting");
+
+    // Local demo only: no order API or kitchen integration exists yet.
+    window.setTimeout(() => {
+      clearCart();
+      setSubmissionState("success");
+    }, 650);
   };
 
-  const handleVietQrPayment = () => {
-    alert("Đã chọn thanh toán VietQR");
-    clearCart();
+  const handleBackToMenu = () => {
+    setSubmissionState("idle");
+    router.push("/menu");
   };
+
+  if (submissionState === "success") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-slate-900">
+        <section className="w-full max-w-md rounded-3xl border border-emerald-100 bg-white p-7 text-center shadow-xl shadow-emerald-100/60">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+            <CheckCircle2 size={36} aria-hidden="true" />
+          </div>
+          <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Bàn A12</p>
+          <h1 className="mt-2 text-2xl font-extrabold">Đã ghi nhận yêu cầu gọi món</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Yêu cầu đã được lưu trong phiên bản demo trên thiết bị này.
+          </p>
+          <p className="mt-2 text-xs leading-5 text-slate-400">
+            Hệ thống hiện chưa kết nối gửi đơn trực tiếp đến bếp.
+          </p>
+          <button
+            type="button"
+            onClick={handleBackToMenu}
+            className="mt-7 min-h-14 w-full rounded-2xl bg-emerald-600 px-5 font-bold text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98] hover:bg-emerald-700"
+          >
+            Quay lại thực đơn
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white text-slate-900">
@@ -34,10 +70,8 @@ export default function GuestCartPage() {
           </button>
 
           <div className="text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">
-              Khách vãng lai
-            </p>
-            <h1 className="mt-1 text-xl font-bold text-slate-900">Giỏ hàng</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">Nhà hàng ABC</p>
+            <h1 className="mt-1 text-xl font-bold text-slate-900">Xác nhận đơn</h1>
           </div>
 
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-sm">
@@ -48,9 +82,13 @@ export default function GuestCartPage() {
 
       <section className="mx-auto max-w-2xl px-4 pb-36 pt-4">
         <div className="mb-4 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-700">
-            <MessageCircleMore size={16} className="text-emerald-600" aria-hidden="true" />
-            Ghi chú sẽ được lưu riêng cho từng món.
+          <div className="flex items-center gap-2 font-semibold text-slate-700">
+            <MapPin size={16} className="text-emerald-600" aria-hidden="true" />
+            Đơn này dành cho bàn A12
+          </div>
+          <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+            <MessageCircleMore size={15} className="text-emerald-600" aria-hidden="true" />
+            Ghi chú được lưu riêng cho từng món.
           </div>
         </div>
 
@@ -66,6 +104,8 @@ export default function GuestCartPage() {
                 <div className="min-w-0">
                   <h2 className="truncate text-base font-bold text-slate-900">{item.name}</h2>
                   <p className="mt-1 text-sm font-semibold text-emerald-600">{formatCurrency(item.basePrice + item.modifierTotal)}</p>
+                  {item.toppings.length > 0 && <p className="mt-1 text-xs text-slate-500">Topping: {item.toppings.join(", ")}</p>}
+                  <p className="mt-1 text-xs text-slate-500">Độ ngọt: {item.sweetness}</p>
                 </div>
 
                 <div className="flex items-center rounded-full border border-slate-200 bg-white shadow-sm">
@@ -115,25 +155,15 @@ export default function GuestCartPage() {
             <p className="text-2xl font-extrabold tracking-tight text-orange-600">{formatCurrency(totalPrice)}</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={handleCashPayment}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-4 text-sm font-bold text-white shadow-lg shadow-orange-200 transition active:scale-[0.98] hover:bg-orange-600"
-            >
-              <CreditCard size={18} aria-hidden="true" />
-              Thanh toán Tiền mặt
-            </button>
-
-            <button
-              type="button"
-              onClick={handleVietQrPayment}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98] hover:bg-emerald-700"
-            >
-              <QrCode size={18} aria-hidden="true" />
-              Thanh toán VietQR
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSubmitOrder}
+            disabled={cartItems.length === 0 || submissionState !== "idle"}
+            className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+          >
+            {submissionState === "submitting" ? <LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> : <ShoppingBag size={18} aria-hidden="true" />}
+            {submissionState === "submitting" ? "Đang ghi nhận..." : "Xác nhận gọi món"}
+          </button>
         </div>
       </footer>
     </main>

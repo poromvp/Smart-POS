@@ -1,0 +1,23 @@
+server:
+  port: 8083 # Port gợi ý: Identity (8081), Catalog-Inventory (8082), Sales (8083)
+
+spring:
+  application:
+    name: sales-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pos_sales_db
+    username: ${POSTGRES_USER:pos_admin}
+    password: ${POSTGRES_PASSWORD:pos_password123}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # Vì database đã được dựng sẵn bởi Docker script, dùng 'validate' để kiểm tra khớp schema
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC

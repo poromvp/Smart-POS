@@ -1,0 +1,28 @@
+services:
+  auth-db:
+    image: postgres:16-alpine
+    container_name: smart-pos-auth-db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth_db}
+      POSTGRES_USER: ${AUTH_DB_USER:-auth_user}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+
+    ports:
+      - "127.0.0.1:${AUTH_DB_PORT:-5433}:5432"
+
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  auth_db_data:

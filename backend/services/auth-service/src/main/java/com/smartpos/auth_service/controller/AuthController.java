@@ -2,10 +2,12 @@ package com.smartpos.auth_service.controller;
 
 import com.smartpos.auth_service.dto.request.LoginRequest;
 import com.smartpos.auth_service.dto.response.TokenResponse;
+import com.smartpos.auth_service.dto.response.UserResponse;
 import com.smartpos.auth_service.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,4 +24,14 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> me(
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(
+                authService.getCurrentUser(
+                        authentication.getName()
+                )
+        );
+    }
 }

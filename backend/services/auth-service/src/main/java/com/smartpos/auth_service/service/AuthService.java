@@ -49,4 +49,24 @@ public class AuthService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public UserResponse getCurrentUser(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() ->
+                   new UsernameNotFoundException(
+                           "User not found"
+                   )
+                );
+
+        return new UserResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getFullName(),
+                user.getPhone(),
+                user.isActive(),
+                user.getRole().getName(),
+                user.getCreatedAt()
+        );
+    }
+
 }

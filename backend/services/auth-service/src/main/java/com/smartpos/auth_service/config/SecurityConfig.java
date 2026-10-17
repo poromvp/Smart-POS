@@ -58,6 +58,7 @@ public class SecurityConfig {
                                 "api/auth/login",
                                 "api/auth/refresh"
                         ).permitAll()
+                        .requestMatchers("/api/auth/logout").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(

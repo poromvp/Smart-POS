@@ -28,28 +28,41 @@ const STATUS_STYLES: Record<
     container: string;
     badge: string;
     timer: string;
-    label: string;
   }
 > = {
   safe: {
-    container: "border-emerald-200 bg-emerald-50",
-    badge: "bg-emerald-100 text-emerald-700",
-    timer: "text-emerald-700",
-    label: "Bình thường",
+    container: "border-[var(--border)] bg-[var(--surface)]",
+    badge: "bg-stone-100 text-stone-600",
+    timer: "text-stone-700",
   },
   warning: {
-    container: "border-amber-300 bg-amber-50",
-    badge: "bg-amber-100 text-amber-700",
+    container: "border-amber-400 bg-[var(--warning-soft)]",
+    badge: "bg-amber-100 text-amber-800",
     timer: "text-amber-700",
-    label: "Sắp trễ",
   },
   danger: {
-    container: "border-red-300 bg-red-50 animate-pulse",
+    container: "border-red-400 bg-[var(--danger-soft)]",
     badge: "bg-red-100 text-red-700",
     timer: "text-red-700",
-    label: "Quá giờ",
   },
 };
+
+/**
+ * Determine the Vietnamese status label based on timing.
+ * - safe tasks that started recently (<2 min) → "Mới nhận"
+ * - safe tasks actively cooking → "Đang chế biến"
+ * - warning → "Chờ lâu"
+ * - danger → "Quá thời gian"
+ */
+function getStatusLabel(
+  status: "safe" | "warning" | "danger",
+  totalSeconds: number
+): string {
+  if (status === "danger") return "Quá thời gian";
+  if (status === "warning") return "Chờ lâu";
+  if (totalSeconds < 120) return "Mới nhận";
+  return "Đang chế biến";
+}
 
 export default function KitchenTaskCard({
   task,
@@ -64,49 +77,82 @@ export default function KitchenTaskCard({
   const elapsedTime = formatElapsedTime(timing.totalSeconds);
   const taskStatus = timing.status;
   const statusStyle = STATUS_STYLES[taskStatus];
-  const isOverTarget = timing.remainingSeconds < 0;
   const quantity = task.quantity ?? 1;
+  const statusLabel = getStatusLabel(taskStatus, timing.totalSeconds);
+  const isDanger = taskStatus === "danger";
 
   return (
-    <article className={['flex flex-col rounded-2xl border-2 p-3 shadow-sm transition', statusStyle.container].join(' ')}>
-      <div className="flex items-center justify-between gap-3">
-        <span className="rounded-lg bg-white/80 px-2 py-1 text-xs font-bold text-slate-800 shadow-sm">
-          #{task.orderId}
+    <article
+      className={[
+        "flex w-[280px] shrink-0 flex-col rounded-xl border-2 p-4 shadow-sm transition",
+        statusStyle.container,
+      ].join(" ")}
+    >
+      {/* Top row: Table name + Timer */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-extrabold text-stone-900">
+          Bàn {task.orderId}
         </span>
-        <span className={['rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide', statusStyle.badge].join(' ')}>
-          {statusStyle.label}
+        <span
+          className={[
+            "font-mono text-sm font-bold tabular-nums",
+            statusStyle.timer,
+          ].join(" ")}
+        >
+          {elapsedTime}
         </span>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <h3 className="text-lg font-bold leading-tight text-slate-900">{task.productName}</h3>
-        <span className="rounded-md bg-slate-900 px-2 py-1 text-[11px] font-bold text-white">
-          x{quantity}
+      {/* Status badge */}
+      <div className="mt-2">
+        <span
+          className={[
+            "inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold",
+            statusStyle.badge,
+          ].join(" ")}
+        >
+          {statusLabel}
         </span>
       </div>
 
-      <p className="mt-2 text-sm leading-5 text-slate-600">{task.modifiers || "Không có ghi chú"}</p>
+      {/* Divider */}
+      <div className="my-3 border-t border-stone-200/60" />
 
-      <div className="mt-3 rounded-xl bg-white/80 p-2.5">
-        <div className="flex items-center justify-between gap-2 text-[11px] uppercase tracking-wide text-slate-400">
-          <span>Thời gian</span>
-          <span className={['font-mono text-sm font-black tabular-nums', statusStyle.timer].join(' ')}>{elapsedTime}</span>
-        </div>
-
-        <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-          <span>Mục tiêu: {task.targetTime} phút</span>
-          <span className={isOverTarget ? 'font-bold text-red-600' : 'font-medium'}>
-            {isOverTarget ? `Trễ ${formatElapsedTime(Math.abs(timing.remainingSeconds))}` : `Còn ${formatElapsedTime(timing.remainingSeconds)}`}
+      {/* Checklist items */}
+      <div className="flex-1 space-y-2">
+        <label className="flex items-start gap-2 text-sm text-stone-800">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-stone-300 accent-[var(--brand)]"
+            readOnly
+          />
+          <span>
+            <span className="font-semibold">{quantity}×</span>{" "}
+            {task.productName}
           </span>
-        </div>
+        </label>
       </div>
 
+      {/* Notes */}
+      {task.modifiers && (
+        <p className="mt-3 rounded-lg bg-stone-50 px-3 py-2 text-xs leading-relaxed text-stone-500">
+          <span className="font-semibold text-stone-600">Ghi chú:</span>{" "}
+          {task.modifiers}
+        </p>
+      )}
+
+      {/* Action button */}
       <button
         type="button"
         onClick={() => onComplete(task.id)}
-        className="mt-3 min-h-10 w-full rounded-xl bg-slate-900 px-3 text-sm font-bold text-white transition hover:bg-slate-800 active:scale-[0.98]"
+        className={[
+          "mt-4 min-h-10 w-full rounded-lg px-3 text-sm font-bold transition active:scale-[0.98]",
+          isDanger
+            ? "bg-red-600 text-white hover:bg-red-700"
+            : "bg-[var(--brand)] text-white hover:bg-[#8f1d15]",
+        ].join(" ")}
       >
-        Hoàn thành
+        {isDanger ? "Ưu tiên trả món khẩn cấp" : "Hoàn thành toàn bộ"}
       </button>
     </article>
   );

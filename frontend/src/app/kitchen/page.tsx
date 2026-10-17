@@ -1,19 +1,11 @@
 "use client";
 
 import {
-  AlarmClockCheck,
-  ChevronRight,
-  Clock3,
   Flame,
-  LogOut,
-  Package,
   Salad,
-  Settings,
-  ShieldAlert,
   Soup,
-  UserRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import KitchenTaskCard, { type KitchenTask } from "@/components/kds/KitchenTaskCard";
 
@@ -100,40 +92,18 @@ const INITIAL_TASKS: KitchenTask[] = [
   },
 ];
 
-const STATION_META = {
-  hot: {
-    title: "Bếp nóng",
-    icon: Flame,
-    accent: "bg-rose-100 text-rose-600",
-    border: "border-rose-200",
-    soft: "bg-rose-50",
-  },
-  cold: {
-    title: "Bếp lạnh",
-    icon: Salad,
-    accent: "bg-cyan-100 text-cyan-600",
-    border: "border-cyan-200",
-    soft: "bg-cyan-50",
-  },
-  bar: {
-    title: "Pha chế",
-    icon: Soup,
-    accent: "bg-amber-100 text-amber-600",
-    border: "border-amber-200",
-    soft: "bg-amber-50",
-  },
-} as const;
+type StationId = "hot" | "cold" | "bar";
 
-const NAV_ITEMS = [
-  { id: "kitchen", label: "Điều phối bếp", icon: Flame, active: true },
-  { id: "history", label: "Lịch sử món", icon: Clock3 },
-  { id: "stock", label: "Tồn kho nguyên liệu", icon: Package },
-  { id: "settings", label: "Cài đặt", icon: Settings },
+const STATION_TABS: { id: StationId; label: string; icon: typeof Flame }[] = [
+  { id: "hot", label: "Bếp nóng", icon: Flame },
+  { id: "cold", label: "Đồ lạnh", icon: Salad },
+  { id: "bar", label: "Quầy bar", icon: Soup },
 ];
 
 export default function KitchenPage() {
   const [tasks, setTasks] = useState<KitchenTask[]>(INITIAL_TASKS);
   const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
+  const [activeStation, setActiveStation] = useState<StationId>("hot");
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -144,178 +114,130 @@ export default function KitchenPage() {
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
   };
 
-  const taskCountByStation = useMemo(
-    () => ({
-      hot: tasks.filter((task) => task.stationId === "hot").length,
-      cold: tasks.filter((task) => task.stationId === "cold").length,
-      bar: tasks.filter((task) => task.stationId === "bar").length,
-    }),
-    [tasks]
-  );
-
-  const overviewStats = [
-    {
-      label: "Tổng hóa đơn đang chờ",
-      value: "18",
-      delta: "+3 so với giờ trước",
-      icon: AlarmClockCheck,
-      tone: "text-orange-600 bg-orange-50",
-    },
-    {
-      label: "Tổng số món ăn",
-      value: "126",
-      delta: "+12 món mới",
-      icon: Package,
-      tone: "text-violet-600 bg-violet-50",
-    },
-    {
-      label: "Số món báo động đỏ",
-      value: "05",
-      delta: "Cần ưu tiên xử lý",
-      icon: ShieldAlert,
-      tone: "text-rose-600 bg-rose-50",
-    },
-    {
-      label: "Thời gian chờ trung bình",
-      value: "08:42",
-      delta: "Dưới ngưỡng 10 phút",
-      icon: Clock3,
-      tone: "text-emerald-600 bg-emerald-50",
-    },
-  ];
+  const filteredTasks = tasks.filter((t) => t.stationId === activeStation);
 
   return (
-    <main className="flex min-h-screen bg-slate-100 text-slate-900">
-      <aside className="flex h-screen w-72 shrink-0 flex-col border-r border-slate-200 bg-white/90 px-5 py-6 shadow-sm backdrop-blur-sm">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <main className="flex min-h-screen flex-col bg-[var(--background)] text-stone-900">
+      {/* ── Header ── */}
+      <header className="border-b border-[var(--border)] bg-[var(--surface)] px-5 py-4 shadow-sm lg:px-7">
+        <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-400 text-lg font-bold text-white shadow-sm">
-              <UserRound size={24} />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
-                Bếp trưởng
-              </p>
-              <h2 className="mt-1 text-lg font-bold text-slate-900">
-                Nguyễn Hoàng Lập
-              </h2>
-            </div>
-          </div>
-        </div>
-
-        <nav className="mt-8 space-y-2">
-          {NAV_ITEMS.map(({ id, label, icon: Icon, active }) => (
-            <button
-              key={id}
-              type="button"
-              className={[
-                "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition",
-                active
-                  ? "border-orange-200 bg-orange-50 text-orange-700 shadow-sm"
-                  : "border-transparent bg-white text-slate-600 hover:border-slate-200 hover:bg-slate-50",
-              ].join(" ")}
-            >
-              <span className="flex items-center gap-3">
-                <span
-                  className={
-                    active
-                      ? "rounded-lg bg-orange-100 p-2 text-orange-600"
-                      : "rounded-lg bg-slate-100 p-2 text-slate-500"
-                  }
-                >
-                  <Icon size={18} />
-                </span>
-                <span className="text-sm font-semibold">{label}</span>
-              </span>
-              <ChevronRight size={16} className={active ? "text-orange-500" : "text-slate-400"} />
-            </button>
-          ))}
-        </nav>
-
-        <div className="mt-auto pt-6">
-          <button
-            type="button"
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white"
-          >
-            <LogOut size={18} />
-            Đăng xuất
-          </button>
-        </div>
-      </aside>
-
-      <section className="flex-1 overflow-hidden p-5 lg:p-6">
-        <div className="flex h-full flex-col">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {overviewStats.map(({ label, value, delta, icon: Icon, tone }) => (
-              <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">{label}</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">{value}</p>
-                  </div>
-                  <span className={['flex h-11 w-11 items-center justify-center rounded-xl', tone].join(' ')}>
-                    <Icon size={20} />
-                  </span>
-                </div>
-                <p className="mt-3 text-xs font-medium text-slate-500">{delta}</p>
-              </div>
-            ))}
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--brand)] text-white shadow-sm">
+              <Flame size={20} />
+            </span>
+            <h1 className="text-xl font-extrabold text-stone-900">
+              Điều phối bếp
+            </h1>
           </div>
 
-          <div className="mt-6 grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-3">
-            {(Object.entries(STATION_META) as [keyof typeof STATION_META, (typeof STATION_META)[keyof typeof STATION_META]][]).map(
-              ([stationId, meta]) => {
-                const stationTasks = tasks.filter((task) => task.stationId === stationId);
-                const Icon = meta.icon;
+          <div className="flex items-center gap-2 text-sm text-stone-500">
+            <span>
+              Tổng đơn đang chờ:{" "}
+              <span className="font-bold text-stone-800">{tasks.length} món</span>
+            </span>
+            <span className="text-stone-300">|</span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Đã kết nối
+            </span>
+          </div>
+        </div>
+      </header>
 
-                return (
-                  <section
-                    key={stationId}
-                    className={['flex min-h-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm', meta.border].join(' ')}
+      {/* ── Station tabs ── */}
+      <nav className="border-b border-[var(--border)] bg-[var(--surface)] px-5 lg:px-7">
+        <div className="mx-auto flex max-w-[1800px] gap-1">
+          {STATION_TABS.map(({ id, label, icon: Icon }) => {
+            const isActive = activeStation === id;
+            const count = tasks.filter((t) => t.stationId === id).length;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveStation(id)}
+                className={[
+                  "relative flex items-center gap-2 px-5 py-3 text-sm font-semibold transition",
+                  isActive
+                    ? "text-[var(--brand)]"
+                    : "text-stone-500 hover:text-stone-700",
+                ].join(" ")}
+              >
+                <Icon size={16} />
+                {label}
+                {count > 0 && (
+                  <span
+                    className={[
+                      "ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold",
+                      isActive
+                        ? "bg-[var(--brand)] text-white"
+                        : "bg-stone-200 text-stone-600",
+                    ].join(" ")}
                   >
-                    <header className={['flex items-center justify-between border-b border-slate-200 px-4 py-3', meta.soft].join(' ')}>
-                      <div className="flex items-center gap-3">
-                        <span className={['flex h-9 w-9 items-center justify-center rounded-xl', meta.accent].join(' ')}>
-                          <Icon size={18} />
-                        </span>
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-900">{meta.title}</h3>
-                          <p className="text-[11px] text-slate-500">{stationTasks.length} đơn đang chờ</p>
-                        </div>
-                      </div>
-                      <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-900 px-2 text-xs font-bold text-white">
-                        {stationTasks.length}
-                      </span>
-                    </header>
+                    {count}
+                  </span>
+                )}
+                {/* Active tab indicator */}
+                {isActive && (
+                  <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[var(--brand)]" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
-                    <div className="flex-1 overflow-y-auto p-3">
-                      {stationTasks.length === 0 ? (
-                        <div className="flex h-full min-h-40 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 text-center">
-                          <div>
-                            <div className="text-2xl">✓</div>
-                            <p className="mt-2 text-sm font-semibold text-slate-500">Không có món chờ</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {stationTasks.map((task) => (
-                            <KitchenTaskCard
-                              key={task.id}
-                              task={task}
-                              currentTime={currentTime}
-                              onComplete={handleCompleteTask}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </section>
-                );
-              }
-            )}
-          </div>
+      {/* ── Cards area ── */}
+      <section className="flex-1 overflow-hidden px-5 py-5 lg:px-7">
+        <div className="mx-auto max-w-[1800px]">
+          {filteredTasks.length === 0 ? (
+            <div className="flex h-64 items-center justify-center rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 text-center">
+              <div>
+                <div className="text-3xl">✓</div>
+                <p className="mt-2 text-sm font-semibold text-stone-500">
+                  Không có món chờ tại trạm này
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {filteredTasks.map((task) => (
+                <KitchenTaskCard
+                  key={task.id}
+                  task={task}
+                  currentTime={currentTime}
+                  onComplete={handleCompleteTask}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
+
+      {/* ── Footer legend ── */}
+      <footer className="border-t border-[var(--border)] bg-[var(--surface)] px-5 py-3 lg:px-7">
+        <div className="mx-auto flex max-w-[1800px] items-center gap-2 text-xs text-stone-500">
+          <span className="font-semibold text-stone-600">Trạng thái:</span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-stone-300" />
+            Mới nhận
+          </span>
+          <span className="text-stone-300">·</span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-blue-400" />
+            Đang chế biến
+          </span>
+          <span className="text-stone-300">·</span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+            Chờ lâu
+          </span>
+          <span className="text-stone-300">·</span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+            Quá thời gian
+          </span>
+        </div>
+      </footer>
     </main>
   );
 }

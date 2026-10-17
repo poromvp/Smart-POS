@@ -24,15 +24,15 @@ const STATION_CONFIG: Record<
 > = {
   hot: {
     label: "Món nóng",
-    className: "bg-orange-100 text-orange-700",
+    className: "bg-red-50 text-[#a13223]",
   },
   cold: {
     label: "Đồ lạnh",
-    className: "bg-sky-100 text-sky-700",
+    className: "bg-orange-50 text-orange-700",
   },
   bar: {
     label: "Đồ uống",
-    className: "bg-emerald-100 text-emerald-700",
+    className: "bg-amber-50 text-amber-700",
   },
 };
 
@@ -43,41 +43,39 @@ export default function MenuItem({ item, onClick }: MenuItemProps) {
     <button
       type="button"
       onClick={onClick}
-      className="group w-full overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-slate-200 transition active:scale-[0.98] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      className="group flex w-full items-center gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--surface)] p-3 text-left shadow-sm transition hover:border-[var(--border)] hover:shadow-md active:scale-[0.99]"
     >
-      {/* Image */}
-      <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
+      {/* Square thumbnail */}
+      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-stone-100">
         <img
           src={item.image}
           alt={item.name}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
         />
 
+        {/* Subtle station badge */}
         <div
-          className={`absolute left-3 top-3 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm ${station.className}`}
+          className={`absolute bottom-1 left-1 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-tight ${station.className}`}
         >
           {station.label}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="line-clamp-2 text-base font-semibold text-slate-900">
-              {item.name}
-            </h2>
+      {/* Name + Price */}
+      <div className="min-w-0 flex-1">
+        <h2 className="line-clamp-2 text-sm font-bold text-[var(--foreground)]">
+          {item.name}
+        </h2>
 
-            <p className="mt-2 text-lg font-bold text-emerald-600">
-              {item.price.toLocaleString("vi-VN")}₫
-            </p>
-          </div>
-
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xl text-white shadow-sm">
-            +
-          </span>
-        </div>
+        <p className="mt-1 text-sm font-extrabold text-[var(--brand)]">
+          {item.price.toLocaleString("vi-VN")}₫
+        </p>
       </div>
+
+      {/* "+" button */}
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand)] text-lg font-bold text-white shadow-sm transition group-hover:bg-[var(--brand-dark)]">
+        +
+      </span>
     </button>
   );
 }

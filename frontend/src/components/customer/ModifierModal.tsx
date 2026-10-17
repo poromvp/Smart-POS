@@ -94,7 +94,7 @@ export default function ModifierModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -105,30 +105,30 @@ export default function ModifierModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="modifier-title"
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-[#fffdf9] shadow-2xl sm:rounded-2xl"
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 border-b border-slate-100 bg-white px-5 py-4">
-          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
+        <div className="sticky top-0 z-10 border-b border-orange-100 bg-[#fffdf9] px-5 py-4">
+          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-orange-200 sm:hidden" />
 
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2
                 id="modifier-title"
-                className="text-xl font-bold text-slate-900"
+                className="text-xl font-extrabold text-stone-900"
               >
                 {item.name}
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                Tùy chỉnh món theo sở thích
+                Chọn tùy chọn trước khi thêm vào giỏ
               </p>
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl text-slate-600 transition hover:bg-slate-200"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-xl text-stone-600 transition hover:bg-orange-100"
               aria-label="Đóng"
             >
               ×
@@ -158,8 +158,8 @@ export default function ModifierModal({
                     key={topping.id}
                     className={`flex min-h-14 cursor-pointer items-center justify-between rounded-xl border p-3 transition ${
                       checked
-                        ? "border-emerald-500 bg-emerald-50"
-                        : "border-slate-200 bg-white"
+                ? "border-[#b42318] bg-red-50"
+                        : "border-orange-100 bg-white"
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -167,7 +167,7 @@ export default function ModifierModal({
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleTopping(topping.id)}
-                        className="h-5 w-5 accent-emerald-600"
+                        className="h-5 w-5 accent-[#b42318]"
                       />
 
                       <span className="text-sm font-medium text-slate-800">
@@ -175,7 +175,7 @@ export default function ModifierModal({
                       </span>
                     </div>
 
-                    <span className="text-sm font-semibold text-emerald-600">
+                    <span className="text-sm font-semibold text-[#b42318]">
                       +{topping.price.toLocaleString("vi-VN")}₫
                     </span>
                   </label>
@@ -201,8 +201,8 @@ export default function ModifierModal({
                     key={level}
                     className={`flex min-h-12 cursor-pointer items-center rounded-xl border px-3 transition ${
                       active
-                        ? "border-emerald-500 bg-emerald-50"
-                        : "border-slate-200"
+                        ? "border-[#b42318] bg-red-50"
+                        : "border-orange-100 bg-white"
                     }`}
                   >
                     <input
@@ -211,7 +211,7 @@ export default function ModifierModal({
                       value={level}
                       checked={active}
                       onChange={(event) => setSweetness(event.target.value)}
-                      className="h-4 w-4 accent-emerald-600"
+                      className="h-4 w-4 accent-[#b42318]"
                     />
 
                     <span className="ml-2 text-sm font-medium text-slate-800">
@@ -240,17 +240,17 @@ export default function ModifierModal({
               onChange={(event) => setNote(event.target.value)}
               placeholder="Nhập ghi chú cho bếp..."
               rows={3}
-              className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              className="w-full resize-none rounded-xl border border-orange-100 bg-white px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#b42318] focus:ring-2 focus:ring-red-100"
             />
           </section>
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 border-t border-slate-100 bg-white p-4">
+        <div className="sticky bottom-0 border-t border-orange-100 bg-[#fffdf9] p-4">
           <button
             type="button"
             onClick={handleAdd}
-            className="flex min-h-14 w-full items-center justify-between rounded-2xl bg-emerald-600 px-5 text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98] hover:bg-emerald-700"
+            className="flex min-h-14 w-full items-center justify-between rounded-xl bg-[#b42318] px-5 text-white shadow-lg shadow-red-200 transition active:scale-[0.98] hover:bg-[#8f1d15]"
           >
             <span className="font-semibold">Thêm vào giỏ</span>
 

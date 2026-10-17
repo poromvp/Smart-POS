@@ -31,20 +31,20 @@ export default function FloatingCart({
 
   return (
     <>
-      {/* Expanded cart */}
+      {/* Expanded cart drawer */}
       {open && (
-        <div className="fixed inset-0 z-40 bg-slate-900/40">
-          <div className="absolute inset-x-0 bottom-0 mx-auto max-h-[75vh] max-w-2xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 border-b border-slate-100 bg-white px-5 py-4">
-              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200" />
+        <div className="fixed inset-0 z-40 bg-stone-950/45">
+          <div className="absolute inset-x-0 bottom-0 mx-auto max-h-[75vh] max-w-2xl overflow-y-auto rounded-t-2xl bg-[var(--surface-warm)] shadow-2xl">
+            <div className="sticky top-0 z-10 border-b border-[var(--border-light)] bg-[var(--surface-warm)] px-5 py-4">
+              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-orange-200" />
 
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">
+                  <h2 className="text-xl font-bold text-[var(--foreground)]">
                     Giỏ hàng
                   </h2>
 
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-[var(--muted)]">
                     {totalQuantity} món
                   </p>
                 </div>
@@ -52,7 +52,7 @@ export default function FloatingCart({
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-xl text-slate-600"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--brand-soft)] text-xl text-stone-600"
                   aria-label="Đóng giỏ hàng"
                 >
                   ×
@@ -68,37 +68,37 @@ export default function FloatingCart({
                 return (
                   <div
                     key={item.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    className="rounded-xl border border-[var(--border-light)] bg-[var(--surface)] p-4"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-slate-900">
+                        <h3 className="font-semibold text-[var(--foreground)]">
                           {item.name}
                         </h3>
 
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm text-[var(--muted)]">
                           SL: {item.quantity}
                         </p>
 
                         {item.toppings.length > 0 && (
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="mt-1 text-xs text-[var(--muted)]">
                             Topping: {item.toppings.join(", ")}
                           </p>
                         )}
 
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-[var(--muted)]">
                           Độ ngọt: {item.sweetness}
                         </p>
 
                         {item.note && (
-                          <p className="mt-1 text-xs italic text-slate-500">
+                          <p className="mt-1 text-xs italic text-[var(--muted)]">
                             Ghi chú: {item.note}
                           </p>
                         )}
                       </div>
 
                       <div className="shrink-0 text-right">
-                        <p className="font-bold text-emerald-600">
+                        <p className="font-bold text-[var(--brand)]">
                           {itemPrice.toLocaleString("vi-VN")}₫
                         </p>
                       </div>
@@ -108,13 +108,13 @@ export default function FloatingCart({
               })}
             </div>
 
-            <div className="sticky bottom-0 border-t border-slate-100 bg-white p-4">
+            <div className="sticky bottom-0 border-t border-[var(--border-light)] bg-[var(--surface-warm)] p-4">
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-600">
+                <span className="text-sm font-medium text-[var(--muted)]">
                   Tổng cộng
                 </span>
 
-                <span className="text-xl font-bold text-slate-900">
+                <span className="text-xl font-bold text-[var(--foreground)]">
                   {totalPrice.toLocaleString("vi-VN")}₫
                 </span>
               </div>
@@ -122,7 +122,7 @@ export default function FloatingCart({
               <button
                 type="button"
                 onClick={onViewCart}
-                className="min-h-14 w-full rounded-2xl bg-emerald-600 px-5 font-semibold text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98] hover:bg-emerald-700"
+                className="min-h-14 w-full rounded-xl bg-[var(--brand)] px-5 font-semibold text-white shadow-lg shadow-red-200 transition active:scale-[0.98] hover:bg-[var(--brand-dark)]"
               >
                 Xem và xác nhận đơn
               </button>
@@ -131,36 +131,16 @@ export default function FloatingCart({
         </div>
       )}
 
-      {/* Floating button */}
+      {/* Sticky bottom bar */}
       {!open && (
         <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-2xl px-4 pb-4">
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="flex min-h-14 w-full items-center justify-between rounded-2xl bg-slate-900 px-5 text-white shadow-2xl shadow-slate-400/40 transition active:scale-[0.98] hover:bg-slate-800"
+            className="flex min-h-14 w-full items-center justify-center rounded-xl bg-[var(--brand)] px-5 text-white shadow-xl shadow-red-200/60 transition active:scale-[0.98] hover:bg-[var(--brand-dark)]"
           >
-            <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-xl">
-                🛒
-
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
-                  {totalQuantity}
-                </span>
-              </div>
-
-              <div className="text-left">
-                <p className="text-xs text-slate-400">
-                  Giỏ hàng
-                </p>
-
-                <p className="font-semibold">
-                  {totalQuantity} món
-                </p>
-              </div>
-            </div>
-
-            <span className="text-lg font-bold">
-              {totalPrice.toLocaleString("vi-VN")}₫
+            <span className="text-base font-semibold">
+              Xem giỏ hàng ({totalQuantity} món) · {totalPrice.toLocaleString("vi-VN")}₫
             </span>
           </button>
         </div>

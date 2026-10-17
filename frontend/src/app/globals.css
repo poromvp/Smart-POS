@@ -1,8 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  /* Brand palette – Mì Cay restaurant */
+  --background: #fffaf5;
+  --foreground: #292524;
+  --brand: #b42318;
+  --brand-dark: #8f1d15;
+  --brand-soft: #fff0e8;
+  --brand-light: #fde8e4;
+
+  /* Semantic */
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+
+  /* Surfaces & text */
+  --surface: #ffffff;
+  --surface-warm: #fffdf9;
+  --border: #fed7aa;
+  --border-light: #ffedd5;
+  --muted: #78716c;
+  --muted-light: #a8a29e;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(120,53,15,0.06);
+  --shadow-md: 0 4px 12px rgba(120,53,15,0.08);
+  --shadow-lg: 0 8px 30px rgba(120,53,15,0.10);
 }
 
 * {
@@ -18,7 +50,7 @@ body {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
 a {
@@ -27,6 +59,16 @@ a {
 }
 
 button,
-input {
+input,
+textarea,
+select {
   font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }

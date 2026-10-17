@@ -87,6 +87,7 @@ export default function KitchenTaskCard({
         "flex w-[280px] shrink-0 flex-col rounded-xl border-2 p-4 shadow-sm transition",
         statusStyle.container,
       ].join(" ")}
+      suppressHydrationWarning
     >
       {/* Top row: Table name + Timer */}
       <div className="flex items-center justify-between gap-2">
@@ -98,6 +99,7 @@ export default function KitchenTaskCard({
             "font-mono text-sm font-bold tabular-nums",
             statusStyle.timer,
           ].join(" ")}
+          suppressHydrationWarning
         >
           {elapsedTime}
         </span>
@@ -110,6 +112,7 @@ export default function KitchenTaskCard({
             "inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold",
             statusStyle.badge,
           ].join(" ")}
+          suppressHydrationWarning
         >
           {statusLabel}
         </span>
@@ -123,7 +126,7 @@ export default function KitchenTaskCard({
         <label className="flex items-start gap-2 text-sm text-stone-800">
           <input
             type="checkbox"
-            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-stone-300 accent-[var(--brand)]"
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-stone-300 accent-(--brand)"
             readOnly
           />
           <span>
@@ -145,11 +148,12 @@ export default function KitchenTaskCard({
       <button
         type="button"
         onClick={() => onComplete(task.id)}
+        suppressHydrationWarning
         className={[
           "mt-4 min-h-10 w-full rounded-lg px-3 text-sm font-bold transition active:scale-[0.98]",
           isDanger
             ? "bg-red-600 text-white hover:bg-red-700"
-            : "bg-[var(--brand)] text-white hover:bg-[#8f1d15]",
+            : "bg-(--brand) text-white hover:bg-[#8f1d15]",
         ].join(" ")}
       >
         {isDanger ? "Ưu tiên trả món khẩn cấp" : "Hoàn thành toàn bộ"}

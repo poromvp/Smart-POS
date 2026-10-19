@@ -8,6 +8,7 @@ import { Store, Building2, UserCheck, LogOut, LayoutGrid } from "lucide-react";
 interface TopHeaderProps {
   title: string;
   branchName?: string;
+  userName?: string;
   userLabel?: string;
   actionLabel?: string;
   showPortalLink?: boolean;
@@ -18,12 +19,14 @@ interface TopHeaderProps {
 export default function TopHeader({
   title,
   branchName,
-  userLabel = "Người dùng",
+  userName = "Người dùng",
+  userLabel,
   actionLabel = "Đăng xuất",
   showPortalLink = false,
   rightContent,
   onActionClick,
 }: TopHeaderProps) {
+  const displayUser = userLabel || userName;
   const router = useRouter();
 
   const handleAction = () => {
@@ -79,7 +82,7 @@ export default function TopHeader({
         ) : (
           <div className="hidden md:flex items-center gap-1.5 text-gray-700 font-medium">
             <UserCheck className="w-4 h-4 text-orange-600" />
-            <span>{userLabel}</span>
+            <span>{displayUser}</span>
           </div>
         )}
 

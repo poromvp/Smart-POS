@@ -1,13 +1,13 @@
 "use client";
 
-import {
-  Flame,
-  Salad,
-  Soup,
-} from "lucide-react";
+import { Flame, Salad, Soup } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import KitchenTaskCard, { type KitchenTask } from "@/components/kds/KitchenTaskCard";
+import TopHeader from "@/components/layout/TopHeader";
+import WorkspaceSidebar from "@/components/layout/WorkspaceSidebar";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const INITIAL_TASKS: KitchenTask[] = [
   {
@@ -104,6 +104,7 @@ export default function KdsPage() {
   const [tasks, setTasks] = useState<KitchenTask[]>(INITIAL_TASKS);
   const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
   const [activeStation, setActiveStation] = useState<StationId>("hot");
+  const toast = useToast();
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -111,134 +112,118 @@ export default function KdsPage() {
   }, []);
 
   const handleCompleteTask = (taskId: string) => {
+    const completedItem = tasks.find((t) => t.id === taskId);
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
+
+    if (completedItem) {
+      toast.success(
+        `Đã hoàn tất: ${completedItem.productName}`,
+        `Đơn ${completedItem.orderId} (${completedItem.quantity} phần) đã sẵn sàng phục vụ.`
+      );
+    }
   };
 
   const filteredTasks = tasks.filter((t) => t.stationId === activeStation);
 
   return (
-    <main className="flex min-h-screen flex-col bg-(--background) text-stone-900">
-      {/* ── Header ── */}
-      <header className="border-b border-(--border) bg-(--surface) px-5 py-4 shadow-sm lg:px-7">
-        <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-(--brand) text-white shadow-sm">
-              <Flame size={20} />
+    <div className="flex min-h-screen flex-col bg-gray-50 text-stone-900">
+      <TopHeader
+        title="Điều phối bếp (KDS)"
+        userName="Bếp trưởng"
+        rightContent={
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-stone-500">
+              Đang chờ:{" "}
+              <strong className="text-orange-600 font-bold">
+                {tasks.length} món
+              </strong>
             </span>
-            <h1 className="text-xl font-extrabold text-stone-900">
-              Điều phối bếp
-            </h1>
+            <StatusBadge label="Đã kết nối" variant="success" />
           </div>
+        }
+      />
 
-          <div className="flex items-center gap-2 text-sm text-stone-500">
-            <span>
-              Tổng đơn đang chờ:{" "}
-              <span className="font-bold text-stone-800">{tasks.length} món</span>
-            </span>
-            <span className="text-stone-300">|</span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Đã kết nối
-            </span>
-          </div>
-        </div>
-      </header>
+      <div className="flex flex-1 min-h-0">
+        <WorkspaceSidebar defaultCollapsed={true} />
 
-      {/* ── Station tabs ── */}
-      <nav className="border-b border-(--border) bg-(--surface) px-5 lg:px-7">
-        <div className="mx-auto flex max-w-[1800px] gap-1">
-          {STATION_TABS.map(({ id, label, icon: Icon }) => {
-            const isActive = activeStation === id;
-            const count = tasks.filter((t) => t.stationId === id).length;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActiveStation(id)}
-                className={[
-                  "relative flex items-center gap-2 px-5 py-3 text-sm font-semibold transition",
-                  isActive
-                    ? "text-(--brand)"
-                    : "text-stone-500 hover:text-stone-700",
-                ].join(" ")}
-              >
-                <Icon size={16} />
-                {label}
-                {count > 0 && (
-                  <span
+        <main className="flex flex-1 flex-col min-w-0">
+          <nav className="border-b border-gray-200 bg-white px-5 lg:px-7">
+            <div className="mx-auto flex max-w-[1800px] gap-1">
+              {STATION_TABS.map(({ id, label, icon: Icon }) => {
+                const isActive = activeStation === id;
+                const count = tasks.filter((t) => t.stationId === id).length;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveStation(id)}
                     className={[
-                      "ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold",
+                      "relative flex items-center gap-2 px-5 py-3.5 text-sm font-semibold transition cursor-pointer",
                       isActive
-                        ? "bg-(--brand) text-white"
-                        : "bg-stone-200 text-stone-600",
+                        ? "text-orange-600"
+                        : "text-stone-500 hover:text-stone-800",
                     ].join(" ")}
                   >
-                    {count}
-                  </span>
-                )}
-                {/* Active tab indicator */}
-                {isActive && (
-                  <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-(--brand)" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* ── Cards area ── */}
-      <section className="flex-1 overflow-hidden px-5 py-5 lg:px-7">
-        <div className="mx-auto max-w-[1800px]">
-          {filteredTasks.length === 0 ? (
-            <div className="flex h-64 items-center justify-center rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 text-center">
-              <div>
-                <div className="text-3xl">✓</div>
-                <p className="mt-2 text-sm font-semibold text-stone-500">
-                  Không có món chờ tại trạm này
-                </p>
-              </div>
+                    <Icon size={16} />
+                    {label}
+                    {count > 0 && (
+                      <span
+                        className={[
+                          "ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold",
+                          isActive
+                            ? "bg-orange-600 text-white"
+                            : "bg-stone-200 text-stone-600",
+                        ].join(" ")}
+                      >
+                        {count}
+                      </span>
+                    )}
+                    {isActive && (
+                      <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-orange-600" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          ) : (
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {filteredTasks.map((task) => (
-                <KitchenTaskCard
-                  key={task.id}
-                  task={task}
-                  currentTime={currentTime}
-                  onComplete={handleCompleteTask}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+          </nav>
 
-      {/* ── Footer legend ── */}
-      <footer className="border-t border-(--border) bg-(--surface) px-5 py-3 lg:px-7">
-        <div className="mx-auto flex max-w-[1800px] items-center gap-2 text-xs text-stone-500">
-          <span className="font-semibold text-stone-600">Trạng thái:</span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-stone-300" />
-            Mới nhận
-          </span>
-          <span className="text-stone-300">·</span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-blue-400" />
-            Đang chế biến
-          </span>
-          <span className="text-stone-300">·</span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-            Chờ lâu
-          </span>
-          <span className="text-stone-300">·</span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-            Quá thời gian
-          </span>
-        </div>
-      </footer>
-    </main>
+          <section className="flex-1 overflow-hidden px-5 py-5 lg:px-7">
+            <div className="mx-auto max-w-[1800px]">
+              {filteredTasks.length === 0 ? (
+                <div className="flex h-64 items-center justify-center rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/30 text-center">
+                  <div>
+                    <div className="text-3xl text-orange-500 font-bold">✓</div>
+                    <p className="mt-2 text-sm font-semibold text-stone-600">
+                      Không có món chờ tại trạm này
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-4 overflow-x-auto pb-4">
+                  {filteredTasks.map((task) => (
+                    <KitchenTaskCard
+                      key={task.id}
+                      task={task}
+                      currentTime={currentTime}
+                      onComplete={handleCompleteTask}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <footer className="border-t border-gray-200 bg-white px-5 py-3 lg:px-7">
+            <div className="mx-auto flex flex-wrap max-w-[1800px] items-center gap-3 text-xs text-stone-500">
+              <span className="font-semibold text-stone-700">Trạng thái:</span>
+              <StatusBadge label="Mới nhận" variant="neutral" />
+              <StatusBadge label="Đang chế biến" variant="serving" />
+              <StatusBadge label="Chờ lâu" variant="pending" />
+              <StatusBadge label="Quá thời gian" variant="danger" />
+            </div>
+          </footer>
+        </main>
+      </div>
+    </div>
   );
 }
-

@@ -1,34 +1,22 @@
-import type { ReactElement, ReactNode } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata } from "next";
 import "./globals.css";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata = {
-  title: "Smart POS & KDS",
-  description: "Màn hình quản lý bán hàng cho quán Mì Cay",
+export const metadata: Metadata = {
+  title: "SmartPOS - Hệ thống Quản lý Nhà hàng",
+  description: "Giải pháp quản lý bán hàng và vận hành đa chi nhánh",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: ReactNode;
-}>): ReactElement {
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html
-      lang="vi"
-      data-scroll-behavior="smooth"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="vi">
+      <body className="antialiased bg-gray-50 text-gray-900">
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

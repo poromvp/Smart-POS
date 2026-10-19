@@ -9,49 +9,86 @@ import {
   Package,
   Users,
   LogOut,
+  ChevronRight,
 } from "lucide-react";
 
-const navItems = [
-  { label: "Tổng quan", href: "/admin", icon: LayoutDashboard },
-  { label: "Thực đơn & BOM", href: "/admin/menu-bom", icon: UtensilsCrossed },
-  { label: "Quản lý kho", href: "/admin/inventory", icon: Package },
-  { label: "Nhân sự & chi nhánh", href: "/admin/staff-branches", icon: Users },
+const adminNavItems = [
+  {
+    label: "Tổng quan",
+    href: "/admin",
+    icon: LayoutDashboard,
+    exact: true,
+  },
+  {
+    label: "Thực đơn & BOM",
+    href: "/admin/menu-bom",
+    icon: UtensilsCrossed,
+  },
+  {
+    label: "Quản lý kho",
+    href: "/admin/inventory",
+    icon: Package,
+    badge: "3",
+  },
+  {
+    label: "Nhân sự & chi nhánh",
+    href: "/admin/staff",
+    icon: Users,
+  },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const handleLogout = () => {
-    router.push("/login");
-  };
-
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between shrink-0 min-h-[calc(100vh-4rem)] p-4">
+    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between shrink-0 min-h-[calc(100vh-4rem)] p-4 select-none">
       <div>
         <div className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
           Quản trị
         </div>
-        <nav className="space-y-1">
-          {navItems.map((item) => {
+
+        <nav className="space-y-1.5">
+          {adminNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition-all ${
                   isActive
-                    ? "bg-orange-50 text-orange-600 border-l-4 border-orange-600 font-semibold"
-                    : "text-gray-600 hover:bg-orange-50/50 hover:text-orange-600"
+                    ? "bg-orange-600 text-white font-semibold shadow-xs shadow-orange-500/25"
+                    : "text-gray-600 font-medium hover:bg-orange-50 hover:text-orange-600"
                 }`}
               >
-                <Icon
-                  className={`w-5 h-5 ${
-                    isActive ? "text-orange-600" : "text-gray-400"
-                  }`}
-                />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <Icon
+                    className={`w-5 h-5 transition-colors ${
+                      isActive
+                        ? "text-white"
+                        : "text-gray-400 group-hover:text-orange-600"
+                    }`}
+                  />
+                  <span>{item.label}</span>
+                </div>
+
+                {item.badge ? (
+                  <span
+                    className={`px-2 py-0.5 text-xs font-bold rounded-full ${
+                      isActive
+                        ? "bg-white text-orange-600"
+                        : "bg-orange-100 text-orange-700"
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                ) : (
+                  isActive && <ChevronRight className="w-4 h-4 text-white/80" />
+                )}
               </Link>
             );
           })}
@@ -60,8 +97,8 @@ export default function AdminSidebar() {
 
       <div className="pt-4 border-t border-gray-100">
         <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+          onClick={() => router.push("/login")}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
         >
           <LogOut className="w-5 h-5" />
           <span>Đăng xuất</span>

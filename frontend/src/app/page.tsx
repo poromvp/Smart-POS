@@ -21,11 +21,18 @@ export default function DashboardPortalPage() {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    setNow(new Date());
+    const initialTimer = setTimeout(() => {
+      setNow(new Date());
+    }, 0);
+
     const interval = setInterval(() => {
       setNow(new Date());
     }, 1000);
-    return () => clearInterval(interval);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
   }, []);
 
   const timeString = now
@@ -112,7 +119,7 @@ export default function DashboardPortalPage() {
     <div className="min-h-screen bg-gradient-to-b from-orange-50/40 via-gray-50 to-gray-100/70 flex flex-col">
       <TopHeader
         title="Quản lý nhà hàng"
-        userLabel="Người dùng"
+        userName="Người dùng"
         actionLabel="Đăng xuất"
       />
 

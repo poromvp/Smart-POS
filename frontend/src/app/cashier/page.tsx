@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import PosPage from "@/app/pos/page";
 
-export default function CashierRedirectPage() {
-  redirect("/pos");
+export default function CashierPage() {
+  return <PosPage />;
 }

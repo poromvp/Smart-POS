@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import KdsPage from "@/app/kds/page";
 
-export default function KitchenRedirectPage() {
-  redirect("/kds");
+export default function KitchenPage() {
+  return <KdsPage />;
 }

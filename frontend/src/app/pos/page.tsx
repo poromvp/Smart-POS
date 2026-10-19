@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LayoutGrid, ReceiptText } from "lucide-react";
+import { LayoutGrid, ReceiptText, X } from "lucide-react";
 import InvoicePanel, {
   type MenuItem,
   type OrderItem,
@@ -22,9 +22,9 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: "pepsi", name: "Pepsi", price: 15000 },
 ];
 
-export const INITIAL_TABLES: RestaurantTable[] = Array.from({ length: 12 }, (_, index) => {
+export const INITIAL_TABLES: RestaurantTable[] = Array.from({ length: 20 }, (_, index) => {
   const tableNumber = index + 1;
-  const occupiedTableNumbers = [1, 3, 6, 9];
+  const occupiedTableNumbers = [1, 3, 6, 9, 14, 18];
 
   return {
     id: `table-${tableNumber}`,
@@ -74,12 +74,31 @@ export const INITIAL_ORDERS: Record<string, OrderItem[]> = {
       spicyLevel: "Cấp 5",
     },
   ],
+  "table-14": [
+    {
+      id: "spicy-seafood-noodles-cap-2",
+      menuItemId: "spicy-seafood-noodles",
+      name: "Mì cay hải sản",
+      price: 85000,
+      quantity: 2,
+      spicyLevel: "Cấp 2",
+    },
+  ],
+  "table-18": [
+    {
+      id: "peach-lemongrass-tea",
+      menuItemId: "peach-lemongrass-tea",
+      name: "Trà đào cam sả",
+      price: 25000,
+      quantity: 4,
+    },
+  ],
 };
 
 export default function PosPage() {
   const [tables, setTables] = useState<RestaurantTable[]>(INITIAL_TABLES);
   const [ordersByTable, setOrdersByTable] = useState<Record<string, OrderItem[]>>(INITIAL_ORDERS);
-  const [selectedTableId, setSelectedTableId] = useState("table-1");
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const toast = useToast();
 
@@ -87,13 +106,20 @@ export default function PosPage() {
     () => tables.find((table) => table.id === selectedTableId) ?? null,
     [selectedTableId, tables]
   );
-  const selectedOrder = ordersByTable[selectedTableId] ?? [];
+
+  const selectedOrder = selectedTableId ? ordersByTable[selectedTableId] ?? [] : [];
   const selectedTotal = selectedOrder.reduce(
     (total, item) => total + item.price * item.quantity,
     0
   );
 
+  const handleSelectTable = (table: RestaurantTable) => {
+    setSelectedTableId((prevId) => (prevId === table.id ? null : table.id));
+  };
+
   const handleAddItem = (menuItem: MenuItem, spicyLevel?: string) => {
+    if (!selectedTableId) return;
+
     const orderItemId = `${menuItem.id}${
       spicyLevel ? `-${spicyLevel.toLowerCase().replace(" ", "-")}` : ""
     }`;
@@ -133,6 +159,8 @@ export default function PosPage() {
   };
 
   const handleChangeQuantity = (orderItemId: string, quantity: number) => {
+    if (!selectedTableId) return;
+
     setOrdersByTable((currentOrders) => {
       const nextTableOrder = (currentOrders[selectedTableId] ?? [])
         .map((item) => (item.id === orderItemId ? { ...item, quantity } : item))
@@ -143,6 +171,8 @@ export default function PosPage() {
   };
 
   const handlePaymentSuccess = () => {
+    if (!selectedTableId) return;
+
     const paidTableId = selectedTableId;
     const paidTableName = selectedTable?.name ?? "Bàn";
 
@@ -153,6 +183,7 @@ export default function PosPage() {
       )
     );
     setIsPaymentModalOpen(false);
+    setSelectedTableId(null);
 
     toast.success(
       `Thanh toán thành công ${paidTableName}`,
@@ -171,43 +202,62 @@ export default function PosPage() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <WorkspaceSidebar defaultCollapsed={true} />
 
-        <main className="mx-auto flex w-full max-w-[1600px] flex-1 min-h-0 flex-col p-3.5 lg:p-4">
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <div className="h-[117.65%] w-[117.65%] origin-top-left scale-[0.85]">
-              <div className="grid h-full min-h-0 gap-3.5 lg:grid-cols-[3fr_2fr] lg:gap-4">
-                <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                  <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 text-[13px] font-semibold text-slate-600 lg:px-5 lg:py-3 lg:text-sm">
-                    <div className="flex items-center gap-2">
-                      <LayoutGrid size={18} className="text-orange-500" aria-hidden="true" />
-                      <span>Khu vực phục vụ</span>
-                    </div>
-                    <span className="text-xs font-medium text-orange-600">
-                      Đang dùng: {tables.filter((t) => t.status === "occupied").length}/{tables.length} bàn
+        <main className="mx-auto flex w-full max-w-[1800px] flex-1 min-h-0 flex-col p-3.5 lg:p-5">
+          <div
+            className={`grid h-full min-h-0 gap-4 transition-all duration-300 ${
+              selectedTable
+                ? "lg:grid-cols-[1fr_440px] xl:grid-cols-[1fr_480px]"
+                : "grid-cols-1"
+            }`}
+          >
+            <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 text-sm font-semibold text-slate-600">
+                <div className="flex items-center gap-2">
+                  <LayoutGrid size={18} className="text-orange-500" aria-hidden="true" />
+                  <span>Khu vực phục vụ</span>
+                </div>
+                <span className="text-xs font-bold text-orange-600">
+                  Đang dùng: {tables.filter((t) => t.status === "occupied").length}/{tables.length} bàn
+                </span>
+              </div>
+
+              <TableMap
+                tables={tables}
+                selectedTableId={selectedTableId}
+                onSelectTable={handleSelectTable}
+              />
+            </section>
+
+            {selectedTable && (
+              <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-orange-200 bg-white shadow-lg shadow-orange-500/5">
+                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 text-sm font-semibold text-slate-700 bg-orange-50/40">
+                  <div className="flex items-center gap-2">
+                    <ReceiptText size={18} className="text-orange-600" aria-hidden="true" />
+                    <span className="font-bold text-slate-800">
+                      Chi tiết của {selectedTable.name}
                     </span>
                   </div>
-                  <TableMap
-                    tables={tables}
-                    selectedTableId={selectedTableId}
-                    onSelectTable={(table) => setSelectedTableId(table.id)}
-                  />
-                </section>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTableId(null)}
+                    title="Đóng chi tiết bàn"
+                    className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-orange-100 hover:text-orange-600 transition-colors cursor-pointer"
+                  >
+                    <span>Đóng</span>
+                    <X size={15} />
+                  </button>
+                </div>
 
-                <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                  <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2.5 text-[13px] font-semibold text-slate-600 lg:px-5 lg:py-3 lg:text-sm">
-                    <ReceiptText size={18} className="text-orange-500" aria-hidden="true" />
-                    <span>Đơn hàng hiện tại</span>
-                  </div>
-                  <InvoicePanel
-                    table={selectedTable}
-                    orderItems={selectedOrder}
-                    menuItems={MENU_ITEMS}
-                    onAddItem={handleAddItem}
-                    onChangeQuantity={handleChangeQuantity}
-                    onPayment={() => setIsPaymentModalOpen(true)}
-                  />
-                </section>
-              </div>
-            </div>
+                <InvoicePanel
+                  table={selectedTable}
+                  orderItems={selectedOrder}
+                  menuItems={MENU_ITEMS}
+                  onAddItem={handleAddItem}
+                  onChangeQuantity={handleChangeQuantity}
+                  onPayment={() => setIsPaymentModalOpen(true)}
+                />
+              </section>
+            )}
           </div>
         </main>
       </div>

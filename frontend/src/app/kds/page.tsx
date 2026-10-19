@@ -129,7 +129,7 @@ export default function KdsPage() {
     <div className="flex min-h-screen flex-col bg-gray-50 text-stone-900">
       <TopHeader
         title="Điều phối bếp (KDS)"
-        userName="Bếp trưởng"
+        userLabel="Bếp trưởng"
         rightContent={
           <div className="flex items-center gap-3 text-sm">
             <span className="text-stone-500">

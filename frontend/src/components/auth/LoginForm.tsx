@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { DEMO_ROLE_STORAGE_KEY, type UserRole } from "@/lib/auth";
 import {
   Store,
   Eye,
@@ -16,6 +18,7 @@ import AlertBanner from "@/components/ui/AlertBanner";
 
 interface DemoAccount {
   role: string;
+  roleKey: UserRole;
   email: string;
   password: string;
   redirectUrl: string;
@@ -25,6 +28,7 @@ interface DemoAccount {
 const DEMO_ACCOUNTS: DemoAccount[] = [
   {
     role: "Đầu bếp",
+    roleKey: "chef",
     email: "chef@smartpos.vn",
     password: "123456",
     redirectUrl: "/kds",
@@ -32,6 +36,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     role: "Thu ngân",
+    roleKey: "cashier",
     email: "cashier@smartpos.vn",
     password: "123456",
     redirectUrl: "/pos",
@@ -39,6 +44,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     role: "Quản lý",
+    roleKey: "manager",
     email: "manager@smartpos.vn",
     password: "123456",
     redirectUrl: "/",
@@ -46,6 +52,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     role: "Phục vụ",
+    roleKey: "waiter",
     email: "waiter@smartpos.vn",
     password: "123456",
     redirectUrl: "/order-taking",
@@ -92,15 +99,20 @@ export default function LoginForm() {
           acc.password === password
       );
 
-      if (!matchedAccount && password !== "123456") {
+      if (!matchedAccount) {
         setIsLoading(false);
         setErrorMsg("Email hoặc mật khẩu không chính xác.");
         toast.error("Đăng nhập thất bại", "Vui lòng kiểm tra lại thông tin.");
         return;
       }
 
-      const targetUrl = matchedAccount ? matchedAccount.redirectUrl : "/";
-      const roleTitle = matchedAccount ? matchedAccount.role : "Người dùng";
+      window.localStorage.removeItem(DEMO_ROLE_STORAGE_KEY);
+      window.sessionStorage.removeItem(DEMO_ROLE_STORAGE_KEY);
+      const storage = rememberMe ? window.localStorage : window.sessionStorage;
+      storage.setItem(DEMO_ROLE_STORAGE_KEY, matchedAccount.roleKey);
+
+      const targetUrl = matchedAccount.redirectUrl;
+      const roleTitle = matchedAccount.role;
 
       toast.success(
         "Đăng nhập thành công",
@@ -258,6 +270,19 @@ export default function LoginForm() {
               </button>
             </div>
           </form>
+
+          <div className="mt-6 border-t border-slate-100 pt-5">
+            <Link
+              href="/menu"
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-5 py-3 text-sm font-bold text-orange-800 transition-colors hover:border-orange-300 hover:bg-orange-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+            >
+              <Utensils className="h-4 w-4" aria-hidden="true" />
+              Xem thực đơn dành cho khách
+            </Link>
+            <p className="mt-2 text-center text-xs leading-5 text-slate-500">
+              Khách tại nhà hàng vui lòng quét mã QR trên bàn để mở đúng thực đơn.
+            </p>
+          </div>
         </div>
       </div>
     </div>

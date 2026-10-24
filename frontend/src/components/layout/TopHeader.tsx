@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Store, Building2, UserCheck, LogOut, LayoutGrid } from "lucide-react";
+import { DEMO_ROLE_STORAGE_KEY } from "@/lib/auth";
 
 interface TopHeaderProps {
   title: string;
@@ -34,6 +35,12 @@ export default function TopHeader({
       onActionClick();
       return;
     }
+
+    if (actionLabel === "Đăng xuất") {
+      window.localStorage.removeItem(DEMO_ROLE_STORAGE_KEY);
+      window.sessionStorage.removeItem(DEMO_ROLE_STORAGE_KEY);
+    }
+
     router.push("/login");
   };
 

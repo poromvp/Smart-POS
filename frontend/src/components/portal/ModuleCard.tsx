@@ -9,6 +9,7 @@ interface ModuleCardProps {
   icon: LucideIcon;
   badge?: string;
   isDanger?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }
 
@@ -18,16 +19,21 @@ export default function ModuleCard({
   icon: Icon,
   badge,
   isDanger = false,
+  disabled = false,
   onClick,
 }: ModuleCardProps) {
+  const stateClasses = disabled
+    ? "cursor-not-allowed border-gray-200 opacity-75 shadow-none"
+    : isDanger
+      ? "cursor-pointer border-gray-200 hover:border-red-400 hover:bg-red-50/20"
+      : "cursor-pointer border-gray-200/90 hover:border-orange-500 hover:shadow-orange-500/10";
+
   return (
     <button
       onClick={onClick}
-      className={`group relative w-full bg-white p-6 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col items-center text-center justify-center min-h-[180px] shadow-xs hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] ${
-        isDanger
-          ? "border-gray-200 hover:border-red-400 hover:bg-red-50/20"
-          : "border-gray-200/90 hover:border-orange-500 hover:shadow-orange-500/10"
-      }`}
+      disabled={disabled}
+      title={disabled ? description : undefined}
+      className={`group relative w-full bg-white p-6 rounded-2xl border text-left transition-all duration-200 flex flex-col items-center text-center justify-center min-h-[180px] shadow-xs ${stateClasses} ${disabled ? "" : "hover:shadow-lg hover:-translate-y-1 active:scale-[0.98]"}`}
     >
       {badge && (
         <span className="absolute top-3.5 right-3.5 px-2.5 py-0.5 text-[11px] font-semibold bg-orange-100 text-orange-700 rounded-full">
@@ -35,7 +41,7 @@ export default function ModuleCard({
         </span>
       )}
 
-      {!badge && !isDanger && (
+      {!badge && !isDanger && !disabled && (
         <ArrowUpRight className="absolute top-4 right-4 w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 group-hover:text-orange-500 transition-all" />
       )}
 

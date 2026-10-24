@@ -1,5 +1,7 @@
 export type UserRole = "chef" | "cashier" | "manager" | "waiter";
 
+export const DEMO_ROLE_STORAGE_KEY = "smartpos-demo-role";
+
 export type MockUser = {
   id: string;
   name: string;

@@ -25,6 +25,9 @@ public class Role {
     @Column(length = 255)
     private String description;
 
+    @Column(name = "is_system", nullable = false)
+    private boolean isSystem = false;
+
     @OneToMany(mappedBy = "role")
     private Set<User> users = new HashSet<>();
 
@@ -39,5 +42,11 @@ public class Role {
     public Role (String name, String description) {
         this.name = name;
         this.description = description;
+    }
+
+    public Role(String name, String description, boolean isSystem) {
+        this.name = name;
+        this.description = description;
+        this.isSystem = isSystem;
     }
 }

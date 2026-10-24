@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Store,
@@ -258,6 +259,19 @@ export default function LoginForm() {
               </button>
             </div>
           </form>
+
+          <div className="mt-6 border-t border-slate-100 pt-5">
+            <Link
+              href="/menu"
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-5 py-3 text-sm font-bold text-orange-800 transition-colors hover:border-orange-300 hover:bg-orange-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+            >
+              <Utensils className="h-4 w-4" aria-hidden="true" />
+              Xem thực đơn dành cho khách
+            </Link>
+            <p className="mt-2 text-center text-xs leading-5 text-slate-500">
+              Khách tại nhà hàng vui lòng quét mã QR trên bàn để mở đúng thực đơn.
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Search, ShoppingCart, UtensilsCrossed } from "lucide-react";
+import { ArrowLeft, MapPin, Search, ShoppingCart, UtensilsCrossed } from "lucide-react";
 
 import MenuItem, {
   type MenuItemData,
@@ -106,6 +106,15 @@ export default function MenuPage() {
       <header className="sticky top-0 z-30 border-b border-orange-100 bg-[#fffdf9]/95 backdrop-blur">
         <div className="mx-auto max-w-2xl px-4 py-4">
           <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="Quay lại"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-orange-200 bg-white text-stone-700 shadow-sm transition hover:border-[#b42318] hover:bg-orange-50 hover:text-[#b42318] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b42318]"
+            >
+              <ArrowLeft size={18} aria-hidden="true" />
+            </button>
+
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#b42318] text-white shadow-sm shadow-red-200">
                 <UtensilsCrossed size={21} aria-hidden="true" />

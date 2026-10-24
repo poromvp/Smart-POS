@@ -1,10 +1,11 @@
 
 package com.smartpos.auth_service.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
@@ -24,9 +25,9 @@ public class RestAuthenticationEntryPoint
 
     @Override
     public void commence(
-            HttpServletRequest request,
+            @NonNull HttpServletRequest request,
             HttpServletResponse response,
-            AuthenticationException authException
+            @NonNull AuthenticationException authException
     ) throws IOException {
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

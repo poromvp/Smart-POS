@@ -1,7 +1,8 @@
 
 package com.smartpos.auth_service.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jspecify.annotations.NonNull;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -23,9 +24,9 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
     @Override
     public void handle(
-            HttpServletRequest request,
+            @NonNull HttpServletRequest request,
             HttpServletResponse response,
-            AccessDeniedException accessDeniedException
+            @NonNull AccessDeniedException accessDeniedException
     ) throws IOException {
 
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);

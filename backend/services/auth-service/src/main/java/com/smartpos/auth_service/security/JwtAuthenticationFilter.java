@@ -1,20 +1,19 @@
-
 package com.smartpos.auth_service.security;
 
 import com.smartpos.auth_service.service.AuthUserDetailsService;
 import com.smartpos.auth_service.service.JwtService;
-
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -41,13 +40,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader == null ||
+                !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -55,63 +55,78 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = authHeader.substring(7).trim();
 
         if (token.isEmpty()) {
-            SecurityContextHolder.clearContext();
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    new BadCredentialsException("Empty bearer token")
-            );
+            rejectToken(request, response,
+                    new BadCredentialsException("Empty bearer token"));
             return;
         }
 
         try {
+            if (SecurityContextHolder.getContext()
+                    .getAuthentication() != null) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             String username = jwtService.extractUsername(token);
 
             if (username == null || username.isBlank()) {
-                throw new BadCredentialsException("Invalid JWT subject");
+                throw new BadCredentialsException(
+                        "Invalid JWT subject");
             }
 
-            if (SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails =
-                        userDetailsService.loadUserByUsername(username);
+            UserDetails userDetails =
+                    userDetailsService.loadUserByUsername(username);
 
-                if (!userDetails.isEnabled()) {
-                    throw new BadCredentialsException("Account is disabled");
-                }
-
-                if (!jwtService.isTokenValid(token, userDetails.getUsername())) {
-                    throw new BadCredentialsException("Invalid or expired JWT");
-                }
-
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
-
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request)
-                );
-
-                SecurityContextHolder.getContext()
-                        .setAuthentication(authentication);
+            if (!userDetails.isEnabled()) {
+                throw new BadCredentialsException(
+                        "Account is disabled");
             }
 
-            filterChain.doFilter(request, response);
+            if (!jwtService.isTokenValid(
+                    token, userDetails.getUsername())) {
+                throw new BadCredentialsException(
+                        "Invalid or expired JWT");
+            }
 
-        } catch (JwtException | IllegalArgumentException
-                 | BadCredentialsException
-                 | UsernameNotFoundException ex) {
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+
+            authentication.setDetails(
+                    new WebAuthenticationDetailsSource()
+                            .buildDetails(request)
+            );
+
+            SecurityContextHolder.getContext()
+                    .setAuthentication(authentication);
+
+        } catch (JwtException
+                 | IllegalArgumentException
+                 | AuthenticationException ex) {
 
             SecurityContextHolder.clearContext();
 
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    new BadCredentialsException("Invalid or expired JWT", ex)
-            );
+            rejectToken(request, response,
+                    new BadCredentialsException(
+                            "Invalid or expired JWT", ex));
+            return;
         }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private void rejectToken(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AuthenticationException exception
+    ) throws IOException {
+
+        SecurityContextHolder.clearContext();
+
+        authenticationEntryPoint.commence(
+                request, response, exception);
     }
 }

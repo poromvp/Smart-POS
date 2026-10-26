@@ -9,6 +9,7 @@ import com.smartpos.auth_service.dto.response.RoleResponse;
 import com.smartpos.auth_service.dto.response.UserResponse;
 import com.smartpos.auth_service.service.RoleService;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 
@@ -29,6 +30,7 @@ import java.util.List;
 @RequestMapping("/api/roles")
 @RequiredArgsConstructor
 @Validated
+@SecurityRequirement(name = "bearerAuth")
 public class RoleController {
 
     private final RoleService roleService;

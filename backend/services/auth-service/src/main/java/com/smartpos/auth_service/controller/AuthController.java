@@ -6,6 +6,7 @@ import com.smartpos.auth_service.dto.response.TokenResponse;
 import com.smartpos.auth_service.dto.response.UserResponse;
 import com.smartpos.auth_service.security.CookieUtil;
 import com.smartpos.auth_service.service.AuthService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<UserResponse> me(
             Authentication authentication
     ) {
@@ -60,6 +62,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> logout(
             HttpServletRequest request,
             Authentication authentication

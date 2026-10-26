@@ -2,6 +2,7 @@ package com.smartpos.auth_service.controller;
 
 import com.smartpos.auth_service.dto.response.PermissionResponse;
 import com.smartpos.auth_service.service.PermissionService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import java.util.List;
 @RequestMapping("/api/permissions")
 @RequiredArgsConstructor
 @Validated
+@SecurityRequirement(name = "bearerAuth")
 public class PermissionController {
 
     private final PermissionService permissionService;

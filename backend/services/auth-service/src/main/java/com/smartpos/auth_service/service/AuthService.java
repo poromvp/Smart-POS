@@ -28,6 +28,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final CookieUtil cookieUtil;
 
+    @Transactional
     public AuthResult login(LoginRequest request) {
 
         Authentication authentication =

@@ -21,6 +21,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,6 +38,7 @@ public class RoleController {
 
     // Create a role
     @PostMapping
+    @PreAuthorize("hasAuthority('ROLE_CREATE')")
     public ResponseEntity<RoleResponse> createRole(
             @Valid @RequestBody CreateRoleRequest request
     ) {
@@ -49,6 +51,7 @@ public class RoleController {
 
     // Get all roles with pagination
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_READ')")
     public ResponseEntity<Page<RoleResponse>> getAllRoles(
             @PageableDefault(
                     page = 0,
@@ -65,6 +68,7 @@ public class RoleController {
 
     // Get role details
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_READ')")
     public ResponseEntity<RoleDetailResponse> getRoleById(
             @PathVariable @Positive(message = "Role ID must be positive")
             Long id
@@ -76,6 +80,7 @@ public class RoleController {
 
     // Update a role
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_UPDATE')")
     public ResponseEntity<RoleResponse> updateRole(
             @PathVariable @Positive(message = "Role ID must be positive")
             Long id,
@@ -88,6 +93,7 @@ public class RoleController {
 
     // Delete a role
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_DELETE')")
     public ResponseEntity<Void> deleteRole(
             @PathVariable @Positive(message = "Role ID must be positive")
             Long id
@@ -99,6 +105,7 @@ public class RoleController {
 
     // Get permissions assigned to a role
     @GetMapping("/{roleId}/permissions")
+    @PreAuthorize("hasAuthority('ROLE_READ')")
     public ResponseEntity<List<PermissionResponse>> getPermissionsByRoleId(
             @PathVariable @Positive(message = "Role ID must be positive")
             Long roleId
@@ -110,6 +117,7 @@ public class RoleController {
 
     // Replace permissions assigned to a role
     @PutMapping("/{roleId}/permissions")
+    @PreAuthorize("hasAuthority('ROLE_MANAGE_PERMISSIONS')")
     public ResponseEntity<RoleResponse> replacePermissions(
             @PathVariable @Positive(message = "Role ID must be positive")
             Long roleId,
@@ -122,6 +130,7 @@ public class RoleController {
 
     // Get users assigned to a role
     @GetMapping("/{roleId}/users")
+    @PreAuthorize("hasAuthority('ROLE_READ')")
     public ResponseEntity<Page<UserResponse>> getUsersByRoleId(
             @PathVariable @Positive(message = "Role ID must be positive")
             Long roleId,

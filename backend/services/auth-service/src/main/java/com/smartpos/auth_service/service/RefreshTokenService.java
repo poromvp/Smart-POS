@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -47,6 +48,7 @@ public class RefreshTokenService {
                 .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
     }
 
+    @Transactional
     public void revokeToken(String rawRefreshToken, String username) {
         String tokenHash = hashToken(rawRefreshToken);
         refreshTokenRepository.findByTokenHash(tokenHash)
@@ -68,5 +70,10 @@ public class RefreshTokenService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 is not available", ex);
         }
+    }
+
+    @Transactional
+    public int revokeAllByUserId(Long userId) {
+        return refreshTokenRepository.revokeAllByUserId(userId);
     }
 }

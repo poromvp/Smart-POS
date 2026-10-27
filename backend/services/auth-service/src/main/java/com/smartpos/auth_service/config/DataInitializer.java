@@ -83,6 +83,19 @@ public class DataInitializer implements CommandLineRunner {
                 new Permission(
                         "USER_DELETE", "Delete user", "USER"),
 
+                new Permission(
+                        "USER_MANAGE_STATUS",
+                        "Manage user status",
+                        "USER"),
+                new Permission(
+                        "USER_ASSIGN_ROLE",
+                        "Assign a role to a user",
+                        "USER"),
+                new Permission(
+                        "USER_RESET_PASSWORD",
+                        "Reset user password",
+                        "USER"),
+
                 // Role management
                 new Permission(
                         "ROLE_CREATE", "Create role", "ROLE"),
@@ -93,22 +106,23 @@ public class DataInitializer implements CommandLineRunner {
                 new Permission(
                         "ROLE_DELETE", "Delete role", "ROLE"),
 
-                // Permission management
                 new Permission(
-                        "PERMISSION_CREATE",
-                        "Create permission",
-                        "PERMISSION"),
+                        "ROLE_MANAGE_PERMISSIONS",
+                        "Manage permissions assigned to a role",
+                        "ROLE"),
+                new Permission(
+                        "ROLE_READ_PERMISSIONS",
+                        "View permissions assigned to a role",
+                        "ROLE"),
+                new Permission(
+                        "ROLE_READ_USER",
+                        "View users assigned to a role",
+                        "ROLE"),
+
+                // Permission management
                 new Permission(
                         "PERMISSION_READ",
                         "View permissions",
-                        "PERMISSION"),
-                new Permission(
-                        "PERMISSION_UPDATE",
-                        "Update permission",
-                        "PERMISSION"),
-                new Permission(
-                        "PERMISSION_DELETE",
-                        "Delete permission",
                         "PERMISSION"),
 
                 // Menu management
@@ -207,10 +221,16 @@ public class DataInitializer implements CommandLineRunner {
                         "USER_READ",
                         "USER_UPDATE",
                         "USER_DELETE",
+                        "USER_MANAGE_STATUS",
+                        "USER_ASSIGN_ROLE",
+                        "USER_RESET_PASSWORD",
                         "ROLE_CREATE",
                         "ROLE_READ",
                         "ROLE_UPDATE",
                         "ROLE_DELETE",
+                        "ROLE_MANAGE_PERMISSIONS",
+                        "ROLE_READ_PERMISSIONS",
+                        "ROLE_READ_USER",
                         "PERMISSION_READ",
                         "MENU_CREATE",
                         "MENU_READ",

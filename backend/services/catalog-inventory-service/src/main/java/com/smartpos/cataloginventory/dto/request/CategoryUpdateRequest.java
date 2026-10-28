@@ -12,7 +12,7 @@ public class CategoryUpdateRequest {
     @Size(max = 100, message = "Tên danh mục tối đa 100 ký tự")
     private String name;
 
-    private Integer displayOrder = 0;
+    private Integer displayOrder ;
 
-    private Boolean isActive = true ;
+    private Boolean isActive  ;
 }

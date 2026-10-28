@@ -9,6 +9,7 @@ import com.smartpos.cataloginventory.exception.InvalidOperationException;
 import com.smartpos.cataloginventory.exception.ResourceNotFoundException;
 import com.smartpos.cataloginventory.mapper.CategoryMapper;
 import com.smartpos.cataloginventory.repository.CategoryRepository;
+import com.smartpos.cataloginventory.repository.ProductRepository;
 import com.smartpos.cataloginventory.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CategoryServiceImpl implements CategoryService {
     private final CategoryRepository categoryRepository;
+    private final ProductRepository productRepository;
     private final CategoryMapper categoryMapper;
 
     @Override
@@ -85,8 +87,7 @@ public class CategoryServiceImpl implements CategoryService {
     public void deleteCategory(Long id) {
         Category category = findCategoryOrThrow(id);
 
-        // Chặn xóa nếu danh mục đang chứa sản phẩm
-        if (category.getProducts() != null && !category.getProducts().isEmpty()) {
+        if(productRepository.existsByCategoryId(id)){
             throw new InvalidOperationException("Không thể xóa danh mục đang có chứa sản phẩm. Hãy chuyển hoặc xóa sản phẩm trước");
         }
 

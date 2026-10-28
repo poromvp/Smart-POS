@@ -47,7 +47,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     roleKey: "manager",
     email: "manager@smartpos.vn",
     password: "123456",
-    redirectUrl: "/",
+    redirectUrl: "/admin",
     icon: ShieldCheck,
   },
   {

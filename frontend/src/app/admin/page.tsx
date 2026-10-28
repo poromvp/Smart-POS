@@ -123,7 +123,7 @@ export default function AdminOverviewPage() {
                 </span>
                 <div
                   style={{ height: `${item.percent}%` }}
-                  className={`w-full max-w-[60px] rounded-t-lg transition-all ${
+                  className={`w-full max-w-15 rounded-t-lg transition-all ${
                     item.percent === 100
                       ? "bg-orange-600 shadow-sm shadow-orange-500/30"
                       : "bg-orange-200 group-hover:bg-orange-400"

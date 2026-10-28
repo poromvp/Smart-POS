@@ -9,6 +9,7 @@ import com.smartpos.cataloginventory.dto.response.ModifierGroupResponse;
 import com.smartpos.cataloginventory.dto.response.ModifierOptionResponse;
 import org.mapstruct.*;
 
+import java.util.Collection;
 import java.util.List;
 
 @Mapper(componentModel = "spring")
@@ -32,5 +33,5 @@ public interface ModifierMapper {
 
     ModifierOptionResponse toOptionResponse(ModifierOption entity);
 
-    List<ModifierOptionResponse> toOptionResponseList(List<ModifierOption> entities);
+    List<ModifierOptionResponse> toOptionResponseList(Collection<ModifierOption> entities);
 }

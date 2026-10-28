@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 export type StationId = "hot" | "cold" | "bar";
 
 export interface MenuItemData {
@@ -43,14 +45,16 @@ export default function MenuItem({ item, onClick }: MenuItemProps) {
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full items-center gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--surface)] p-3 text-left shadow-sm transition hover:border-[var(--border)] hover:shadow-md active:scale-[0.99]"
+      className="group flex w-full items-center gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--surface)] p-3 text-left shadow-sm transition hover:border-[var(--border)] hover:shadow-md active:scale-[0.99]"
     >
-      {/* Square thumbnail */}
-      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-stone-100">
-        <img
+      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-stone-100 sm:h-28 sm:w-28">
+        <Image
           src={item.image}
           alt={item.name}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          fill
+          loading={item.id === "m1" ? "eager" : "lazy"}
+          sizes="(min-width: 640px) 112px, 96px"
+          className="object-cover transition duration-300 group-hover:scale-105"
         />
 
         {/* Subtle station badge */}

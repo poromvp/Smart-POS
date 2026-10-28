@@ -10,7 +10,6 @@ const ADMIN_ALLOWED_ROLES = ["manager"] as const;
 
 const HEADER_TITLES: Record<string, string> = {
   "/admin": "Báo cáo doanh thu & vận hành đa chi nhánh",
-  "/admin/bom-setup": "Cấu hình công thức định lượng BOM",
   "/admin/menu-bom": "Thiết lập thực đơn & định lượng nguyên vật liệu",
   "/admin/inventory": "Quản lý kho hàng",
   "/admin/staff": "Nhân sự, chi nhánh & mã QR",

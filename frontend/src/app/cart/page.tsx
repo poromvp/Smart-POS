@@ -1,19 +1,32 @@
 "use client";
 
 import { ArrowLeft, CheckCircle2, LoaderCircle, MapPin, MessageCircleMore, Minus, Plus, ShoppingBag } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useGuestCart } from "@/components/customer/guestCartStore";
+import { getGuestTableId, getGuestTableLabel, getGuestTableQuery } from "@/components/customer/guestTable";
 
 const formatCurrency = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`;
 
 export default function GuestCartPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#fffaf5]" aria-label="Đang tải giỏ hàng" />}>
+      <GuestCartContent />
+    </Suspense>
+  );
+}
+
+function GuestCartContent() {
   const router = useRouter();
-  const { cartItems, totalPrice, updateNote, updateQuantity: changeQuantity, clearCart } = useGuestCart();
+  const searchParams = useSearchParams();
+  const tableId = getGuestTableId(searchParams.get("table"));
+  const tableLabel = getGuestTableLabel(tableId);
+  const tableQuery = getGuestTableQuery(tableId);
+  const { cartItems, totalPrice, updateNote, updateQuantity: changeQuantity, clearCart } = useGuestCart(tableId ?? "unassigned");
   const [submissionState, setSubmissionState] = useState<"idle" | "submitting" | "success">("idle");
 
   const handleSubmitOrder = () => {
-    if (cartItems.length === 0 || submissionState !== "idle") return;
+    if (!tableId || cartItems.length === 0 || submissionState !== "idle") return;
 
     setSubmissionState("submitting");
 
@@ -26,7 +39,7 @@ export default function GuestCartPage() {
 
   const handleBackToMenu = () => {
     setSubmissionState("idle");
-    router.push("/menu");
+    router.push(`/menu${tableQuery}`);
   };
 
   if (submissionState === "success") {
@@ -36,10 +49,10 @@ export default function GuestCartPage() {
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-red-50 text-[#b42318]">
             <CheckCircle2 size={36} aria-hidden="true" />
           </div>
-          <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-[#b42318]">Bàn A12</p>
+          <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-[#b42318]">{tableLabel ?? "Chưa xác định bàn"}</p>
           <h1 className="mt-2 text-2xl font-extrabold">Đã ghi nhận yêu cầu gọi món</h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Yêu cầu đã được lưu trong phiên bản demo trên thiết bị này.
+            Yêu cầu gọi món đã được ghi nhận trong phiên bản demo cho {tableLabel ?? "bàn chưa xác định"} trên thiết bị này.
           </p>
           <p className="mt-2 text-xs leading-5 text-slate-400">
             Hệ thống hiện chưa kết nối gửi đơn trực tiếp đến bếp.
@@ -84,11 +97,11 @@ export default function GuestCartPage() {
         <div className="mb-4 rounded-xl border border-orange-100 bg-white px-4 py-3 text-sm text-stone-600 shadow-sm">
           <div className="flex items-center gap-2 font-semibold text-slate-700">
             <MapPin size={16} className="text-[#b42318]" aria-hidden="true" />
-            Đơn này dành cho bàn A12
+            {tableLabel ? `Đơn này dành cho ${tableLabel}` : "Chưa xác định bàn"}
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
             <MessageCircleMore size={15} className="text-[#b42318]" aria-hidden="true" />
-            Ghi chú được lưu riêng cho từng món.
+            {tableLabel ? "Ghi chú được lưu riêng cho từng món." : "Quét mã QR tại bàn để đơn được gắn đúng bàn."}
           </div>
         </div>
 
@@ -158,11 +171,11 @@ export default function GuestCartPage() {
           <button
             type="button"
             onClick={handleSubmitOrder}
-            disabled={cartItems.length === 0 || submissionState !== "idle"}
+            disabled={!tableId || cartItems.length === 0 || submissionState !== "idle"}
             className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#b42318] px-4 text-sm font-bold text-white shadow-lg shadow-red-200 transition active:scale-[0.98] hover:bg-[#8f1d15] disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none"
           >
             {submissionState === "submitting" ? <LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> : <ShoppingBag size={18} aria-hidden="true" />}
-            {submissionState === "submitting" ? "Đang ghi nhận..." : "Xác nhận gọi món"}
+            {submissionState === "submitting" ? "Đang ghi nhận..." : tableLabel ? "Xác nhận gọi món" : "Quét mã QR để xác nhận đơn"}
           </button>
         </div>
       </footer>

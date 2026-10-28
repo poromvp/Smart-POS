@@ -29,11 +29,11 @@ const CART_STORAGE_KEY = "guest-cart-v1";
 const createCartItemId = () =>
   `cart-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-const readCartItems = (): CartItem[] => {
+const readCartItems = (storageKey: string): CartItem[] => {
   if (typeof window === "undefined") return [];
 
   try {
-    const rawValue = window.localStorage.getItem(CART_STORAGE_KEY);
+    const rawValue = window.localStorage.getItem(storageKey);
     if (!rawValue) return [];
 
     const parsedValue = JSON.parse(rawValue) as unknown;
@@ -43,30 +43,31 @@ const readCartItems = (): CartItem[] => {
   }
 };
 
-const writeCartItems = (items: CartItem[]) => {
-  window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+const writeCartItems = (storageKey: string, items: CartItem[]) => {
+  window.localStorage.setItem(storageKey, JSON.stringify(items));
 };
 
-export function useGuestCart() {
+export function useGuestCart(tableId: string) {
+  const storageKey = `${CART_STORAGE_KEY}:${tableId}`;
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [isReady, setIsReady] = useState(false);
+  const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
 
   useEffect(() => {
     const hydrateTimer = window.setTimeout(() => {
-      setCartItems(readCartItems());
-      setIsReady(true);
+      setCartItems(readCartItems(storageKey));
+      setLoadedStorageKey(storageKey);
     }, 0);
 
     return () => {
       window.clearTimeout(hydrateTimer);
     };
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
-    if (!isReady) return;
+    if (loadedStorageKey !== storageKey) return;
 
-    writeCartItems(cartItems);
-  }, [cartItems, isReady]);
+    writeCartItems(storageKey, cartItems);
+  }, [cartItems, loadedStorageKey, storageKey]);
 
   const addItem = useCallback((input: CartItemInput) => {
     setCartItems((currentItems) => [

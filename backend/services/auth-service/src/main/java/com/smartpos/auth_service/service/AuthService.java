@@ -2,10 +2,12 @@ package com.smartpos.auth_service.service;
 
 import com.smartpos.auth_service.dto.request.LoginRequest;
 import com.smartpos.auth_service.dto.response.AuthResult;
+import com.smartpos.auth_service.dto.response.CurrentUserResponse;
 import com.smartpos.auth_service.dto.response.TokenResponse;
 import com.smartpos.auth_service.dto.response.UserResponse;
 import com.smartpos.auth_service.entity.RefreshToken;
 import com.smartpos.auth_service.entity.User;
+import com.smartpos.auth_service.mapper.UserMapper;
 import com.smartpos.auth_service.repository.UserRepository;
 import com.smartpos.auth_service.security.CookieUtil;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final CookieUtil cookieUtil;
+    private final UserMapper userMapper;
 
     @Transactional
     public AuthResult login(LoginRequest request) {
@@ -63,7 +66,7 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public UserResponse getCurrentUser(String username) {
+    public CurrentUserResponse getCurrentUser(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() ->
                    new UsernameNotFoundException(
@@ -71,15 +74,7 @@ public class AuthService {
                    )
                 );
 
-        return new UserResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getFullName(),
-                user.getPhone(),
-                user.isActive(),
-                user.getRole().getName(),
-                user.getCreatedAt()
-        );
+        return userMapper.toCurrentResponse(user);
     }
 
     @Transactional

@@ -2,6 +2,7 @@ package com.smartpos.auth_service.controller;
 
 import com.smartpos.auth_service.dto.request.LoginRequest;
 import com.smartpos.auth_service.dto.response.AuthResult;
+import com.smartpos.auth_service.dto.response.CurrentUserResponse;
 import com.smartpos.auth_service.dto.response.TokenResponse;
 import com.smartpos.auth_service.dto.response.UserResponse;
 import com.smartpos.auth_service.security.CookieUtil;
@@ -38,7 +39,7 @@ public class AuthController {
 
     @GetMapping("/me")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<UserResponse> me(
+    public ResponseEntity<CurrentUserResponse> me(
             Authentication authentication
     ) {
         return ResponseEntity.ok(

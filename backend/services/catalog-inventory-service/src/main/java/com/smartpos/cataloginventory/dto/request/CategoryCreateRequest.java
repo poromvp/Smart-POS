@@ -13,6 +13,5 @@ public class CategoryCreateRequest {
     private String name;
 
     private Integer displayOrder = 0;
-
     private Boolean isActive = true;
 }

@@ -3,9 +3,8 @@ package com.smartpos.cataloginventory.domain;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 @Entity
@@ -35,7 +34,7 @@ public class ModifierGroup {
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
     @Builder.Default
-    private List<ModifierOption> options = new ArrayList<>();
+    private Set<ModifierOption> options = new LinkedHashSet<>();
 
     @ManyToMany(mappedBy = "modifierGroups")
     @ToString.Exclude

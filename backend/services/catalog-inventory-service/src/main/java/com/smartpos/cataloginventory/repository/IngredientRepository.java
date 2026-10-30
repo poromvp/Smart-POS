@@ -17,9 +17,22 @@ public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
 
     Optional<Ingredient> findByCode(String code);
 
+    boolean existsByNameIgnoreCase(String name);
+
+    boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
+
+    boolean existsByCodeIgnoreCase(String code);
+
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
+
+    List<Ingredient> findAllByOrderByNameAsc();
+
+    List<Ingredient> findByNameContainingIgnoreCaseOrCodeContainingIgnoreCaseOrderByNameAsc(
+            String name, String code);
+
     // Khóa bi quan chống Race Condition khi nhiều đơn hàng trừ kho cùng lúc
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT i FROM Ingredient i WHERE i.id IN :ids")
+    @Query("SELECT i FROM Ingredient i WHERE i.id IN :ids ORDER BY i.id")
     List<Ingredient> findAllByIdWithLock(@Param("ids") Collection<Long> ids);
 
     // Tra cứu các nguyên liệu sắp hết hàng

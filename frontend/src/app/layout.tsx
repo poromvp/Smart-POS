@@ -13,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi">
-      <body className="antialiased bg-gray-50 text-gray-900">
+    <html lang="vi" suppressHydrationWarning>
+      <body className="antialiased bg-gray-50 text-gray-900" suppressHydrationWarning>
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

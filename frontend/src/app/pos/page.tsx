@@ -13,16 +13,16 @@ import WorkspaceSidebar from "@/components/layout/WorkspaceSidebar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
 
-export const SPICY_LEVELS = Array.from({ length: 8 }, (_, index) => `Cấp ${index}`);
+const SPICY_LEVELS = Array.from({ length: 8 }, (_, index) => `Cấp ${index}`);
 
-export const MENU_ITEMS: MenuItem[] = [
+const MENU_ITEMS: MenuItem[] = [
   { id: "spicy-beef-noodles", name: "Mì cay bò", price: 75000, spicyLevels: SPICY_LEVELS },
   { id: "spicy-seafood-noodles", name: "Mì cay hải sản", price: 85000, spicyLevels: SPICY_LEVELS },
   { id: "peach-lemongrass-tea", name: "Trà đào cam sả", price: 25000 },
   { id: "pepsi", name: "Pepsi", price: 15000 },
 ];
 
-export const INITIAL_TABLES: RestaurantTable[] = Array.from({ length: 20 }, (_, index) => {
+const INITIAL_TABLES: RestaurantTable[] = Array.from({ length: 20 }, (_, index) => {
   const tableNumber = index + 1;
   const occupiedTableNumbers = [1, 3, 6, 9, 14, 18];
 
@@ -33,7 +33,7 @@ export const INITIAL_TABLES: RestaurantTable[] = Array.from({ length: 20 }, (_, 
   };
 });
 
-export const INITIAL_ORDERS: Record<string, OrderItem[]> = {
+const INITIAL_ORDERS: Record<string, OrderItem[]> = {
   "table-1": [
     {
       id: "spicy-beef-noodles-cap-3",

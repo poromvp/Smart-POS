@@ -24,6 +24,8 @@ public class DataInitializer implements CommandLineRunner {
     private final IngredientRepository ingredientRepository;
     private final RecipeRepository recipeRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final SupplierRepository supplierRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
 
     @Override
     @Transactional
@@ -32,6 +34,7 @@ public class DataInitializer implements CommandLineRunner {
         initIngredientsData();
         initRecipesData();
         initInventoryTransactionsData();
+        initSuppliersAndPurchaseOrdersData();
     }
 
     /**
@@ -231,6 +234,7 @@ public class DataInitializer implements CommandLineRunner {
                 createIng("NL-XUCXICH", "Xúc xích Đức xông khói", "cây", "7000", "80.000", "20.000"),
                 createIng("NL-PHOMAI", "Phô mai sợi Mozzarella", "kg", "190000", "8.500", "2.000"),
                 createIng("NL-NAM", "Nấm kim châm tươi", "gói", "9000", "45.000", "10.000"),
+                createIng("NL-RAU", "Rau củ tươi Đà Lạt", "kg", "35000", "30.000", "10.000"),
                 createIng("NL-NUOCDUNG", "Cốt nước dùng mì cay", "lít", "25000", "40.000", "10.000"),
 
                 // Nguyên liệu pha chế thức uống
@@ -393,6 +397,120 @@ public class DataInitializer implements CommandLineRunner {
             inventoryTransactionRepository.saveAll(txs);
             log.info(">>> Khởi tạo {} giao dịch nhập kho ban đầu thành công!", txs.size());
         }
+    }
+
+    /**
+     * 5. Nạp Nhà cung cấp & Đơn nhập kho mẫu (Phase 3)
+     */
+    private void initSuppliersAndPurchaseOrdersData() {
+        if (supplierRepository.count() > 0) {
+            log.info("Dữ liệu Nhà cung cấp đã tồn tại ({} NCC), bỏ qua.", supplierRepository.count());
+            return;
+        }
+
+        log.info("Bắt đầu nạp dữ liệu Nhà cung cấp & Phiếu nhập kho mẫu...");
+
+        Supplier sup1 = supplierRepository.save(Supplier.builder()
+                .name("Công ty TNHH Thực Phẩm Tươi Sống Nam An")
+                .phone("0901234567")
+                .email("contact@namanfood.vn")
+                .address("123 Kha Vạn Cân, TP. Thủ Đức, TP. HCM")
+                .isActive(true)
+                .build());
+
+        Supplier sup2 = supplierRepository.save(Supplier.builder()
+                .name("Nhà Cung Cấp Nông Sản Đà Lạt Xanh")
+                .phone("0988776655")
+                .email("sales@dalatxanh.com")
+                .address("45 Lê Hồng Phong, TP. Đà Lạt")
+                .isActive(true)
+                .build());
+
+        Supplier sup3 = supplierRepository.save(Supplier.builder()
+                .name("Đại Lý Gia Vị & Đồ Khô Tân Bình")
+                .phone("0912348899")
+                .email("giavi.tanbinh@gmail.com")
+                .address("78 Lý Thường Kiệt, Q. Tân Bình, TP. HCM")
+                .isActive(true)
+                .build());
+
+        // Lấy nguyên liệu để tạo đơn nhập kho mẫu
+        Optional<Ingredient> ingBoOpt = ingredientRepository.findByCode("NL-BO");
+        Optional<Ingredient> ingGaOpt = ingredientRepository.findByCode("NL-GA");
+        Optional<Ingredient> ingNamOpt = ingredientRepository.findByCode("NL-NAM");
+        Optional<Ingredient> ingRauOpt = ingredientRepository.findByCode("NL-RAU");
+
+        if (ingBoOpt.isPresent() && ingGaOpt.isPresent()) {
+            Ingredient ingBo = ingBoOpt.get();
+            Ingredient ingGa = ingGaOpt.get();
+
+            PurchaseOrder poCompleted = PurchaseOrder.builder()
+                    .poNumber("PO-20261028-1001")
+                    .supplier(sup1)
+                    .staffId(1L)
+                    .orderDate(java.time.LocalDate.of(2026, 10, 28))
+                    .deliveryDate(java.time.LocalDate.of(2026, 10, 28))
+                    .status(PurchaseOrderStatus.COMPLETED)
+                    .note("Đơn nhập thịt tươi đầu tuần phục vụ cơ sở chính")
+                    .totalAmount(new BigDecimal("4430000.00"))
+                    .build();
+
+            PurchaseOrderItem item1 = PurchaseOrderItem.builder()
+                    .purchaseOrder(poCompleted)
+                    .ingredient(ingBo)
+                    .quantity(new BigDecimal("20.000"))
+                    .unitPrice(new BigDecimal("175000.00"))
+                    .totalPrice(new BigDecimal("3500000.00"))
+                    .build();
+
+            PurchaseOrderItem item2 = PurchaseOrderItem.builder()
+                    .purchaseOrder(poCompleted)
+                    .ingredient(ingGa)
+                    .quantity(new BigDecimal("15.000"))
+                    .unitPrice(new BigDecimal("62000.00"))
+                    .totalPrice(new BigDecimal("930000.00"))
+                    .build();
+
+            poCompleted.setItems(new ArrayList<>(List.of(item1, item2)));
+            purchaseOrderRepository.save(poCompleted);
+        }
+
+        if (ingNamOpt.isPresent() && ingRauOpt.isPresent()) {
+            Ingredient ingNam = ingNamOpt.get();
+            Ingredient ingRau = ingRauOpt.get();
+
+            PurchaseOrder poDraft = PurchaseOrder.builder()
+                    .poNumber("PO-20261030-1002")
+                    .supplier(sup2)
+                    .staffId(1L)
+                    .orderDate(java.time.LocalDate.of(2026, 10, 30))
+                    .deliveryDate(java.time.LocalDate.of(2026, 10, 31))
+                    .status(PurchaseOrderStatus.DRAFT)
+                    .note("Dự trù nấm và rau củ tươi cho cuối tuần")
+                    .totalAmount(new BigDecimal("750000.00"))
+                    .build();
+
+            PurchaseOrderItem item1 = PurchaseOrderItem.builder()
+                    .purchaseOrder(poDraft)
+                    .ingredient(ingNam)
+                    .quantity(new BigDecimal("10.000"))
+                    .unitPrice(new BigDecimal("40000.00"))
+                    .totalPrice(new BigDecimal("400000.00"))
+                    .build();
+
+            PurchaseOrderItem item2 = PurchaseOrderItem.builder()
+                    .purchaseOrder(poDraft)
+                    .ingredient(ingRau)
+                    .quantity(new BigDecimal("25.000"))
+                    .unitPrice(new BigDecimal("14000.00"))
+                    .totalPrice(new BigDecimal("350000.00"))
+                    .build();
+
+            poDraft.setItems(new ArrayList<>(List.of(item1, item2)));
+            purchaseOrderRepository.save(poDraft);
+        }
+
+        log.info(">>> Khởi tạo 3 Nhà cung cấp và 2 Đơn nhập kho mẫu thành công!");
     }
 
     // Các hàm phụ trợ

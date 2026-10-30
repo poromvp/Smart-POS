@@ -39,7 +39,7 @@ public class PurchaseOrder {
     @Column(name = "delivery_date")
     private LocalDate deliveryDate;
 
-    @Column(name = "total_amount", precision = 12, scale = 2)
+    @Column(name = "total_amount", precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal totalAmount = BigDecimal.ZERO;
 

@@ -1,170 +1,241 @@
-# 📋 BÁO CÁO ĐÁNH GIÁ TOÀN DIỆN MÃ NGUỒN, LOGIC NGHIỆP VỤ & TRẢI NGHIỆM NGƯỜI DÙNG (UX)
-## Phân Hệ Catalog & Inventory Service (Giai Đoạn 1 & Giai Đoạn 2)
+# 📋 BÁO CÁO KIỂM TOÁN TOÀN DIỆN (END-TO-END AUDIT REPORT)
+## Phân Hệ `catalog-inventory-service` — Backend, Database, Exception Handling & Frontend
 
-> **Dự án:** Smart-POS (Hệ thống Quản lý Bán hàng & Quản trị Nhà hàng Đa Nền tảng)  
-> **Phân hệ:** `catalog-inventory-service` (Backend Spring Boot) & Next.js 16 / React 19 (Frontend)  
-> **Phạm vi thẩm định:** Toàn bộ tính năng đã xây dựng thuộc **Giai đoạn 1 (Catalog, Thực đơn, Biến thể, Topping)** và **Giai đoạn 2 (Nguyên liệu, Định lượng BOM, Lõi trừ kho tự động)**.  
-> **Mục tiêu đánh giá:** Đánh giá song song **Chất lượng Mã Nguồn (Code Quality)**, **Tính Toàn Vẹn Logic Nghiệp Vụ (Business Logic)** và **Trải Nghiệm Thực Tế Của Người Dùng (User Experience - UX)**.  
-> **Thời điểm cập nhật:** 16:30, Ngày 30/10/2026.
+> **Dự án:** Smart-POS (Hệ thống Quản lý Bán hàng & Quản trị Nhà hàng)  
+> **Phạm vi rà soát:** Toàn bộ mã nguồn từ đầu đến cuối (Giai đoạn 0 $\rightarrow$ Giai đoạn 4) trên cả **Backend (`catalog-inventory-service`)**, **Database (`init-scripts`, `seed-demo-data.sql`, JPA Entities/Repositories)**, **Cơ chế Xử lý Ngoại lệ & Validation**, và **Frontend (`Next.js 16 / React 19`)**.  
+> **Thời điểm kiểm toán:** 19:15, Ngày 30/10/2026.  
+> **Nguyên tắc thực hiện:** Chỉ kiểm toán và xuất báo cáo hướng dẫn khắc phục chi tiết; tuyệt đối không can thiệp mã nguồn dự án và không chỉnh sửa `CATALOG_INVENTORY_PLAN.md`.
 
 ---
 
-## 🗺️ 1. Sơ Đồ Kiến Trúc & Luồng Tương Tác Nghiệp Vụ
+## ✅ 1. Kết Quả Kiểm Tra Biên Dịch & Tổng Quan Chất Lượng Hiện Tại
+
+| Hạng mục kiểm tra | Công cụ / Lệnh kiểm chứng | Kết quả thực tế | Đánh giá |
+| :--- | :--- | :--- | :---: |
+| **Backend Compile** | `mvn -f backend/pom.xml -pl services/catalog-inventory-service compile` | `BUILD SUCCESS` (0 lỗi biên dịch) | ✅ Tốt |
+| **Backend Unit / Integration Tests** | `mvn -f backend/pom.xml -pl services/catalog-inventory-service test` | `No tests to run` (**0 bài test**) | ⚠️ Thiếu test tự động |
+| **Frontend TypeScript** | `tsc --project frontend/tsconfig.json --noEmit` | **0 lỗi** *(Lỗi prop `ingredientToEdit` tại `inventory/page.tsx:783` đã được sửa)* | ✅ Đạt 100% |
+| **Frontend ESLint** | `npm --prefix frontend run lint` | `EXIT CODE 0` (0 errors, 0 warnings) | ✅ Đạt 100% |
+| **Frontend Unit Tests** | `npm --prefix frontend test` | `6/6 tests PASSED` *(chỉ mới test `kds-timer`, chưa có test Catalog/BOM)* | 🟡 Cơ bản |
+
+### 🌟 Những Điểm Mạnh Nền Tảng Đã Xây Dựng Rất Tốt
+1. **Kiến trúc phân tầng chuẩn mực:** Tách biệt rõ `Controller` $\rightarrow$ `Service` $\rightarrow$ `Repository` $\rightarrow$ `MapStruct Mapper` $\rightarrow$ `DTO` cho toàn bộ 9 nhóm tài nguyên (Danh mục, Món ăn & Size, Topping, Upload file, Nguyên liệu, Công thức BOM 3 tầng, Trừ kho & Thẻ kho, Nhà cung cấp, Phiếu nhập kho).
+2. **Tư duy chống Deadlock hai chiều:** Cả luồng trừ kho (`InventoryServiceImpl`) và duyệt phiếu nhập (`PurchaseOrderServiceImpl`) đều sắp xếp tăng dần ID nguyên liệu (`ORDER BY i.id`) khi lấy khóa bi quan `PESSIMISTIC_WRITE`.
+3. **Bảo vệ tính toàn vẹn nghiệp vụ:** Chặn sửa trực tiếp `currentStock` khi cập nhật nguyên liệu; chặn đổi `unit` (đơn vị tính) hoặc xóa nguyên liệu/danh mục/món ăn khi đã phát sinh dữ liệu liên quan; tính giá vốn bình quân gia quyền tự động.
+
+---
+
+## 🚨 2. Kiểm Toán Cơ Chế Xử Lý Ngoại Lệ, Thông Báo Lỗi & Validation
 
 ```mermaid
-flowchart TD
-    subgraph UI_Customers["Khách Hàng & Thu Ngân (Frontend Web)"]
-        MenuGuest["/menu<br>(QR Order Khách)"]
-        CartGuest["/cart<br>(Giỏ hàng Khách)"]
-        PosScreen["/pos<br>(Thu ngân POS - Đã nối API)"]
-    end
-
-    subgraph UI_Admin["Quản Trị Viên & Bếp (Admin Portal)"]
-        AdminProd["/admin/products<br>(Quản trị Món ăn, Danh mục & Topping)"]
-        AdminBom["/admin/menu-bom<br>(Cấu hình Định lượng BOM & Giá vốn)"]
-        AdminInv["/admin/inventory<br>(Quản trị Nguyên liệu & Tồn kho)"]
-    end
-
-    subgraph Backend_Service["Backend: catalog-inventory-service (Cổng 8082)"]
-        CatCtrl["CategoryController<br>/api/categories"]
-        ProdCtrl["ProductController<br>/api/products"]
-        ModCtrl["ModifierGroupController<br>/api/modifier-groups"]
-        FileCtrl["FileController<br>/api/files/upload"]
-        IngCtrl["IngredientController<br>/api/ingredients"]
-        RecCtrl["RecipeController<br>/api/recipes"]
-        InvCtrl["InventoryController<br>/api/inventory/deduct"]
-    end
-
-    subgraph Core_Engine["Lõi Xử Lý Nghiệp Vụ Chuyên Sâu"]
-        BOMCalc["BOM Engine: Tính định lượng cộng dồn<br>(Món gốc + Size + Topping)"]
-        PessimisticLock["Pessimistic Lock Engine<br>(ORDER BY i.id chống Deadlock)"]
-        Idempotent["Idempotent Check<br>(idx_inventory_tx_order_code)"]
-    end
-
-    subgraph DB["PostgreSQL: pos_catalog_inventory_db"]
-        CatalogTables[("Thực đơn: categories, products,<br>product_variants, modifier_groups, modifier_options")]
-        InventoryTables[("Kho: ingredients, recipes,<br>inventory_transactions")]
-    end
-
-    MenuGuest & PosScreen -->|GET /api/products/menu| ProdCtrl
-    AdminProd -->|CRUD Món ăn & Topping| ProdCtrl & CatCtrl & ModCtrl & FileCtrl
-    AdminBom -->|Thiết lập công thức| RecCtrl & ProdCtrl & IngCtrl
-    AdminInv -->|CRUD Nguyên liệu| IngCtrl
-    AdminInv -.->|Mô phỏng trừ kho| InvCtrl
-
-    InvCtrl --> BOMCalc --> PessimisticLock --> Idempotent
-    ProdCtrl & CatCtrl & ModCtrl --> CatalogTables
-    IngCtrl & RecCtrl & Idempotent --> InventoryTables
+flowchart LR
+    Req["Client gửi dữ liệu sai"] --> Valid["Jakarta @Valid / Spring Web"]
+    Valid --> GEH["GlobalExceptionHandler"]
+    GEH -->|ProblemDetail: detail='Dữ liệu không hợp lệ'<br>+ errors={field: msg}| ApiTs["frontend/src/lib/api.ts"]
+    ApiTs -->|Chỉ đọc errorJson.detail<br>BỎ QUA errorJson.errors!| Toast["Toast UI: 'Dữ liệu không hợp lệ'<br>(Mất sạch thông báo chi tiết từng trường!)"]
 ```
 
----
+### 🔴 [EX-01] Mất sạch thông báo lỗi chi tiết từng trường (`@Valid`) giữa Backend và Frontend *(Nghiêm trọng)*
+* **Vị trí:**
+  * Backend: [`GlobalExceptionHandler.java#L36-L44`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/exception/GlobalExceptionHandler.java#L36-L44)
+  * Frontend: [`api.ts#L36-L46`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/lib/api.ts#L36-L46) và [`api.ts#L194-L202`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/lib/api.ts#L194-L202)
+* **Nguyên nhân:** Khi DTO vi phạm `@NotBlank`, `@Size`, `@Email`, `@Digits`, `@Positive`..., `GlobalExceptionHandler` gán cứng `detail = "Dữ liệu không hợp lệ"` và đặt danh sách lỗi chi tiết vào `problem.setProperty("errors", errors)`. Tuy nhiên hàm `handleResponse` trong `api.ts` chỉ lấy:
+  ```ts
+  errorMsg = errorJson.detail || errorJson.message || errorJson.title || errorMsg;
+  ```
+  Vì `errorJson.detail` luôn có giá trị `"Dữ liệu không hợp lệ"`, toàn bộ object `errorJson.errors` (ví dụ: `{"email": "Email không đúng định dạng", "quantityNeeded": "Định lượng tối đa 9 chữ số nguyên và 3 chữ số thập phân"}`) bị vứt bỏ hoàn toàn.
+* **Hệ quả:** Người dùng nhập sai định dạng email, số âm, hoặc quá số lẻ thập phân chỉ nhận được đúng một thông báo mù mờ `"Dữ liệu không hợp lệ"`, không biết phải sửa ở ô nào.
+* **Hướng khắc phục:**
+  * Tại `GlobalExceptionHandler.handleValidation`: Ghép thông báo chi tiết vào `detail` (VD: nối các `FieldError.getDefaultMessage()` bằng dấu `"; "`).
+  * Tại `api.ts`: Kiểm tra thêm `if (errorJson.errors && typeof errorJson.errors === "object")` để trích xuất chuỗi lỗi chi tiết hiển thị lên Toast/Modal.
 
-## 📊 2. Ma Trận Đánh Giá Tính Năng Đã Xây Dựng (BE & FE)
+### 🔴 [EX-02] `GlobalExceptionHandler` bỏ sót 7 nhóm ngoại lệ phổ biến (Gây lọt lỗi HTTP 500 hoặc tiếng Anh thô) *(Nghiêm trọng)*
+* **Vị trí:** [`GlobalExceptionHandler.java#L13-L60`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/exception/GlobalExceptionHandler.java#L13-L60)
+* **Hiện trạng:** File chỉ mới bắt đúng 5 ngoại lệ custom + `MethodArgumentNotValidException`. Các ngoại lệ thực tế sau đây **chưa được xử lý**:
+  1. **`DataIntegrityViolationException` (Spring DAO):** Khi xảy ra race condition đụng `UNIQUE` constraint (`po_number`, `sku`, `code`), lỗi khóa ngoại `FOREIGN KEY`, hoặc lỗi tràn kiểu số `numeric field overflow` $\rightarrow$ Hệ thống văng **HTTP 500 Internal Server Error** thay vì `409 Conflict` / `400 Bad Request` tiếng Việt.
+  2. **`MaxUploadSizeExceededException`:** Khi người dùng tải ảnh món ăn nặng `> 10MB` (giới hạn tại [`application.yml#L10-L12`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/resources/application.yml#L10-L12)) $\rightarrow$ Không trả về thông báo tiếng Việt thân thiện (*"Ảnh tải lên vượt quá dung lượng tối đa 10MB"*).
+  3. **`HttpMessageNotReadableException`:** Khi client gửi sai kiểu dữ liệu JSON (VD: nhập số lẻ `1.5` vào ô Số lượng bán kiểu `Integer`, sai định dạng ngày `yyyy-MM-dd`, hoặc sai giá trị Enum `PurchaseOrderStatus`) $\rightarrow$ Trả về thông báo tiếng Anh mặc định `"Failed to read request"`.
+  4. **`MethodArgumentTypeMismatchException`:** Khi truyền sai kiểu trên URL/Query (VD: `/api/products/abc`, `/api/inventory/transactions?type=SAI_LOAI`).
+  5. **`MissingServletRequestParameterException` & `MissingServletRequestPartException`:** Khi gọi `PATCH .../status` thiếu tham số `?isActive=` hoặc gọi `POST /api/files/upload` thiếu part `file`.
+  6. **`NoResourceFoundException`:** Khi truy cập đường dẫn ảnh hoặc endpoint không tồn tại.
+  7. **Chốt chặn cuối `@ExceptionHandler(Exception.class)` kèm `@Slf4j`:** Chưa có logger ghi lại stacktrace lỗi bất ngờ và trả về thông điệp tiếng Việt chuẩn hóa.
 
-| TT | Nghiệp Vụ / Chức Năng | Đánh Giá Backend | Đánh Giá Frontend | Đánh Giá Nghiệp Vụ & UX | Xếp Loại |
-| :-: | :--- | :--- | :--- | :--- | :-: |
-| **1** | **Quản lý Danh mục (Categories)** | ✅ RESTful đầy đủ (GET, POST, PUT, DELETE, PATCH). Chặn xóa danh mục khi có sản phẩm (`existsByCategoryId`). | ✅ Tích hợp trong `CategoryModal.tsx`. Thêm/sửa/xóa, đổi thứ tự hiển thị ngay trên UI. | **Rất tốt:** Thao tác nhanh, không tải lại trang, modal hỗ trợ tìm kiếm và thông báo rõ ràng. | ⭐⭐⭐⭐⭐ (Xuất sắc) |
-| **2** | **Upload ảnh món ăn (File Storage)** | ✅ Lưu trữ file an toàn, tên ngẫu nhiên UUID chống trùng, kiểm tra đuôi (`jpg, png, webp`), phục vụ tĩnh qua WebMvcConfigurer. | ✅ Tích hợp trong `ProductModal.tsx`. Hỗ trợ chọn ảnh từ máy tính, preview ảnh tức thì. | **Tốt:** Thao tác trực quan. *Điểm trừ nhỏ:* Chưa có tính năng crop/nén ảnh phía client trước khi upload. | ⭐⭐⭐⭐☆ (Tốt) |
-| **3** | **Nhóm tùy chọn & Topping (Modifiers)** | ✅ CRUD nhóm tùy chọn, cấu hình bắt buộc/tùy chọn, chọn 1/chọn nhiều. Chặn xóa nhóm/option nếu đang có công thức hoặc gắn vào món. | ✅ `ModifierGroupModal.tsx` cho Admin.<br>✅ `ModifierModal.tsx` cho Khách hàng chọn Topping. | **Rất tốt:** UX khách chọn topping linh hoạt. Admin dễ dàng thêm nhiều option kèm giá phụ thu. | ⭐⭐⭐⭐⭐ (Xuất sắc) |
-| **4** | **Món ăn & Biến thể Size (Products)** | ✅ Tạo/sửa món ăn kèm size và topping trong 1 transaction. Cập nhật size tại chỗ giữ nguyên ID. Search đa tiêu chí. | ✅ Trang `/admin/products` phân tab danh mục, lọc tìm kiếm realtime, toggle kinh doanh. | **Rất tốt:** Quản trị viên nắm bắt nhanh tổng số món, món mở bán/tạm ngưng. Có nút chuyển nhanh sang cấu hình BOM. | ⭐⭐⭐⭐⭐ (Xuất sắc) |
-| **5** | **Thực đơn động (Menu Aggregation)** | ✅ `GET /api/products/menu` tối ưu bằng `@EntityGraph`, triệt tiêu 100% lỗi N+1 Query. Gom nhóm theo danh mục. | ✅ Khách hàng xem `/menu` đẹp mắt.<br>✅ Thu ngân xem `/pos` đã nạp thực đơn động từ CSDL. | **Rất tốt:** Đồng bộ dữ liệu xuyên suốt giữa Khách gọi món và Thu ngân thu tiền. Có fallback mock an toàn. | ⭐⭐⭐⭐⭐ (Xuất sắc) |
-| **6** | **Quản lý Nguyên liệu (Ingredients)** | ✅ CRUD nguyên liệu, cờ `lowStock` tính realtime, tự động sinh thẻ kho ban đầu `AUDIT_ADJUST`, chặn sửa tồn trực tiếp, chặn đổi đơn vị tính khi đã dùng. | ✅ Trang `/admin/inventory` có thống kê tổng vốn tồn kho, lọc nguyên liệu sắp hết, modal thêm/sửa chuẩn. | **Xuất sắc:** Ngăn chặn gian lận sửa tồn kho. Giao diện báo động nguyên liệu sắp hết bằng màu sắc nổi bật. | ⭐⭐⭐⭐⭐ (Xuất sắc) |
-| **7** | **Định lượng công thức (BOM 3 tầng)** | ✅ Cấu hình độc lập 3 tầng: Món gốc, Từng Size, Từng Topping. Chặn trùng nguyên liệu, bảo vệ toàn vẹn dữ liệu. | ✅ Trang `/admin/menu-bom` phân 3 tab trực quan, ước tính giá vốn (COGS) realtime khi nhập số lượng. | **Xuất sắc:** Đã giải quyết triệt để lỗi nhảy số input, chặn trùng dropdown và bảo vệ an toàn bằng Empty State. | ⭐⭐⭐⭐⭐ (Xuất sắc) |
-| **8** | **Lõi trừ kho tự động (Deduction Engine)** | ✅ Khóa bi quan `ORDER BY i.id` chống deadlock. Chống trừ trùng bằng `orderCode`. Rollback toàn bộ nếu thiếu hàng. Validate option thuộc món. | ✅ Giỏ hàng đã bảo toàn `modifierOptionIds`. Admin có modal mô phỏng test trừ kho realtime. | **Rất tốt:** Backend chuẩn ngân hàng/enterprise. *Cần kết nối thêm:* Nối luồng gọi API thật từ Đơn hàng Bán hàng. | ⭐⭐⭐⭐☆ (Rất tốt) |
+### 🟠 [EX-03] Lỗ hổng Validation trên các Request DTO dẫn tới lỗi 500 dưới Database *(Quan trọng)*
+1. **Thiếu `@Digits` trên các trường giá tiền Catalog:**
+   * [`ProductCreateRequest.java#L30-L32`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/dto/request/ProductCreateRequest.java#L30-L32), [`ProductUpdateRequest.java#L30-L32`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/dto/request/ProductUpdateRequest.java#L30-L32), [`ProductVariantRequest.java#L21-L23`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/dto/request/ProductVariantRequest.java#L21-L23), [`ModifierOptionRequest.java#L21-L23`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/dto/request/ModifierOptionRequest.java#L21-L23) chỉ có `@DecimalMin("0.0")` mà **thiếu `@Digits(integer = 10, fraction = 2)`**. Nếu nhập giá `>= 10.000.000.000`, request vượt qua `@Valid` nhưng làm nổ cột `DECIMAL(12,2)` của PostgreSQL (HTTP 500).
+2. **`NullPointerException` (HTTP 500) trong `DeductItemRequest`:**
+   * [`DeductItemRequest.java#L19`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/dto/request/DeductItemRequest.java#L19) không có `@NotNull` trên `modifierOptionIds`. Nếu JSON truyền `"modifierOptionIds": null`, [`InventoryServiceImpl.java#L113`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/InventoryServiceImpl.java#L113) và `#L152` sẽ ném `NullPointerException` ngay lập tức.
+3. **Truyền `null` vào các cờ Boolean khi tạo mới gây lỗi `NOT NULL` DB:**
+   * `CategoryCreateRequest.isActive`, `ProductCreateRequest.isActive`, `SupplierCreateRequest.isActive`, `ModifierGroupCreateRequest.isMultiple` / `isRequired` không có `@NotNull` (hoặc xử lý `Boolean.TRUE.equals(...)` khi map). Nếu payload truyền `"isActive": null`, Jackson ghi đè giá trị mặc định `= true` thành `null` và gây lỗi 500 `violates not-null constraint`.
+4. **Thiếu `@Size` trên `imageUrl`:**
+   * [`Product.java#L39-L40`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/domain/Product.java#L39-L40) khai báo `@Column(name = "image_url")` (mặc định Hibernate tạo `VARCHAR(255)`), nhưng `ProductCreateRequest.imageUrl` không có `@Size(max = 255)` (hoặc cần đổi cột thành `columnDefinition = "TEXT"`).
 
----
-
-## 🔬 3. Đánh Giá Chuyên Sâu Về Kỹ Thuật Lập Trình (Code Quality)
-
-### 3.1. Những Điểm Sáng Đạt Chuẩn Cao
-1. **Thiết kế Chống Deadlock và Xung Đột Dữ Liệu (Concurrency):**
-   * Trong [`IngredientRepository.java`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/repository/IngredientRepository.java), câu lệnh `@Lock(LockModeType.PESSIMISTIC_WRITE)` kết hợp mệnh đề `ORDER BY i.id` là kỹ thuật chuẩn mực trong các hệ thống tài chính / kho vận. Bất kể các món trong đơn hàng được gửi theo thứ tự nào, các dòng trong bảng `ingredients` đều bị khóa theo một thứ tự duy nhất tăng dần theo ID, triệt tiêu hoàn toàn bài toán Deadlock (hai giao dịch chờ chéo nhau).
-2. **Nguyên Lý Lũy Đẳng (Idempotency) Trong Trừ Kho:**
-   * Trong [`InventoryServiceImpl.java`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/InventoryServiceImpl.java), việc kiểm tra `existsByOrderCodeAndTransactionType(orderCode, SALE_DEDUCT)` được thực hiện **sau khi đã nắm giữ khóa nguyên liệu**. Điều này đảm bảo nếu hai request trùng mã đơn hàng được gửi tới đồng thời (do mạng lag hoặc retry tự động từ client), request thứ hai buộc phải xếp hàng chờ và ngay khi request thứ nhất trừ kho xong, request thứ hai sẽ bị phát hiện và chặn đứng bằng lỗi 409 (`DuplicateResourceException`).
-3. **Kiểm Soát Thất Thoát Dữ Liệu Phía Frontend:**
-   * Trong [`BomTableEditor`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/app/admin/menu-bom/page.tsx), việc định nghĩa `LocalRecipeRow` với kiểu `quantityNeeded: string | number` giúp tách biệt giữa trạng thái hiển thị nhập liệu của người dùng và dữ liệu số thực tế. Khi người dùng bấm phím `Backspace` xóa trắng ô, giá trị tạm thời là `""` chứ không bị ép về `0.001` như trước. Toàn bộ quá trình validate chỉ kích hoạt khi bấm Lưu.
-   * `key` của bảng được gắn thêm mã phiên bản: `key={`${selectedProductId}-${activeScope}-${activeVariantId}-${activeOptionId}-rev-${revision}`}`, đảm bảo React luôn unmount/remount sạch sẽ khi người dùng chuyển tab hoặc bấm "Hủy thay đổi".
-
----
-
-## 💡 4. Đánh Giá Logic Nghiệp Vụ & Trải Nghiệm Người Dùng (UX & Business Logic)
-
-Dưới đây là các phát hiện quan trọng về nghiệp vụ và trải nghiệm người dùng sau khi rà soát toàn bộ luồng hoạt động:
-
-### 🌟 4.1. Những Điểm Xuất Sắc Về Mặt Nghiệp Vụ
-1. **Bảo Vệ Tính Toàn Vẹn Sổ Kho (Audit Trail):**
-   * Trong `IngredientServiceImpl`, việc **tuyệt đối không cho phép sửa trường `currentStock`** trong API `PUT /api/ingredients/{id}` là quyết định thiết kế rất chính xác về mặt kế toán kho. Người dùng không thể "phù phép" số lượng tồn kho tùy tiện. Tồn kho chỉ được phép thay đổi thông qua các sự kiện có lịch sử giao dịch: Nhập hàng (`IMPORT`), Trừ bán hàng (`SALE_DEDUCT`) hoặc Điều chỉnh kiểm kê (`AUDIT_ADJUST`).
-2. **Ngăn Chặn Đổi Đơn Vị Tính Khi Đã Phát Sinh Nghiệp Vụ:**
-   * Phương thức `isInUse(id)` chặn không cho đổi đơn vị tính (`unit`) của nguyên liệu nếu nguyên liệu đó đã từng có công thức hoặc thẻ kho. Điều này bảo vệ người dùng khỏi thảm họa sai lệch số liệu (ví dụ: đang quản lý bằng `kg` với định lượng `0.05kg`, nếu đổi sang đơn vị `g` mà công thức cũ không đổi thì hệ thống sẽ trừ nhầm `0.05g`, sai lệch 1000 lần).
-3. **Cơ Chế Empty State & Link Điều Hướng Thông Minh Trên Giao Diện BOM:**
-   * Khi chọn một món ăn không có size (ví dụ: Đĩa khoai tây chiên) và chuyển sang tab *"Định lượng theo Size"*, giao diện không còn để bảng trống dễ gây hiểu nhầm mà hiển thị hộp thông báo giải thích: *"Món này chỉ có kích thước tiêu chuẩn mặc định"*, đi kèm nút bấm một chạm chuyển về tab Món gốc hoặc link chuyển sang trang Thêm size. Tương tự đối với Topping. Điều này giúp nhân viên quản trị không bao giờ bị bối rối hoặc lưu nhầm dữ liệu.
+### 🟡 [EX-04] Bất đồng nhất định dạng Envelope giữa Thành công và Lỗi *(Trung bình)*
+* Thành công trả về `ApiResponse<T>` (`{ success, message, data, timestamp }`), trong khi lỗi trả về `ProblemDetail` (`{ type, title, status, detail, instance, timestamp }`), đồng thời khác cấu trúc lỗi của `auth-service` và `sales-service`. Nên thống nhất chuẩn phản hồi trước khi tích hợp qua `api-gateway`.
 
 ---
 
-### ⚠️ 4.2. Các Điểm Khuyết Nghiệp Vụ & Góc Khuất Trải Nghiệm Cần Cải Thiện
+## ⚙️ 3. Kiểm Toán Logic Code & Concurrency Trên Backend
 
-#### 1. Thiếu Nghiệp Vụ "Kiểm Kê Định Kỳ & Cân Bằng Kho" (Stocktake / Inventory Adjustment)
-* **Thực tế vận hành nhà hàng:** Cuối mỗi ngày hoặc cuối tuần, thủ kho sẽ kiểm đếm thực tế (ví dụ: trên phần mềm ghi tồn 15.5 kg thịt bò, nhưng cân thực tế trong tủ đông chỉ còn 14.8 kg do rã đông hoặc hao hụt).
-* **Bất cập hiện tại:** Vì hệ thống đã chặn sửa `currentStock` trên form nguyên liệu, người quản trị **hoàn toàn không có cách nào để cân bằng số tồn thực tế** trên giao diện.
-* **Đề xuất cải thiện UX & Nghiệp vụ:**
-  * Bổ sung nút **"Kiểm kê / Điều chỉnh kho"** trên trang `/admin/inventory`.
-  * Mở modal cho phép nhập: Số lượng thực tế kiểm đếm, Loại điều chỉnh (`AUDIT_ADJUST` nếu chênh lệch kiểm kê, hoặc `SPOILAGE` nếu xuất hủy do ôi thiu/hết hạn), và Ghi chú lý do.
-  * Backend tự tính chênh lệch: $\Delta = \text{Thực tế} - \text{Tồn máy}$, cập nhật lại `currentStock` và ghi một dòng biến động $\Delta$ vào `inventory_transactions`.
+### 🔴 [BE-01] Lỗi nổ `UNIQUE` khi gửi chuỗi rỗng `code` & Không thể xóa trắng các trường tùy chọn khi Cập nhật *(Nghiêm trọng)*
+* **Vị trí:**
+  * [`ProductServiceImpl.java#L48-L50`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/ProductServiceImpl.java#L48-L50), `#L140-L142`, `#L187-L200`
+  * [`ProductMapper.java#L43`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/mapper/ProductMapper.java#L43), [`SupplierMapper.java#L21`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/mapper/SupplierMapper.java#L21), [`IngredientServiceImpl.java#L98-L115`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/IngredientServiceImpl.java#L98-L115)
+* **Phân tích 2 lỗi liên hoàn:**
+  1. **Lưu chuỗi rỗng `""` vào cột `UNIQUE (code)` của `products`:** Nếu request gửi `code: ""` (hoặc `"   "`), hàm `validateUniqueFieldsOnCreate` bỏ qua kiểm tra vì `!request.getCode().isBlank()` là `false`. Nhưng ngay sau đó dòng 49 và 141 lại chạy `product.setCode(request.getCode().trim().toUpperCase())` $\rightarrow$ lưu `""` thay vì `null`! Khi tạo món thứ 2 cũng để `code: ""`, PostgreSQL ném lỗi **HTTP 500 Duplicate Key**! (Cần chuẩn hóa bằng hàm `normalizeCode` chuyển chuỗi rỗng về `null` giống `normalizeSku`).
+  2. **Không thể xóa trắng `code`, `description`, `imageUrl`, `phone`, `email`, `address` khi Edit:** Trên Frontend (`ProductModal.tsx:181-184`, `IngredientModal.tsx:53`, `SupplierModal.tsx:42-44`), khi người dùng xóa trắng ô nhập, Frontend gửi `undefined` (tức `null` trong DTO Java). Vì tất cả các Mapper đều gắn `@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)`, MapStruct **bỏ qua toàn bộ giá trị `null`**, khiến dữ liệu cũ trong DB giữ nguyên không thể xóa!
 
-#### 2. Thông Báo Lỗi Ràng Buộc Khi Xóa Món Ăn Chưa Thân Thiện Với Người Dùng
-* **Vị trí:** [`frontend/src/app/admin/products/page.tsx#L181-L183`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/app/admin/products/page.tsx#L181-L183)
-* **Thực trạng:** Khi người dùng xóa một món ăn đang có công thức định lượng BOM, backend ném lỗi 400 kèm message: *"Không thể xóa món ăn đang có công thức định lượng. Hãy xóa công thức trước"*.
-* **Bất cập UX:** Phía Frontend hiện chỉ toast chung chung: `toast.error("Không thể xóa món ăn", err.message)`. Người dùng phổ thông thường không hiểu "công thức định lượng" nằm ở đâu để xóa.
-* **Đề xuất cải thiện UX:** Trong thông báo lỗi của toast, cung cấp luôn một nút hành động nhanh: **[Đi tới Định lượng BOM]** dẫn thẳng sang trang `/admin/menu-bom?productId=...` để người dùng thao tác xóa ngay mà không mất công tìm kiếm.
+### 🔴 [BE-02] Race Condition cộng đúp tồn kho 2 lần khi duyệt Phiếu nhập kho (`completePurchaseOrder`) *(Nghiêm trọng)*
+* **Vị trí:** [`PurchaseOrderServiceImpl.java#L158-L230`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/PurchaseOrderServiceImpl.java#L158-L230)
+* **Nguyên nhân:** Dòng 159 gọi `purchaseOrderRepository.findWithDetailsById(id)` **không có khóa bi quan (`PESSIMISTIC_WRITE`)** trên bản ghi `PurchaseOrder` (và entity `PurchaseOrder` cũng không có `@Version`), rồi kiểm tra `po.getStatus() == COMPLETED` ở dòng 162 *trước khi* khóa các dòng `Ingredient` ở dòng 181.
+* **Kịch bản tái hiện:** Nếu thủ kho bấm đúp hoặc 2 tab cùng gửi `PATCH /api/purchase-orders/2/complete` cùng lúc:
+  1. Cả Luồng A và Luồng B đều đọc `po` ở dòng 159 và thấy `status = DRAFT`.
+  2. Luồng A lấy khóa `Ingredient` ở dòng 181, cộng tồn kho, ghi thẻ kho `IMPORT`, đổi `status = COMPLETED` và commit.
+  3. Luồng B (đang chờ ở dòng 181) được nhả khóa `Ingredient`, nhưng biến `po` trong bộ nhớ của Luồng B vẫn mang `status = DRAFT` đã vượt qua dòng 162 $\rightarrow$ **cộng đúp toàn bộ số lượng phiếu nhập vào kho lần thứ 2**!
+* **Hướng khắc phục:** Bổ sung query `@Lock(LockModeType.PESSIMISTIC_WRITE)` cho `PurchaseOrderRepository` khi gọi trong `completePurchaseOrder`, `updatePurchaseOrder` và `cancelPurchaseOrder` (hoặc thêm `@Version` vào `PurchaseOrder`).
 
-#### 3. Chênh Lệch Quy Đổi Đơn Vị Tính Trong Định Lượng (Unit Mismatch Confusion)
-* **Thực tế:** Nguyên liệu trong kho nhập theo đơn vị lớn: Thịt bò (`kg`), Sữa tươi (`hộp` hoặc `lít`), Đường (`kg`). Nhưng khi cấu hình định lượng cho 1 ly nước hoặc 1 tô mì, đầu bếp thường tính theo đơn vị nhỏ: `g`, `ml`, `muỗng`.
-* **Bất cập UX:** Trên trang `/admin/menu-bom`, người dùng buộc phải tự nhẩm đổi đơn vị: muốn định lượng 50g thịt bò thì phải tự gõ `0.05` (vì đơn vị kho là `kg`). Nếu vô tình gõ `50`, hệ thống sẽ hiểu là 50 kg thịt bò cho 1 tô mì, dẫn đến trừ âm kho hàng loạt khi bán.
-* **Đề xuất cải thiện UX:**
-  * Bổ sung nhãn hướng dẫn rõ ràng ngay dưới cột định lượng: ví dụ nếu nguyên liệu là `kg`, hiển thị gợi ý nhỏ: `(Nhập 0.1 tương đương 100g)`.
+### 🟠 [BE-03] Thiếu hoàn toàn API nghiệp vụ Kiểm kê kho (`AUDIT_ADJUST`) và Hủy hàng hỏng (`SPOILAGE`) *(Quan trọng)*
+* **Vị trí:** [`InventoryController.java`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/controller/InventoryController.java) & [`IngredientServiceImpl.java`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/IngredientServiceImpl.java)
+* **Phân tích nghiệp vụ:** Hệ thống đã chặn không cho sửa `currentStock` trong `PUT /api/ingredients/{id}` để bảo vệ sổ kho, đồng thời đã khai báo enum `AUDIT_ADJUST` (Kiểm kê) & `SPOILAGE` (Hỏng hóc). Tuy nhiên **chưa có API nào (ví dụ `POST /api/inventory/adjust`)** để thủ kho thực hiện xuất hủy nguyên liệu hư hỏng/hết hạn hoặc cân bằng kho sau kiểm kê thực tế! Nếu nguyên liệu trong bếp bị đổ vỡ/hết hạn, thủ kho hiện không có bất kỳ chức năng nào để trừ kho hợp lệ.
 
-#### 4. Bán Hàng Chưa Khép Kín Luồng Trừ Kho Tự Động (End-to-End Gap)
-* **Thực trạng:**
-  * Khách đặt món trên `/cart`: Nút bấm đang dùng `setTimeout` giả lập.
-  * Thu ngân thanh toán trên `/pos`: Nút "Thanh toán" hiện chỉ giải phóng bàn trống trên giao diện, chưa gửi đơn sang `sales-service` và chưa tự động trừ kho.
-* **Đề xuất:** Kết nối gọi `POST /api/inventory/deduct` khi đơn hàng chuyển sang trạng thái đã thanh toán (`COMPLETED`) để hoàn tất 100% vòng đời của một đơn hàng thực tế.
+### 🟠 [BE-04] Lưu cứng `http://localhost:8082/...` vào Database khi Upload ảnh làm hỏng QR Menu trên điện thoại *(Quan trọng)*
+* **Vị trí:** [`FileStorageService.java#L62-L65`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/FileStorageService.java#L62-L65)
+* **Nguyên nhân:** `ServletUriComponentsBuilder.fromRequestUri(request)...` tạo URL gắn cứng host lúc upload (`http://localhost:8082/uploads/products/uuid.png`) và lưu vào cột `products.image_url`. Khi khách hàng quét mã QR tại bàn bằng điện thoại qua mạng Wi-Fi/LAN (VD: `http://192.168.1.10:3000/menu`), trình duyệt điện thoại sẽ gọi về `localhost:8082` (chính chiếc điện thoại đó) làm **toàn bộ ảnh món ăn mới upload bị lỗi không hiển thị**.
+* **Bổ sung thêm tại `FileStorageService`:**
+  * Mới chỉ kiểm tra đuôi tên file (`.jpg`, `.png`, `.webp`), chưa kiểm tra Content-Type / Magic Bytes thực sự của file.
+  * Khi xóa món ăn hoặc thay ảnh khác cho món ăn, file ảnh cũ trong `uploads/products/` không được xóa đi (gây rác ổ cứng theo thời gian).
+* **Hướng khắc phục:** Chỉ lưu đường dẫn tương đối `/uploads/products/<uuid>.png` vào DB, và ghép với `API_ORIGIN` ở Frontend (hoặc cấu hình `rewrites` trong `next.config.mjs`).
 
----
-
-## 🧪 5. Bảng Tổng Hợp Kiểm Thử Chất Lượng (Quality Verification)
-
-Toàn bộ hệ thống đã được chạy kiểm tra thực tế bằng các công cụ kiểm thử tự động của dự án:
-
-```
-[1] Maven Backend Build (Java 21 / 25 Compiler):
-    $ mvn -f backend/pom.xml -pl services/catalog-inventory-service compile -DskipTests
-    => [INFO] BUILD SUCCESS (Thời gian: 3.465 s) - 0 errors.
-
-[2] TypeScript Type-checking (Frontend Compiler):
-    $ tsc --project frontend/tsconfig.json --noEmit
-    => EXIT CODE 0 (Hoàn thành sạch sẽ, không có lỗi kiểu dữ liệu).
-
-[3] ESLint (Next.js & React 19 Linting):
-    $ npm --prefix frontend run lint
-    => EXIT CODE 0 (0 errors, 0 warnings).
-
-[4] Automated Unit Tests (Frontend Test Suite):
-    $ npm --prefix frontend test
-    => 6/6 tests PASSED (TAP version 13, thời gian chạy: 154 ms).
-```
+### 🟠 [BE-05] Các kẽ hở Validation logic trong Service *(Quan trọng)*
+1. **`ProductServiceImpl.createProduct` ([`dòng 57-68`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/ProductServiceImpl.java#L57-L68)):** Chưa kiểm tra trùng `sku` *giữa các dòng size trong cùng 1 request tạo mới* (khác với `updateProduct` đã có `seenSkus`), và cả `createProduct` lẫn `updateProduct` đều chưa chặn đặt trùng `sizeName` (VD: tạo 2 dòng cùng tên `"Size M"` trong 1 món).
+2. **`ProductServiceImpl.attachModifierGroups` ([`dòng 174-181`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/ProductServiceImpl.java#L174-L181)):** Dùng `modifierGroupRepository.findAllById(groupIds)` mà không đối chiếu số lượng tìm thấy $\rightarrow$ nếu gửi `modifierGroupIds` không tồn tại sẽ âm thầm bỏ qua thay vì báo `404 ResourceNotFoundException`.
+3. **`ModifierGroupServiceImpl.createGroup` ([`dòng 44-51`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/ModifierGroupServiceImpl.java#L44-L51)):** Không chặn trùng tên `ModifierOption` ngay trong mảng `options` lúc tạo nhóm, và cho phép tạo nhóm bắt buộc (`isRequired = true`) nhưng danh sách `options` rỗng `[]`.
+4. **Cảnh báo tồn kho sai cho nguyên liệu có `minThreshold = 0`:**
+   * [`IngredientRepository.java#L39`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/repository/IngredientRepository.java#L39) và [`IngredientMapper.java#L16`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/mapper/IngredientMapper.java#L16) dùng điều kiện `currentStock <= minThreshold`. Khi tạo nguyên liệu mới với `currentStock = 0, minThreshold = 0` (không đặt ngưỡng cảnh báo), `0 <= 0` trả về `true`, đẩy nguyên liệu vào Tab Cảnh báo với `deficit = 0, suggestedReorderQuantity = 0`! Nên đổi thành `minThreshold > 0 AND currentStock <= minThreshold` (hoặc `currentStock <= 0` nếu muốn cảnh báo hết sạch kho).
+5. **Ghi đè chéo BOM Topping dùng chung (`RecipeServiceImpl`):**
+   * [`RecipeServiceImpl.java#L51-L62`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/RecipeServiceImpl.java#L51-L62) lưu định lượng Topping theo `modifier_option_id` toàn cục (`product_id = NULL`). Với các nhóm tùy chọn dùng chung cho nhiều món như *"Lượng Đường"* (*100% đường*, *50% đường*), sửa định lượng đường khi đang chọn món *Trà Đào* sẽ ghi đè luôn định lượng đường của *Cà Phê Sữa* và *Matcha Latte*.
+6. **Không nhất quán loại giao dịch khởi tạo kho ban đầu:**
+   * [`IngredientServiceImpl.java#L56-L60`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/IngredientServiceImpl.java#L56-L60) tạo thẻ kho đầu kỳ với loại `AUDIT_ADJUST` (`orderCode = null`), trong khi [`DataInitializer.java#L387-L392`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/config/DataInitializer.java#L387-L392) lại tạo với loại `IMPORT` (`orderCode = "INIT-STOCK-2026"`).
+7. **`InventoryServiceImpl.deductInventory`:** Chưa chặn trừ kho đối với món ăn đang ngừng kinh doanh (`product.getIsActive() == false`).
 
 ---
 
-## 🎯 6. Kế Hoạch Đề Xuất Cho Bước Tiếp Theo (Actionable Roadmap)
+## 🗄️ 4. Kiểm Toán Cơ Sở Dữ Liệu, Dữ Liệu Mồi (Seed) & Hiệu Năng JPA
 
-### Bước 1: Hoàn thiện trải nghiệm người dùng cho Giai đoạn 2 (Trong 1 ngày)
-1. Thêm nhãn gợi ý quy đổi đơn vị tính (kg $\leftrightarrow$ g, lít $\leftrightarrow$ ml) trên bảng định lượng BOM.
-2. Xây dựng Modal **"Kiểm kê & Điều chỉnh kho"** trên trang `/admin/inventory` để thủ kho cân bằng số lượng thực tế khi có hao hụt / đổ vỡ.
+### 🔴 [DB-01] Lệch Schema nghiêm trọng giữa `init-scripts/01-init-all-databases.sql` (Docker) và JPA Entities *(Nghiêm trọng)*
+Khi chạy `docker compose up -d postgres`, PostgreSQL chạy [`init-scripts/01-init-all-databases.sql`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/init-scripts/01-init-all-databases.sql) để tạo bảng trước. Vì Hibernate `ddl-auto: update` **không tự sửa độ chính xác/kiểu dữ liệu của cột đã tồn tại**, môi trường Docker gặp các xung đột trực tiếp sau:
 
-### Bước 2: Khép kín luồng bán hàng với Kho (Trong 1-2 ngày)
-1. Kết nối `/cart` và `/pos` gọi API tạo đơn hàng sang `sales-service`.
-2. Thiết lập cơ chế tự động gọi `POST /api/inventory/deduct` từ `sales-service` sang `catalog-inventory-service` khi thanh toán đơn thành công.
+| Bảng & Cột | Trong `01-init-all-databases.sql` | Trong JPA Entity (`domain/*.java`) | Hậu quả thực tế khi chạy với Docker Postgres |
+| :--- | :--- | :--- | :--- |
+| `ingredients.current_stock` | `decimal(12, 2)` *(2 số lẻ)* | `precision = 12, scale = 3` *(3 số lẻ)* | **Sai lệch tồn kho vĩnh viễn:** Trừ BOM `0.025 kg` bị làm tròn thành `0.03 kg` trong `current_stock`, lệch hẳn với sổ thẻ kho! |
+| `ingredients.min_threshold` | `decimal(12, 2)` | `precision = 12, scale = 3` | Mất chữ số thập phân thứ 3 của ngưỡng tối thiểu. |
+| `ingredients.name` | `varchar(100)` | `length = 150` (`@Size(max=150)`) | Nhập tên nguyên liệu 101–150 ký tự qua `@Valid` nhưng **nổ lỗi 500 SQL**! |
+| `purchase_orders.total_amount` | `decimal(14, 2)` | `precision = 12, scale = 2` | Trên DB do Hibernate tạo mới, đơn nhập `>= 10 tỷ` bị tràn số 500 (`PurchaseOrderItem.totalPrice` cũng chỉ `12,2` dù `qty(9,3) * price(10,2)` vượt `12,2`). |
+| `inventory_transactions.order_code` | **Không có cột này** | `@Column(name = "order_code", length = 50)` | Nếu chuyển `ddl-auto: validate` khi lên Production, ứng dụng sập ngay lúc khởi động. |
+| `02-seed-data.sql` vs `DataInitializer` | Chỉ seed 3 nhóm Modifier *(thiếu "Lượng Đá")* | `if (categoryRepository.count() > 0) return;` | Khi chạy Docker, `02-seed-data.sql` nạp trước làm `DataInitializer` bỏ qua `initCatalogData()` $\rightarrow$ **thiếu mất nhóm "Lượng Đá"**! |
 
-### Bước 3: Triển khai Giai đoạn 3 (Nhà cung cấp & Nhập kho - Purchasing)
-1. Xây dựng CRUD Quản lý Nhà cung cấp (`Supplier`).
-2. Hiện thực hóa quy trình Lập phiếu nhập kho (`PurchaseOrder`) $\rightarrow$ Xác nhận nhập kho $\rightarrow$ Tự động cộng số lượng vào `currentStock` của nguyên liệu và tính toán lại giá vốn bình quân gia quyền (Weighted Average Cost).
+### 🟠 [DB-02] Lỗi logic trong `DataInitializer.java` và `seed-demo-data.sql` *(Quan trọng)*
+1. **Phiếu nhập nháp `PO-20261030-1002` không bao giờ được tạo bởi `DataInitializer`:**
+   * Tại [`DataInitializer.java#L440`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/config/DataInitializer.java#L440), code gọi `ingredientRepository.findByCode("NL-RAU")`. Tuy nhiên trong 21 nguyên liệu khởi tạo ở `initIngredientsData()` (`dòng 227-254`), **hoàn toàn không có mã `"NL-RAU"`**!
+   * Do đó câu lệnh `if (ingNamOpt.isPresent() && ingRauOpt.isPresent())` ở dòng 477 luôn `false`, phiếu `PO-20261030-1002` bị bỏ qua hoàn toàn dù dòng 512 vẫn ghi log *"Khởi tạo 3 Nhà cung cấp và 2 Đơn nhập kho mẫu thành công!"*.
+2. **Dữ liệu mồi không khớp nghiệp vụ trong `seed-demo-data.sql`:**
+   * Tại [`seed-demo-data.sql#L165-L174`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/resources/seed-demo-data.sql#L165-L174): Phiếu `PO-20261030-1002` có ghi chú *"Dự trù nấm và rau củ tươi"* nhưng chi tiết lại nhập `ingredient_id = 4` (*Mì sợi*) và `5` (*Trứng gà*); phiếu `PO-20261028-1001` mang trạng thái `COMPLETED` nhưng không có bản ghi `IMPORT` nào trong bảng `inventory_transactions`.
+
+### 🟠 [DB-03] Hai điểm nghẽn N+1 Query còn sót trong tầng Repository *(Quan trọng)*
+1. **[`ProductRepository.java#L43-L50`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/repository/ProductRepository.java#L43-L50) (`searchProducts`):**
+   * Chưa gắn `@EntityGraph(attributePaths = {"category", "variants"})`. Khi `ProductMapper.toSummaryResponseList` truy cập `product.getCategory().getName()` và `product.getVariants().size()`, Hibernate phải bắn thêm **1 + C + N câu truy vấn SQL phụ** cho mỗi lần tải trang Danh sách món hoặc trang BOM!
+2. **[`PurchaseOrderRepository.java#L27-L38`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/repository/PurchaseOrderRepository.java#L27-L38) (`searchPurchaseOrders`):**
+   * Mới chỉ gắn `@EntityGraph(attributePaths = {"supplier"})`, thiếu `"items"` và `"items.ingredient"`. Khi `PurchaseOrderMapper.toResponseList` ánh xạ chi tiết mặt hàng cho từng phiếu nhập, Hibernate phát sinh **N+1 câu truy vấn** cho `purchase_order_items` và `ingredients`.
+
+### 🟡 [DB-04] Thiếu Ràng buộc DB (Constraints), Index, Phân trang & Dọn dẹp Code thừa *(Trung bình)*
+* **Rủi ro Cascade xóa nhầm:** [`Category.java#L32`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/domain/Category.java#L32) đặt `cascade = CascadeType.ALL` trên `List<Product> products` — rất nguy hiểm, nên bỏ `CascadeType.ALL` để DB bảo vệ khóa ngoại `RESTRICT`.
+* **Thiếu `UNIQUE` dưới DB:** Các cột `categories.name`, `modifier_groups.name`, `products.name`, `ingredients.name`, `suppliers.name`, `suppliers.phone` mới chỉ kiểm tra trùng ở tầng Java, chưa có Unique Constraint/Index dưới PostgreSQL nên 2 request song song vẫn tạo được bản ghi trùng tên.
+* **Bảng `recipes`:** Nên bổ sung `CHECK` constraint đảm bảo mỗi dòng chỉ trỏ đúng 1 đích (`(CASE WHEN product_id IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN variant_id IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN modifier_option_id IS NOT NULL THEN 1 ELSE 0 END) = 1`) và Index trên `(product_id)`, `(variant_id)`, `(modifier_option_id)`.
+* **Thiếu Phân trang (`Pagination`):** `GET /api/inventory/transactions` và `GET /api/purchase-orders` đang trả toàn bộ lịch sử không giới hạn (`List<...>`), sẽ gây nghẽn bộ nhớ khi dữ liệu thẻ kho lên tới hàng chục nghìn bản ghi.
+* **Class thừa chưa dùng:** [`BaseEntity.java`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/domain/BaseEntity.java) và [`JpaAuditingConfig.java`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/config/JpaAuditingConfig.java) hiện không được bất kỳ Entity nào kế thừa; file [`.env`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/.env) nằm nhầm trong thư mục source code `src/main/java/com/smartpos/cataloginventory/.env`.
+
+---
+
+## 💻 5. Kiểm Toán Toàn Diện Frontend & Trải Nghiệm Người Dùng (UX)
+
+### 🔴 [FE-01] Lỗi hệ thống trong `ToastProvider.tsx` gây Bão Request vô tận khi mất mạng & Xóa sạch dữ liệu đang sửa trên `/admin/menu-bom` *(Nghiêm trọng nhất trên Frontend)*
+* **Vị trí:**
+  * [`ToastProvider.tsx#L49-L55`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/components/ui/ToastProvider.tsx#L49-L55)
+  * Kết hợp với dependency `[toast]` trong `useEffect` tại: [`menu-bom/page.tsx#L318-L338`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/app/admin/menu-bom/page.tsx#L318-L338) & `#L383-L419`, [`products/page.tsx#L103`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/app/admin/products/page.tsx#L103), [`inventory/page.tsx#L122`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/app/admin/inventory/page.tsx#L122), [`purchasing/page.tsx#L118`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/app/admin/purchasing/page.tsx#L118).
+* **Nguyên nhân gốc rễ:** Trong `ToastProvider.tsx`, biến `contextValue` tạo mới một object literal ở **mọi lần render** (không dùng `useMemo`, các hàm `success`, `error`, `warning`, `info` viết inline arrow function). Mỗi khi một toast xuất hiện (`t = 0s`) và khi nó tự đóng (`t = 3.5s`), state `toasts` thay đổi làm `toast` đổi tham chiếu 2 lần!
+* **Hai hậu quả nghiêm trọng:**
+  1. **Treo trình duyệt do vòng lặp vô tận khi Backend tắt/lỗi:** Khi `fetchProducts()` hoặc `fetchIngredients()` thất bại $\rightarrow$ `.catch` gọi `toast.error(...)` $\rightarrow$ `ToastProvider` re-render tạo `toast` mới $\rightarrow$ kích hoạt lại ngay lập tức `useEffect(..., [toast])` $\rightarrow$ gọi lại API lỗi $\rightarrow$ bắn hàng trăm request và hàng trăm toast đỏ mỗi giây!
+  2. **Mất sạch công thức đang nhập và nhảy ngược về Món số 1 trên `/admin/menu-bom`:** Khi người dùng chọn món thứ 4 (*Trà Đào Cam Sả*), bất kỳ lúc nào có một toast bật lên (lưu thành công, cảnh báo hết nguyên liệu để thêm, hoặc báo lỗi nhập số), `useEffect([toast])` ở dòng 326 chạy lại `setSelectedProductId(prods[0].id)` và dòng 406 tăng `revision`, **ép màn hình nhảy ngược về Món số 1 (*Mì Cay Bò Mỹ*) và xóa sạch mọi thay đổi chưa lưu**, rồi lặp lại thêm một lần nữa sau 3,5 giây khi toast biến mất!
+* **Hướng khắc phục:** Bọc `success`, `error`, `warning`, `info` bằng `useCallback` và bọc `contextValue` bằng `useMemo` trong `ToastProvider.tsx`; đồng thời ở `menu-bom/page.tsx:326` dùng `setSelectedProductId((prev) => prev ?? prods[0].id)` để không bao giờ ghi đè món đang chọn.
+
+### 🔴 [FE-02] Màn hình Thu ngân `/pos` làm sai Giá bán theo Size, gắn nhầm Đồ uống thành `"Cấp 3"` (Độ cay) và mất toàn bộ Topping *(Nghiêm trọng)*
+* **Vị trí:** [`pos/page.tsx#L111-L121`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/app/pos/page.tsx#L111-L121), `#L147-L172` & [`InvoicePanel.tsx#L42`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/components/pos/InvoicePanel.tsx#L42), `#L115-L124`
+* **Nguyên nhân:**
+  * `pos/page.tsx` chuyển đổi `ProductDetailResponse` từ API sang cấu trúc cũ `{ id, name, price: p.basePrice, spicyLevels: p.variants.map(v => v.sizeName) }`, **bỏ rơi hoàn toàn `v.id`, `v.finalPrice` (`priceAdjustment`) và `p.modifierGroups`**.
+  * Trong `InvoicePanel.tsx`, bất kỳ món nào có `spicyLevels` (tức có `variants`) đều bị render cứng thành dropdown `Cấp 0` $\rightarrow$ `Cấp 7` (mặc định `"Cấp 3"`).
+* **Hệ quả thực tế:** Khi thu ngân chọn *"Trà Đào Cam Sả"* (Size M / Size L `+8.000đ`) hay *"Gà Sốt Cay"* (Phần 4 miếng / Phần 8 miếng `+60.000đ`), hóa đơn in ra **"Trà Đào Cam Sả • Cấp 3"**, không thể chọn Size L hay Phần 8 miếng, **tính thiếu tiền khách (`+8k` / `+60k`)** và không thể chọn thêm bất kỳ Topping nào!
+* **Hướng khắc phục:** Tái sử dụng `ModifierModal` (hoặc modal chọn Size & Topping tương đương) ngay trên `/pos` khi món ăn có `variants.length > 0` hoặc `modifierGroups.length > 0`, lưu đúng `variantId`, `modifierOptionIds` và `finalPrice`.
+
+### 🔴 [FE-03] Màn hình QR Khách hàng (`ModifierModal.tsx` & `FloatingCart.tsx`) bỏ qua nhóm bắt buộc `isRequired` *(Nghiêm trọng)*
+* **Vị trí:** [`ModifierModal.tsx#L51-L59`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/components/customer/ModifierModal.tsx#L51-L59), `#L83-L85`, `#L138-L147` & [`FloatingCart.tsx#L75-L92`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/components/customer/FloatingCart.tsx#L75-L92)
+* **Chi tiết các lỗi:**
+  1. **Không chặn `isRequired`:** Dù nhóm tùy chọn có `isRequired = true` (hiển thị badge đỏ *"Bắt buộc"*), hàm `handleAdd()` không kiểm tra xem khách đã chọn ít nhất 1 option trong nhóm đó chưa $\rightarrow$ khách vẫn thêm món vào giỏ bình thường mà không cần chọn nhóm bắt buộc.
+  2. **Kẹt nút Radio ở nhóm không bắt buộc:** Với nhóm chọn 1 nhưng `isRequired = false` (như *Lượng Đường*, *Lượng Đá*), khi khách chạm vào 1 lựa chọn radio thì không thể chạm lần nữa để bỏ chọn.
+  3. **Lỗi tham chiếu biến toàn cục `open`:** Tại `ModifierModal.tsx:138`, câu lệnh `if (!open || !item) return null;` dùng biến `open` nhưng `ModifierModalDialog` không destructure `open` từ props (đang vô tình trỏ tới hàm `window.open` của trình duyệt!).
+  4. **Hiển thị thiếu Size và thừa nhãn trống trong `FloatingCart.tsx`:** Ngăn kéo giỏ hàng quên hiển thị `item.sizeName` (khách không biết mình chọn Size M hay Size L) và luôn in dòng chữ trống `"Độ ngọt: "` dưới mọi món ăn (kể cả Mì cay, Gà sốt cay).
+
+### 🟠 [FE-04] Hỏng trạng thái Danh mục khi sửa (`CategoryModal`) & Khóa cứng không cho sửa Nhóm Topping (`ModifierGroupModal`) *(Quan trọng)*
+1. **[`CategoryModal.tsx#L91`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/components/admin/CategoryModal.tsx#L91):** Hàm `handleSaveEdit` truyền cứng `isActive: true` khi lưu. Nếu một danh mục đang ẩn (`isActive: false`), chỉ cần sửa tên là nó tự động bật hiển thị trở lại! Ngoài ra `CategoryModal` cũng chưa có nút gạt ẩn/hiện danh mục dù Backend đã viết sẵn `PATCH /api/categories/{id}/status`.
+2. **[`ModifierGroupModal.tsx`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/components/admin/ModifierGroupModal.tsx) & [`api.ts#L241-L265`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/lib/api.ts#L241-L265):**
+   * Backend đã xây dựng đầy đủ 3 API: sửa nhóm (`PUT /api/modifier-groups/{id}`), thêm option lẻ (`POST /api/modifier-groups/{id}/options`), xóa option lẻ (`DELETE /api/modifier-groups/{id}/options/{optionId}`).
+   * Tuy nhiên `api.ts` và `ModifierGroupModal.tsx` **chưa kết nối cả 3 API này**! Sau khi tạo nhóm Topping, Admin hoàn toàn không thể đổi tên nhóm, không thể thêm topping mới vào nhóm, cũng không thể xóa 1 topping lẻ (mà nếu xóa cả nhóm thì bị chặn do đang gắn với món ăn/công thức).
+   * Ngoài ra `ModifierGroupModal` chưa chặn tạo nhóm rỗng (`validOptions.length === 0`) hoặc trùng tên option.
+
+### 🟠 [FE-05] Thiếu cột Hạn sử dụng (`expiryDate`) & Tự chèn dòng trùng trong `PurchaseOrderModal.tsx` *(Quan trọng)*
+* **Vị trí:** [`PurchaseOrderModal.tsx#L76-L88`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/components/admin/PurchaseOrderModal.tsx#L76-L88) & `#L333-L439`
+* **Chi tiết:**
+  1. **Quên render cột Hạn sử dụng (`expiryDate`):** Interface `LocalItemRow`, hàm `handleSubmit` và Backend DB đều có trường `expiryDate`, nhưng bảng danh sách mặt hàng trong Modal **không có cột input chọn ngày hết hạn** (cũng không hiển thị hạn sử dụng khi xem chi tiết phiếu).
+  2. **Tự động chèn nguyên liệu trùng:** Trong `handleAddRow` (`dòng 79`), khi tất cả nguyên liệu đã có trong bảng, biểu thức `|| ingredients[0]` tự động chèn trùng nguyên liệu đầu tiên rồi chặn lỗi khi bấm Lưu (nên chặn ngay lúc bấm *"+ Thêm dòng"* và disable các nguyên liệu đã chọn trong `<select>` giống trang BOM).
+  3. **Gán cứng `staffId: 1` (`dòng 180`):** Chưa lấy ID nhân viên đăng nhập thực tế, và gửi thừa `staffId` trong payload `PUT`.
+
+### 🟡 [FE-06] Tổng Hợp Các Khiếm Khuyết UX & Tích Hợp Khác Trên Frontend *(Trung bình)*
+* **Trang `/admin/inventory`:**
+  * **Tab 3 (Sổ thẻ kho):** Thanh lọc loại giao dịch (`dòng 614-659`) chỉ có `ALL`, `IMPORT`, `SALE_DEDUCT`, `AUDIT_ADJUST` — **bỏ quên nút lọc `SPOILAGE` (*Hỏng hóc*)** dù bảng bên dưới vẫn render badge cho `SPOILAGE`. Đồng thời chưa có 2 ô chọn ngày `fromDate` – `toDate` dù Backend API và `api.ts` đã hỗ trợ sẵn.
+  * **Modal Mô phỏng trừ kho (`dòng 789-872`):** Bắt gõ tay số `productId` thay vì chọn từ dropdown món ăn, và truyền cứng `modifierOptionIds: []`, không có `variantId` $\rightarrow$ không test được trừ kho theo Size (Tầng 2) và Topping (Tầng 3) ngay trên UI.
+* **Trang `/admin/products` & `ProductModal.tsx`:**
+  * Nút **`BOM`** ở từng dòng món ăn ([`products/page.tsx#L390`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/app/admin/products/page.tsx#L390)) chỉ link tới `/admin/menu-bom` mà không gắn `?productId=${p.id}`, làm người dùng bấm từ món số 6 vẫn bị mở ra món số 1.
+  * `ProductModal.tsx`: Chưa có nút **Xóa ảnh** sau khi đã chọn ảnh; khi bấm *"Đổi ảnh khác"* không hiện vòng xoay loading; nút *"Lưu"* không bị `disabled` khi `uploading === true`; tự sinh SKU `${code}-S${variants.length + 1}` dễ trùng nếu xóa size ở giữa rồi thêm mới.
+* **Trang `/menu` (Khách hàng QR):** Khi mất kết nối Backend (`menu/page.tsx:286-295`), màn hình của thực khách hiển thị nguyên câu lệnh kỹ thuật nội bộ `docker compose up -d postgres` và địa chỉ `http://localhost:8082`!
+* **Sử dụng `window.confirm()` mặc định của trình duyệt:** Xuất hiện tại 7 thao tác quan trọng (xóa món, xóa danh mục, xóa nhóm topping, xóa nguyên liệu, xóa NCC, duyệt nhập kho, hủy phiếu nhập) — nên thay bằng Modal xác nhận đồng bộ giao diện.
+* **Component cũ dư thừa (Dead Code):** [`IngredientList.tsx`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/components/admin/IngredientList.tsx) và [`RecipeEditor.tsx`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/components/admin/RecipeEditor.tsx) không được bất kỳ file nào import và vẫn dùng dữ liệu giả/hàm `alert()` cũ.
+
+---
+
+## 🔗 6. Kiểm Toán Kiến Trúc Tích Hợp Liên Dịch Vụ & Bảo Mật
+
+1. **Chưa khép kín luồng Đặt đơn (`sales-service`) $\rightarrow$ Trừ kho tự động (`catalog-inventory-service`):**
+   * Trên Frontend, cả `/cart` (Khách đặt QR) và `/pos` (Thu ngân thanh toán) đều đang xử lý thanh toán giả lập trên state cục bộ, chưa gọi sang `sales-service` hay `POST /api/inventory/deduct`.
+   * Trong `sales-service` ([`OrderServiceImpl.java`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/backend/services/sales-service/src/main/java/com/smartpos/sales_service/service/impl/OrderServiceImpl.java)), khi tạo/hoàn tất đơn hàng cũng chưa có REST Client / Outbox Event gọi sang `POST /api/inventory/deduct` của `catalog-inventory-service` (và `OrderItem` bên `sales-service` hiện lưu tên topping dạng chuỗi `String toppings` thay vì giữ `variantId` và `modifierOptionIds` như thiết kế bảng SQL gốc!).
+2. **Các màn hình vệ tinh chưa nối dữ liệu thật:**
+   * Trang `/admin` (Tổng quan hệ thống - [`admin/page.tsx#L98`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/app/admin/page.tsx#L98)) vẫn hiển thị cứng *"Cảnh báo tồn kho: 3 nguyên liệu"* và danh sách món bán chạy giả (*Phở bò, Cơm tấm*) thay vì gọi `fetchLowStockAlerts()` / `fetchProducts()`.
+   * Trang `/order-taking` ([`order-taking/page.tsx`](file:///d:/CNTT-SGU/HK7/J2EE/Smart-POS/frontend/src/app/order-taking/page.tsx)) hiện chỉ là trang placeholder 16 dòng.
+   * Hai bảng `areas` và `dining_tables` nằm trong database `pos_catalog_inventory_db` (`01-init-all-databases.sql:66-80`) hiện chưa được triển khai Entity/API trong `catalog-inventory-service`.
+3. **Bảo mật & Phân quyền API (Authentication / Authorization):**
+   * Hiện tại `catalog-inventory-service` chưa cấu hình Spring Security / JWT Filter (và `backend/gateway` mới chỉ có khung `pom.xml` rỗng), đồng thời `frontend/src/lib/api.ts` chưa đính kèm header `Authorization: Bearer <token>`. Mọi endpoint quản trị nhạy cảm (`DELETE /api/products/{id}`, `PATCH /api/purchase-orders/{id}/complete`, `POST /api/inventory/deduct`) hiện có thể gọi tự do không cần xác thực.
+
+---
+
+## 🛠️ 7. Bảng Tổng Hợp Ưu Tiên Khắc Phục Đề Xuất
+
+| Ưu tiên | Mã lỗi | Hạng mục cần khắc phục | Tệp tin trọng tâm |
+| :---: | :---: | :--- | :--- |
+| **P0 (Khẩn cấp)** | **FE-01** | Bọc `useMemo`/`useCallback` trong `ToastProvider.tsx` và bỏ reset `selectedProductId` theo `[toast]` trong `menu-bom/page.tsx`. | `ToastProvider.tsx`, `menu-bom/page.tsx` |
+| **P0 (Khẩn cấp)** | **DB-01 / DB-02** | Đồng bộ `decimal(12,3)`, `varchar(150)`, `order_code` trong `01-init-all-databases.sql`; sửa mã `"NL-RAU"` không tồn tại trong `DataInitializer.java`. | `01-init-all-databases.sql`, `DataInitializer.java`, `seed-demo-data.sql` |
+| **P0 (Khẩn cấp)** | **BE-02** | Thêm khóa bi quan `@Lock(PESSIMISTIC_WRITE)` trên `PurchaseOrder` khi gọi `completePurchaseOrder` chống cộng đúp tồn kho. | `PurchaseOrderRepository.java`, `PurchaseOrderServiceImpl.java` |
+| **P0 (Khẩn cấp)** | **EX-01 / EX-02** | Bổ sung đầy đủ các `@ExceptionHandler` còn thiếu trong `GlobalExceptionHandler.java` và đọc `errorJson.errors` trong `frontend/src/lib/api.ts`. | `GlobalExceptionHandler.java`, `api.ts` |
+| **P1 (Cao)** | **BE-01** | Chuẩn hóa `code` rỗng thành `null` cho `Product` (tránh nổ `UNIQUE`); cho phép xóa trắng các trường tùy chọn khi cập nhật Món, Nguyên liệu, NCC. | `ProductServiceImpl.java`, `*Mapper.java`, `*Modal.tsx` |
+| **P1 (Cao)** | **FE-02 / FE-03** | Nối chọn Size (`finalPrice`) & Topping trên `/pos` (bỏ gán nhầm `"Cấp 3"`); bắt buộc chọn nhóm `isRequired` trong `ModifierModal.tsx`. | `pos/page.tsx`, `InvoicePanel.tsx`, `ModifierModal.tsx`, `FloatingCart.tsx` |
+| **P1 (Cao)** | **BE-03** | Xây dựng API & Modal **Điều chỉnh kiểm kê (`AUDIT_ADJUST`) / Xuất hủy hỏng hóc (`SPOILAGE`)** để hoàn thiện nghiệp vụ kho thực tế. | `InventoryController.java`, `InventoryServiceImpl.java`, `inventory/page.tsx` |
+| **P1 (Cao)** | **BE-04** | Trả đường dẫn ảnh tương đối `/uploads/products/...` kết hợp cấu hình URL gốc động để ảnh hiển thị được trên điện thoại quét QR qua LAN. | `FileStorageService.java`, `next.config.mjs` |
+| **P2 (Trung bình)** | **DB-03 / EX-03** | Thêm `@EntityGraph` cho `ProductRepository.searchProducts` & `PurchaseOrderRepository.searchPurchaseOrders`; thêm `@Digits` & `@NotNull` còn thiếu vào các Request DTO. | `ProductRepository.java`, `PurchaseOrderRepository.java`, `dto/request/*.java` |
+| **P2 (Trung bình)** | **FE-04 / FE-05 / FE-06** | Giữ đúng `isActive` và thêm nút ẩn/hiện trong `CategoryModal`; nối API sửa/thêm/xóa option cho `ModifierGroupModal`; thêm cột `expiryDate` vào `PurchaseOrderModal`; thêm lọc ngày & lọc `SPOILAGE` cho Sổ thẻ kho; xóa 2 file dead code (`IngredientList.tsx`, `RecipeEditor.tsx`) và file `.env` thừa trong `src/main/java`. | `CategoryModal.tsx`, `ModifierGroupModal.tsx`, `PurchaseOrderModal.tsx`, `inventory/page.tsx` |

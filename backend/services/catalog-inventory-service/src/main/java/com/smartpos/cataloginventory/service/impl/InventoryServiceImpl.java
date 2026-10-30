@@ -4,6 +4,8 @@ import com.smartpos.cataloginventory.domain.*;
 import com.smartpos.cataloginventory.dto.request.DeductInventoryRequest;
 import com.smartpos.cataloginventory.dto.request.DeductItemRequest;
 import com.smartpos.cataloginventory.dto.response.DeductInventoryResponse;
+import com.smartpos.cataloginventory.dto.response.InventoryTransactionResponse;
+import com.smartpos.cataloginventory.dto.response.LowStockAlertResponse;
 import com.smartpos.cataloginventory.exception.DuplicateResourceException;
 import com.smartpos.cataloginventory.exception.InsufficientStockException;
 import com.smartpos.cataloginventory.exception.InvalidOperationException;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -189,5 +193,80 @@ public class InventoryServiceImpl implements InventoryService {
     // Tránh mệnh đề "IN ()" rỗng gây lỗi SQL trên PostgreSQL
     private Collection<Long> nonEmpty(Set<Long> ids) {
         return ids.isEmpty() ? List.of(-1L) : ids;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LowStockAlertResponse> getLowStockAlerts() {
+        List<Ingredient> lowStockIngredients = ingredientRepository.findLowStockIngredients();
+
+        return lowStockIngredients.stream()
+                .map(ing -> {
+                    BigDecimal stock = ing.getCurrentStock() != null ? ing.getCurrentStock() : BigDecimal.ZERO;
+                    BigDecimal min = ing.getMinThreshold() != null ? ing.getMinThreshold() : BigDecimal.ZERO;
+                    BigDecimal cost = ing.getCostPerUnit() != null ? ing.getCostPerUnit() : BigDecimal.ZERO;
+
+                    BigDecimal deficit = min.subtract(stock).max(BigDecimal.ZERO);
+
+                    BigDecimal stockPct = BigDecimal.ZERO;
+                    if (min.compareTo(BigDecimal.ZERO) > 0) {
+                        stockPct = stock.divide(min, 4, RoundingMode.HALF_UP)
+                                .multiply(BigDecimal.valueOf(100))
+                                .setScale(1, RoundingMode.HALF_UP);
+                    }
+
+                    BigDecimal estimatedCost = deficit.multiply(cost).setScale(2, RoundingMode.HALF_UP);
+
+                    // Gợi ý lượng nhập: bù đủ ngưỡng tối thiểu x 2 để tạo vùng đệm an toàn
+                    BigDecimal suggestedQty = min.multiply(BigDecimal.valueOf(2)).subtract(stock).max(deficit);
+
+                    return LowStockAlertResponse.builder()
+                            .ingredientId(ing.getId())
+                            .ingredientName(ing.getName())
+                            .ingredientCode(ing.getCode())
+                            .unit(ing.getUnit())
+                            .currentStock(stock)
+                            .minThreshold(min)
+                            .deficit(deficit)
+                            .stockPercentage(stockPct)
+                            .costPerUnit(cost)
+                            .estimatedReorderCost(estimatedCost)
+                            .suggestedReorderQuantity(suggestedQty)
+                            .build();
+                })
+                .sorted(Comparator.comparing(LowStockAlertResponse::getStockPercentage))
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InventoryTransactionResponse> getTransactions(
+            Long ingredientId,
+            InventoryTransactionType type,
+            String search,
+            LocalDateTime fromDate,
+            LocalDateTime toDate) {
+        String pattern = (search != null && !search.isBlank())
+                ? "%" + search.trim().toLowerCase() + "%"
+                : null;
+
+        List<InventoryTransaction> list = inventoryTransactionRepository.searchTransactions(
+                ingredientId, type, pattern, fromDate, toDate);
+
+        return list.stream()
+                .map(tx -> InventoryTransactionResponse.builder()
+                        .id(tx.getId())
+                        .ingredientId(tx.getIngredient().getId())
+                        .ingredientName(tx.getIngredient().getName())
+                        .ingredientCode(tx.getIngredient().getCode())
+                        .unit(tx.getIngredient().getUnit())
+                        .quantity(tx.getQuantity())
+                        .transactionType(tx.getTransactionType())
+                        .orderCode(tx.getOrderCode())
+                        .orderItemId(tx.getOrderItemId())
+                        .purchaseOrderItemId(tx.getPurchaseOrderItem() != null ? tx.getPurchaseOrderItem().getId() : null)
+                        .createdAt(tx.getCreatedAt())
+                        .build())
+                .toList();
     }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LayoutGrid, ReceiptText, X } from "lucide-react";
 import InvoicePanel, {
   type MenuItem,
@@ -12,6 +12,7 @@ import TopHeader from "@/components/layout/TopHeader";
 import WorkspaceSidebar from "@/components/layout/WorkspaceSidebar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
+import { fetchMenu } from "@/lib/api";
 
 const SPICY_LEVELS = Array.from({ length: 8 }, (_, index) => `Cấp ${index}`);
 
@@ -100,7 +101,33 @@ export default function PosPage() {
   const [ordersByTable, setOrdersByTable] = useState<Record<string, OrderItem[]>>(INITIAL_ORDERS);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
   const toast = useToast();
+
+  useEffect(() => {
+    fetchMenu()
+      .then((categories) => {
+        if (categories && categories.length > 0) {
+          const items: MenuItem[] = categories.flatMap((cat) =>
+            cat.products.map((p) => ({
+              id: String(p.id),
+              name: p.name,
+              price: p.basePrice,
+              spicyLevels:
+                p.variants && p.variants.length > 0
+                  ? p.variants.map((v) => v.sizeName)
+                  : undefined,
+            }))
+          );
+          if (items.length > 0) {
+            setMenuItems(items);
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback to static mock menu when backend is unreachable
+      });
+  }, []);
 
   const selectedTable = useMemo(
     () => tables.find((table) => table.id === selectedTableId) ?? null,
@@ -251,7 +278,7 @@ export default function PosPage() {
                 <InvoicePanel
                   table={selectedTable}
                   orderItems={selectedOrder}
-                  menuItems={MENU_ITEMS}
+                  menuItems={menuItems}
                   onAddItem={handleAddItem}
                   onChangeQuantity={handleChangeQuantity}
                   onPayment={() => setIsPaymentModalOpen(true)}

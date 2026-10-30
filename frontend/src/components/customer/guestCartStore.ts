@@ -8,6 +8,7 @@ export interface CartItem {
   name: string;
   sizeName?: string;
   variantId?: number;
+  modifierOptionIds?: number[];
   basePrice: number;
   modifierTotal: number;
   toppings: string[];
@@ -21,6 +22,7 @@ export interface CartItemInput {
   name: string;
   sizeName?: string;
   variantId?: number;
+  modifierOptionIds?: number[];
   basePrice: number;
   modifierTotal: number;
   toppings?: string[];
@@ -82,6 +84,7 @@ export function useGuestCart(tableId: string) {
         name: input.name,
         sizeName: input.sizeName,
         variantId: input.variantId,
+        modifierOptionIds: input.modifierOptionIds || [],
         basePrice: input.basePrice,
         modifierTotal: input.modifierTotal,
         toppings: input.toppings || [],

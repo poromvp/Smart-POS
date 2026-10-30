@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,13 +34,18 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT DISTINCT p FROM Product p WHERE p.isActive = true AND p.category.isActive = true ORDER BY p.id ASC")
     List<Product> findActiveMenuProducts();
 
-    // Tìm kiếm và lọc danh sách sản phẩm
+    // Nạp danh sách món kèm nhóm tùy chọn và options để đối soát khi trừ kho
+    @EntityGraph(attributePaths = {"modifierGroups", "modifierGroups.options"})
+    @Query("SELECT p FROM Product p WHERE p.id IN :ids")
+    List<Product> findAllWithModifiersById(@Param("ids") Collection<Long> ids);
+
+    // Tìm kiếm và lọc danh sách sản phẩm (sử dụng pattern định dạng trước để tránh lỗi PostgreSQL lower(bytea))
     @Query("SELECT p FROM Product p WHERE " +
            "(:categoryId IS NULL OR p.category.id = :categoryId) AND " +
            "(:activeOnly IS NULL OR :activeOnly = false OR p.isActive = true) AND " +
-           "(:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.code) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "(:pattern IS NULL OR LOWER(p.name) LIKE :pattern OR LOWER(p.code) LIKE :pattern) " +
            "ORDER BY p.id DESC")
     List<Product> searchProducts(@Param("categoryId") Long categoryId,
                                 @Param("activeOnly") Boolean activeOnly,
-                                @Param("search") String search);
+                                @Param("pattern") String pattern);
 }

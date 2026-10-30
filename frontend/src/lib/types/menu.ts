@@ -48,3 +48,59 @@ export interface CategoryMenuResponse {
   displayOrder: number;
   products: ProductDetailResponse[];
 }
+
+export interface CategoryResponse {
+  id: number;
+  name: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+export interface CategoryRequest {
+  name: string;
+  displayOrder?: number;
+  isActive?: boolean;
+}
+
+export interface ProductVariantRequest {
+  id?: number;
+  sizeName: string;
+  priceAdjustment: number;
+  sku?: string;
+}
+
+export interface ProductCreateRequest {
+  categoryId: number;
+  name: string;
+  code?: string;
+  basePrice: number;
+  imageUrl?: string;
+  description?: string;
+  isActive?: boolean;
+  variants?: ProductVariantRequest[];
+  modifierGroupIds?: number[];
+}
+
+export interface ProductUpdateRequest {
+  categoryId: number;
+  name: string;
+  code?: string;
+  basePrice: number;
+  imageUrl?: string;
+  description?: string;
+  isActive?: boolean;
+  variants?: ProductVariantRequest[];
+  modifierGroupIds?: number[];
+}
+
+export interface ModifierOptionInput {
+  name: string;
+  price: number;
+}
+
+export interface ModifierGroupCreateRequest {
+  name: string;
+  isMultiple: boolean;
+  isRequired: boolean;
+  options?: ModifierOptionInput[];
+}

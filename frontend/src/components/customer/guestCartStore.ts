@@ -6,6 +6,8 @@ export interface CartItem {
   id: string;
   itemId: string;
   name: string;
+  sizeName?: string;
+  variantId?: number;
   basePrice: number;
   modifierTotal: number;
   toppings: string[];
@@ -17,10 +19,12 @@ export interface CartItem {
 export interface CartItemInput {
   itemId: string;
   name: string;
+  sizeName?: string;
+  variantId?: number;
   basePrice: number;
   modifierTotal: number;
-  toppings: string[];
-  sweetness: string;
+  toppings?: string[];
+  sweetness?: string;
   note: string;
 }
 
@@ -74,7 +78,15 @@ export function useGuestCart(tableId: string) {
       ...currentItems,
       {
         id: createCartItemId(),
-        ...input,
+        itemId: input.itemId,
+        name: input.name,
+        sizeName: input.sizeName,
+        variantId: input.variantId,
+        basePrice: input.basePrice,
+        modifierTotal: input.modifierTotal,
+        toppings: input.toppings || [],
+        sweetness: input.sweetness || "",
+        note: input.note,
         quantity: 1,
       },
     ]);
@@ -115,7 +127,8 @@ export function useGuestCart(tableId: string) {
   const totalPrice = useMemo(
     () =>
       cartItems.reduce(
-        (sum, item) => sum + (item.basePrice + item.modifierTotal) * item.quantity,
+        (sum, item) =>
+          sum + (item.basePrice + (item.modifierTotal || 0)) * item.quantity,
         0,
       ),
     [cartItems],

@@ -11,6 +11,7 @@ import com.smartpos.cataloginventory.dto.response.CategoryMenuResponse;
 import com.smartpos.cataloginventory.dto.response.ProductDetailResponse;
 import com.smartpos.cataloginventory.dto.response.ProductSummaryResponse;
 import com.smartpos.cataloginventory.exception.DuplicateResourceException;
+import com.smartpos.cataloginventory.exception.InvalidOperationException;
 import com.smartpos.cataloginventory.exception.ResourceNotFoundException;
 import com.smartpos.cataloginventory.mapper.ProductMapper;
 import com.smartpos.cataloginventory.repository.*;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +32,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductVariantRepository productVariantRepository;
     private final CategoryRepository categoryRepository;
     private final ModifierGroupRepository modifierGroupRepository;
+    private final RecipeRepository recipeRepository;
     private final ProductMapper productMapper;
 
     @Override
@@ -121,6 +124,9 @@ public class ProductServiceImpl implements ProductService {
 
         validateUniqueFieldsOnUpdate(id, request);
 
+        // Kiểm tra toàn bộ danh sách size TRƯỚC khi thay đổi bất kỳ dữ liệu nào
+        VariantChanges variantChanges = validateVariantsOnUpdate(product, request.getVariants());
+
         if (!product.getCategory().getId().equals(request.getCategoryId())) {
             Category newCategory = categoryRepository.findById(request.getCategoryId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với ID: " + request.getCategoryId()));
@@ -136,19 +142,8 @@ public class ProductServiceImpl implements ProductService {
         // Cập nhật lại Modifier Groups
         attachModifierGroups(product, request.getModifierGroupIds());
 
-        // Cập nhật Variants (xóa cũ, nạp mới an toàn)
-        product.getVariants().clear();
-        if (request.getVariants() != null) {
-            for (ProductVariantRequest vReq : request.getVariants()) {
-                ProductVariant variant = productMapper.toVariantEntity(vReq);
-                variant.setSizeName(vReq.getSizeName().trim());
-                if (vReq.getSku() != null) {
-                    variant.setSku(vReq.getSku().trim().toUpperCase());
-                }
-                variant.setProduct(product);
-                product.getVariants().add(variant);
-            }
-        }
+        // Cập nhật Variants: giữ nguyên ID size cũ, thêm size mới, chặn xóa size đang có công thức
+        applyVariantChanges(product, variantChanges);
 
         Product updated = productRepository.save(product);
         return productMapper.toDetailResponse(updated);
@@ -167,6 +162,10 @@ public class ProductServiceImpl implements ProductService {
     public void deleteProduct(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với ID: " + id));
+        if (recipeRepository.existsByProductId(id) || recipeRepository.existsByVariantProductId(id)) {
+            throw new InvalidOperationException(
+                    "Không thể xóa món ăn đang có công thức định lượng. Hãy xóa công thức (gửi danh sách rỗng) trước");
+        }
         productRepository.delete(product);
     }
 
@@ -197,6 +196,89 @@ public class ProductServiceImpl implements ProductService {
                 productRepository.existsByCodeIgnoreCaseAndIdNot(request.getCode().trim(), id)) {
             throw new DuplicateResourceException("Mã món ăn '" + request.getCode() + "' đã được sử dụng");
         }
+    }
+
+    // Kết quả kiểm tra size: các size cũ được giữ lại (theo ID) và danh sách request đã chuẩn hóa
+    private record VariantChanges(Map<Long, ProductVariant> existingById,
+                                  Set<Long> keptIds,
+                                  List<ProductVariantRequest> requests) {
+    }
+
+    private VariantChanges validateVariantsOnUpdate(Product product, List<ProductVariantRequest> requested) {
+        List<ProductVariantRequest> requests = requested == null ? List.of() : requested;
+
+        Map<Long, ProductVariant> existingById = product.getVariants().stream()
+                .collect(Collectors.toMap(ProductVariant::getId, Function.identity()));
+
+        Set<Long> keptIds = new HashSet<>();
+        Set<String> seenSkus = new HashSet<>();
+
+        for (ProductVariantRequest vReq : requests) {
+            Long variantId = vReq.getId();
+
+            if (variantId != null) {
+                // ID không tồn tại hoặc thuộc món khác đều bị từ chối, không tự gắn size của món khác
+                if (!existingById.containsKey(variantId)) {
+                    throw new InvalidOperationException(
+                            "Size ID " + variantId + " không tồn tại hoặc không thuộc món ăn này");
+                }
+                if (!keptIds.add(variantId)) {
+                    throw new InvalidOperationException(
+                            "Size ID " + variantId + " bị gửi trùng lặp trong danh sách");
+                }
+            }
+
+            String sku = normalizeSku(vReq.getSku());
+            if (sku != null) {
+                if (!seenSkus.add(sku)) {
+                    throw new DuplicateResourceException("Mã SKU '" + sku + "' bị trùng lặp trong danh sách size");
+                }
+                boolean taken = variantId != null
+                        ? productVariantRepository.existsBySkuIgnoreCaseAndIdNot(sku, variantId)
+                        : productVariantRepository.existsBySkuIgnoreCase(sku);
+                if (taken) {
+                    throw new DuplicateResourceException("Mã SKU biến thể '" + sku + "' đã tồn tại");
+                }
+            }
+        }
+
+        // Size cũ không còn trong request sẽ bị xóa: chặn nếu size đó đang có công thức
+        for (ProductVariant existing : existingById.values()) {
+            if (!keptIds.contains(existing.getId())
+                    && recipeRepository.existsByVariantId(existing.getId())) {
+                throw new InvalidOperationException(
+                        "Không thể xóa size '" + existing.getSizeName()
+                                + "' vì đang có công thức định lượng. Hãy xóa công thức của size này trước");
+            }
+        }
+
+        return new VariantChanges(existingById, keptIds, requests);
+    }
+
+    private void applyVariantChanges(Product product, VariantChanges changes) {
+        // Xóa các size không còn trong request (orphanRemoval sẽ xóa khỏi DB)
+        product.getVariants().removeIf(v -> !changes.keptIds().contains(v.getId()));
+
+        for (ProductVariantRequest vReq : changes.requests()) {
+            if (vReq.getId() != null) {
+                // Cập nhật tại chỗ, giữ nguyên ID
+                ProductVariant variant = changes.existingById().get(vReq.getId());
+                variant.setSizeName(vReq.getSizeName().trim());
+                variant.setPriceAdjustment(vReq.getPriceAdjustment());
+                variant.setSku(normalizeSku(vReq.getSku()));
+            } else {
+                ProductVariant variant = productMapper.toVariantEntity(vReq);
+                variant.setSizeName(vReq.getSizeName().trim());
+                variant.setSku(normalizeSku(vReq.getSku()));
+                variant.setProduct(product);
+                product.getVariants().add(variant);
+            }
+        }
+    }
+
+    private String normalizeSku(String sku) {
+        if (sku == null || sku.isBlank()) return null;
+        return sku.trim().toUpperCase();
     }
 
     private void validateVariantSkuOnCreate(String sku) {

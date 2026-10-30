@@ -116,9 +116,22 @@ function GuestCartContent() {
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <h2 className="truncate text-base font-bold text-slate-900">{item.name}</h2>
-                  <p className="mt-1 text-sm font-semibold text-[#b42318]">{formatCurrency(item.basePrice + item.modifierTotal)}</p>
-                  {item.toppings.length > 0 && <p className="mt-1 text-xs text-slate-500">Topping: {item.toppings.join(", ")}</p>}
-                  <p className="mt-1 text-xs text-slate-500">Độ ngọt: {item.sweetness}</p>
+                  <p className="mt-1 text-sm font-semibold text-[#b42318]">{formatCurrency(item.basePrice + (item.modifierTotal || 0))}</p>
+                  {item.sizeName && (
+                    <span className="inline-block mt-1 text-[11px] font-semibold text-orange-800 bg-orange-100/70 px-2 py-0.5 rounded">
+                      {item.sizeName}
+                    </span>
+                  )}
+                  {item.toppings && item.toppings.length > 0 && (
+                    <p className="mt-1 text-xs text-stone-500">
+                      Tùy chọn: {item.toppings.join(", ")}
+                    </p>
+                  )}
+                  {item.sweetness && (
+                    <p className="mt-0.5 text-xs text-stone-500">
+                      Độ ngọt: {item.sweetness}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center rounded-full border border-slate-200 bg-white shadow-sm">

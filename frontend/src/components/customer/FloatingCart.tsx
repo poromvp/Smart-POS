@@ -21,7 +21,7 @@ export default function FloatingCart({
 
   const totalPrice = items.reduce(
     (sum, item) =>
-      sum + (item.basePrice + item.modifierTotal) * item.quantity,
+      sum + (item.basePrice + (item.modifierTotal || 0)) * item.quantity,
     0
   );
 
@@ -63,7 +63,7 @@ export default function FloatingCart({
             <div className="space-y-3 px-5 py-5">
               {items.map((item) => {
                 const itemPrice =
-                  (item.basePrice + item.modifierTotal) * item.quantity;
+                  (item.basePrice + (item.modifierTotal || 0)) * item.quantity;
 
                 return (
                   <div
@@ -80,7 +80,7 @@ export default function FloatingCart({
                           SL: {item.quantity}
                         </p>
 
-                        {item.toppings.length > 0 && (
+                        {item.toppings && item.toppings.length > 0 && (
                           <p className="mt-1 text-xs text-[var(--muted)]">
                             Topping: {item.toppings.join(", ")}
                           </p>

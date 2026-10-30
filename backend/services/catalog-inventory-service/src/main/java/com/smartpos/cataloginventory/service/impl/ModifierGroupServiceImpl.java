@@ -13,6 +13,7 @@ import com.smartpos.cataloginventory.exception.ResourceNotFoundException;
 import com.smartpos.cataloginventory.mapper.ModifierMapper;
 import com.smartpos.cataloginventory.repository.ModifierGroupRepository;
 import com.smartpos.cataloginventory.repository.ModifierOptionRepository;
+import com.smartpos.cataloginventory.repository.RecipeRepository;
 import com.smartpos.cataloginventory.service.ModifierGroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
 
     private final ModifierGroupRepository modifierGroupRepository;
     private final ModifierOptionRepository modifierOptionRepository;
+    private final RecipeRepository recipeRepository;
     private final ModifierMapper modifierMapper;
 
     @Override
@@ -94,6 +96,11 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
             throw new InvalidOperationException("Không thể xóa nhóm tùy chọn đang được gắn vào món ăn. Hãy gỡ khỏi món ăn trước");
         }
 
+        if (recipeRepository.existsByModifierOptionGroupId(id)) {
+            throw new InvalidOperationException(
+                    "Không thể xóa nhóm tùy chọn có tùy chọn đang được dùng trong công thức định lượng. Hãy xóa công thức trước");
+        }
+
         modifierGroupRepository.delete(group);
     }
 
@@ -123,6 +130,11 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
 
         if (!option.getGroup().getId().equals(groupId)) {
             throw new InvalidOperationException("Tùy chọn này không thuộc về nhóm chỉ định");
+        }
+
+        if (recipeRepository.existsByModifierOptionId(optionId)) {
+            throw new InvalidOperationException(
+                    "Không thể xóa tùy chọn đang được dùng trong công thức định lượng. Hãy xóa công thức trước");
         }
 
         modifierOptionRepository.delete(option);

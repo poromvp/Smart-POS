@@ -100,6 +100,9 @@ const STORAGE_OPTIONS = [
   "Bình giữ lạnh (4°C)",
 ];
 
+const getRandomSuffix = (min = 100, max = 999) =>
+  Math.floor(min + Math.random() * (max - min + 1));
+
 interface ExpiryPrintModalProps {
   isOpen: boolean;
   initialItemName?: string;
@@ -127,11 +130,14 @@ export default function ExpiryPrintModal({
 
   useEffect(() => {
     if (initialItemName) {
-      setCustomName(initialItemName);
-      setSelectedPresetId("custom");
-      setShelfLifeHours(6);
-      setStorageCondition("Tủ mát (2°C - 4°C)");
-      setBatchCode(`LOT-${Math.floor(1000 + Math.random() * 9000)}`);
+      const timer = window.setTimeout(() => {
+        setCustomName(initialItemName);
+        setSelectedPresetId("custom");
+        setShelfLifeHours(6);
+        setStorageCondition("Tủ mát (2°C - 4°C)");
+        setBatchCode(`LOT-${getRandomSuffix(1000, 9999)}`);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [initialItemName]);
 
@@ -140,7 +146,7 @@ export default function ExpiryPrintModal({
     setCustomName(preset.name);
     setShelfLifeHours(preset.shelfLifeHours);
     setStorageCondition(preset.storage);
-    const randomSuffix = Math.floor(100 + Math.random() * 900);
+    const randomSuffix = getRandomSuffix(100, 999);
     setBatchCode(`${preset.batchPrefix}-${randomSuffix}`);
   };
 

@@ -6,13 +6,22 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   UtensilsCrossed,
+  Layers,
   Package,
   Users,
   LogOut,
   ChevronRight,
 } from "lucide-react";
 
-const adminNavItems = [
+interface AdminNavItem {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  exact?: boolean;
+  badge?: string;
+}
+
+const adminNavItems: AdminNavItem[] = [
   {
     label: "Tổng quan",
     href: "/admin",
@@ -20,15 +29,19 @@ const adminNavItems = [
     exact: true,
   },
   {
-    label: "Thực đơn & BOM",
-    href: "/admin/menu-bom",
+    label: "Món ăn & Thực đơn",
+    href: "/admin/products",
     icon: UtensilsCrossed,
+  },
+  {
+    label: "Định lượng BOM",
+    href: "/admin/menu-bom",
+    icon: Layers,
   },
   {
     label: "Quản lý kho",
     href: "/admin/inventory",
     icon: Package,
-    badge: "3",
   },
   {
     label: "Nhân sự & chi nhánh",

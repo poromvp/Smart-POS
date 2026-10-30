@@ -148,15 +148,16 @@ public class InventoryServiceImpl implements InventoryService {
         Set<Long> optionIds = items.stream().flatMap(i -> i.getModifierOptionIds().stream())
                 .collect(Collectors.toSet());
 
-        Set<Long> existingProductIds = productRepository.findAllById(productIds).stream()
-                .map(Product::getId).collect(Collectors.toSet());
+        Map<Long, Product> products = productRepository.findAllWithModifiersById(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
         Map<Long, ProductVariant> variants = productVariantRepository.findAllById(variantIds).stream()
                 .collect(Collectors.toMap(ProductVariant::getId, Function.identity()));
         Set<Long> existingOptionIds = modifierOptionRepository.findAllById(optionIds).stream()
                 .map(ModifierOption::getId).collect(Collectors.toSet());
 
         for (DeductItemRequest item : items) {
-            if (!existingProductIds.contains(item.getProductId())) {
+            Product product = products.get(item.getProductId());
+            if (product == null) {
                 throw new ResourceNotFoundException("Không tìm thấy món với ID: " + item.getProductId());
             }
             if (item.getVariantId() != null) {
@@ -166,9 +167,20 @@ public class InventoryServiceImpl implements InventoryService {
                             "Size ID " + item.getVariantId() + " không thuộc món ID " + item.getProductId());
                 }
             }
+
+            // Tập hợp toàn bộ optionId hợp lệ thuộc các nhóm tùy chọn được gắn trên món này
+            Set<Long> allowedOptionIds = product.getModifierGroups().stream()
+                    .flatMap(g -> g.getOptions().stream())
+                    .map(ModifierOption::getId)
+                    .collect(Collectors.toSet());
+
             for (Long optionId : item.getModifierOptionIds()) {
                 if (!existingOptionIds.contains(optionId)) {
                     throw new ResourceNotFoundException("Không tìm thấy tùy chọn với ID: " + optionId);
+                }
+                if (!allowedOptionIds.contains(optionId)) {
+                    throw new InvalidOperationException(
+                            "Tùy chọn ID " + optionId + " không thuộc nhóm tùy chọn của món '" + product.getName() + "'");
                 }
             }
         }

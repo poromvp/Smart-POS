@@ -145,18 +145,20 @@ function MenuPageContent() {
       0
     );
 
-    // Gom nhãn các modifier đã chọn
+    // Gom nhãn các modifier đã chọn và danh sách optionId phục vụ trừ kho
     const modifierLabels = selection.modifiers.map((m) =>
       m.price > 0
         ? `${m.optionName} (+${m.price.toLocaleString("vi-VN")}₫)`
         : m.optionName
     );
+    const modifierOptionIds = selection.modifiers.map((m) => m.optionId);
 
     addItem({
       itemId: String(selectedItem.id),
       name: selectedItem.name,
       sizeName: selection.variant?.sizeName,
       variantId: selection.variant?.id,
+      modifierOptionIds,
       basePrice,
       modifierTotal,
       toppings: modifierLabels,

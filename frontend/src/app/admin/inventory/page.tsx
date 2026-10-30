@@ -142,25 +142,20 @@ export default function InventoryPage() {
       {/* Top Banner / Thống kê */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
-          title="Tổng số nguyên liệu"
-          value={totalCount}
+          label="Tổng số nguyên liệu"
+          value={String(totalCount)}
           icon={Package}
-          color="blue"
-          subText="Đang quản lý trong hệ thống"
         />
         <StatCard
-          title="Nguyên liệu sắp hết"
-          value={lowStockCount}
+          label="Nguyên liệu sắp hết"
+          value={String(lowStockCount)}
           icon={AlertTriangle}
-          color="orange"
-          subText={lowStockCount > 0 ? "Cần lập phiếu nhập kho" : "Tồn kho an toàn"}
+          isWarning={lowStockCount > 0}
         />
         <StatCard
-          title="Ước tính giá trị tồn"
+          label="Ước tính giá trị tồn"
           value={totalAssetValue.toLocaleString("vi-VN") + " đ"}
           icon={Wallet}
-          color="emerald"
-          subText="Tổng giá vốn hàng tồn kho"
         />
       </div>
 

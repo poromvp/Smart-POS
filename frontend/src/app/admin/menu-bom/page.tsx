@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
   UtensilsCrossed,
@@ -12,6 +13,7 @@ import {
   RefreshCw,
   Layers,
   Sparkles,
+  AlertCircle,
 } from "lucide-react";
 import {
   ProductSummaryResponse,
@@ -27,6 +29,11 @@ import {
 } from "@/lib/api";
 
 type RecipeScope = "base" | "variant" | "modifier";
+
+interface LocalRecipeRow {
+  ingredientId: number;
+  quantityNeeded: string | number;
+}
 
 interface BomTableEditorProps {
   title: string;
@@ -45,31 +52,85 @@ function BomTableEditor({
   onReset,
   saving,
 }: BomTableEditorProps) {
-  const [items, setItems] = useState<RecipeItemRequest[]>(initialItems);
+  const toast = useToast();
+  const [items, setItems] = useState<LocalRecipeRow[]>(() =>
+    initialItems.map((i) => ({
+      ingredientId: i.ingredientId,
+      quantityNeeded: i.quantityNeeded,
+    }))
+  );
 
   const handleAddRow = () => {
-    if (ingredients.length === 0) return;
+    if (ingredients.length === 0) {
+      toast.warning("Chưa có dữ liệu", "Danh sách nguyên liệu trong kho đang trống hoặc chưa tải xong.");
+      return;
+    }
+
     const existingIds = new Set(items.map((i) => i.ingredientId));
-    const available = ingredients.find((ing) => !existingIds.has(ing.id)) || ingredients[0];
-    setItems([...items, { ingredientId: available.id, quantityNeeded: 1 }]);
+    const available = ingredients.find((ing) => !existingIds.has(ing.id));
+
+    if (!available) {
+      toast.warning(
+        "Đã dùng hết nguyên liệu",
+        "Tất cả nguyên liệu hiện có trong kho đều đã được thêm vào công thức này."
+      );
+      return;
+    }
+
+    setItems((prev) => [...prev, { ingredientId: available.id, quantityNeeded: 1 }]);
   };
 
-  const handleUpdateRow = (index: number, ingredientId: number, qty: number) => {
-    const next = [...items];
-    next[index] = { ingredientId, quantityNeeded: Math.max(0.001, qty) };
-    setItems(next);
+  const handleUpdateRow = (index: number, ingredientId: number, rawQty: string | number) => {
+    setItems((prev) => {
+      const next = [...prev];
+      next[index] = { ingredientId, quantityNeeded: rawQty };
+      return next;
+    });
   };
 
   const handleRemoveRow = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+    setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const estimatedCost = useMemo(() => {
     return items.reduce((sum, item) => {
       const ing = ingredients.find((i) => i.id === item.ingredientId);
-      return sum + (ing ? ing.costPerUnit * item.quantityNeeded : 0);
+      const qtyNum = parseFloat(String(item.quantityNeeded)) || 0;
+      return sum + (ing ? ing.costPerUnit * qtyNum : 0);
     }, 0);
   }, [items, ingredients]);
+
+  const handleSaveClick = () => {
+    // 1. Kiểm tra nguyên liệu trùng lặp
+    const ids = items.map((i) => i.ingredientId);
+    if (new Set(ids).size !== ids.length) {
+      toast.error("Lỗi công thức", "Có nguyên liệu bị chọn trùng lặp nhiều lần");
+      return;
+    }
+
+    // 2. Kiểm tra định lượng hợp lệ
+    const validatedItems: RecipeItemRequest[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const parsedQty = parseFloat(String(it.quantityNeeded));
+      const ing = ingredients.find((x) => x.id === it.ingredientId);
+
+      if (isNaN(parsedQty) || parsedQty <= 0) {
+        toast.error(
+          "Định lượng không hợp lệ",
+          `Nguyên liệu "${ing?.name || "được chọn"}" phải có định lượng lớn hơn 0`
+        );
+        return;
+      }
+
+      validatedItems.push({
+        ingredientId: it.ingredientId,
+        quantityNeeded: parsedQty,
+      });
+    }
+
+    onSave(validatedItems);
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs">
@@ -82,6 +143,7 @@ function BomTableEditor({
         </div>
 
         <button
+          type="button"
           onClick={handleAddRow}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-orange-50 text-orange-600 hover:bg-orange-100 transition border border-orange-200 cursor-pointer"
         >
@@ -109,6 +171,7 @@ function BomTableEditor({
                   Chưa có nguyên liệu nào được cấu hình cho mục này.
                   <br />
                   <button
+                    type="button"
                     onClick={handleAddRow}
                     className="mt-2 text-xs font-bold text-orange-600 hover:underline cursor-pointer"
                   >
@@ -119,10 +182,11 @@ function BomTableEditor({
             ) : (
               items.map((item, index) => {
                 const ing = ingredients.find((i) => i.id === item.ingredientId);
-                const rowCost = ing ? ing.costPerUnit * item.quantityNeeded : 0;
+                const numericQty = parseFloat(String(item.quantityNeeded)) || 0;
+                const rowCost = ing ? ing.costPerUnit * numericQty : 0;
 
                 return (
-                  <tr key={index} className="hover:bg-gray-50/50">
+                  <tr key={`${item.ingredientId}-${index}`} className="hover:bg-gray-50/50">
                     <td className="px-6 py-3 text-center text-xs text-gray-400">{index + 1}</td>
                     <td className="px-4 py-3">
                       <select
@@ -132,11 +196,20 @@ function BomTableEditor({
                         }
                         className="w-full bg-white border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-800 outline-none focus:border-orange-500 cursor-pointer"
                       >
-                        {ingredients.map((ingItem) => (
-                          <option key={ingItem.id} value={ingItem.id}>
-                            {ingItem.name} ({ingItem.unit})
-                          </option>
-                        ))}
+                        {ingredients.map((ingItem) => {
+                          const isUsedElsewhere = items.some(
+                            (it, itIdx) => itIdx !== index && it.ingredientId === ingItem.id
+                          );
+                          return (
+                            <option
+                              key={ingItem.id}
+                              value={ingItem.id}
+                              disabled={isUsedElsewhere}
+                            >
+                              {ingItem.name} ({ingItem.unit}){isUsedElsewhere ? " - [Đã chọn]" : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -146,8 +219,9 @@ function BomTableEditor({
                         min="0.001"
                         value={item.quantityNeeded}
                         onChange={(e) =>
-                          handleUpdateRow(index, item.ingredientId, Number(e.target.value))
+                          handleUpdateRow(index, item.ingredientId, e.target.value)
                         }
+                        placeholder="0.0"
                         className="w-28 text-right font-mono bg-white border border-gray-300 rounded-xl px-2.5 py-1 text-xs font-bold text-gray-900 outline-none focus:border-orange-500"
                       />
                     </td>
@@ -161,8 +235,10 @@ function BomTableEditor({
                     </td>
                     <td className="px-6 py-3 text-center">
                       <button
+                        type="button"
                         onClick={() => handleRemoveRow(index)}
                         className="p-1 text-gray-400 hover:text-red-600 rounded transition cursor-pointer"
+                        title="Xóa nguyên liệu"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -190,8 +266,14 @@ function BomTableEditor({
 
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={() => {
-              setItems(initialItems);
+              setItems(
+                initialItems.map((i) => ({
+                  ingredientId: i.ingredientId,
+                  quantityNeeded: i.quantityNeeded,
+                }))
+              );
               onReset();
             }}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 bg-white border border-gray-300 hover:bg-gray-100 transition cursor-pointer"
@@ -201,7 +283,8 @@ function BomTableEditor({
           </button>
 
           <button
-            onClick={() => onSave(items)}
+            type="button"
+            onClick={handleSaveClick}
             disabled={saving}
             className="flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 transition shadow-xs shadow-orange-500/25 disabled:opacity-50 cursor-pointer"
           >
@@ -224,6 +307,7 @@ export default function MenuBomPage() {
   const [recipeData, setRecipeData] = useState<RecipeResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [revision, setRevision] = useState(0);
 
   // Phân vùng cấu hình: Món gốc ("base"), Size ("variant"), hoặc Topping ("modifier")
   const [activeScope, setActiveScope] = useState<RecipeScope>("base");
@@ -253,19 +337,48 @@ export default function MenuBomPage() {
     };
   }, [toast]);
 
-  // Tải công thức khi chọn món ăn
-  const loadRecipe = useCallback((productId: number) => {
-    setLoading(true);
-    fetchProductRecipe(productId)
-      .then((data) => {
-        setRecipeData(data);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        toast.error("Không thể tải công thức", err instanceof Error ? err.message : "Lỗi kết nối");
-        setLoading(false);
-      });
-  }, [toast]);
+  // Tải công thức khi chọn món ăn (dùng cho refresh sau lưu)
+  const reloadRecipe = useCallback(
+    (productId: number) => {
+      setLoading(true);
+      fetchProductRecipe(productId)
+        .then((data) => {
+          setRecipeData(data);
+          if (data.variants && data.variants.length > 0) {
+            setSelectedVariantId((prev) =>
+              data.variants.some((v) => v.variantId === prev) ? prev : data.variants[0].variantId
+            );
+          } else {
+            setSelectedVariantId(null);
+          }
+
+          if (data.modifierOptions && data.modifierOptions.length > 0) {
+            setSelectedOptionId((prev) =>
+              data.modifierOptions.some((o) => o.modifierOptionId === prev)
+                ? prev
+                : data.modifierOptions[0].modifierOptionId
+            );
+          } else {
+            setSelectedOptionId(null);
+          }
+
+          setRevision((r) => r + 1);
+          setLoading(false);
+        })
+        .catch((err: unknown) => {
+          toast.error("Không thể tải công thức", err instanceof Error ? err.message : "Lỗi kết nối");
+          setLoading(false);
+        });
+    },
+    [toast]
+  );
+
+  // Khi người dùng đổi món ăn
+  const handleSelectProduct = (newProductId: number) => {
+    setSelectedProductId(newProductId);
+    setSelectedVariantId(null);
+    setSelectedOptionId(null);
+  };
 
   useEffect(() => {
     if (!selectedProductId) return;
@@ -274,6 +387,23 @@ export default function MenuBomPage() {
       .then((data) => {
         if (!ignore) {
           setRecipeData(data);
+          if (data.variants && data.variants.length > 0) {
+            setSelectedVariantId((prev) =>
+              data.variants.some((v) => v.variantId === prev) ? prev : data.variants[0].variantId
+            );
+          } else {
+            setSelectedVariantId(null);
+          }
+          if (data.modifierOptions && data.modifierOptions.length > 0) {
+            setSelectedOptionId((prev) =>
+              data.modifierOptions.some((o) => o.modifierOptionId === prev)
+                ? prev
+                : data.modifierOptions[0].modifierOptionId
+            );
+          } else {
+            setSelectedOptionId(null);
+          }
+          setRevision((r) => r + 1);
           setLoading(false);
         }
       })
@@ -298,11 +428,17 @@ export default function MenuBomPage() {
       }));
     }
     if (activeScope === "variant") {
-      const v = recipeData.variants.find((item) => item.variantId === selectedVariantId) || recipeData.variants[0];
+      if (!recipeData.variants || recipeData.variants.length === 0) return [];
+      const v =
+        recipeData.variants.find((item) => item.variantId === selectedVariantId) ||
+        recipeData.variants[0];
       return v ? v.items.map((i) => ({ ingredientId: i.ingredientId, quantityNeeded: i.quantityNeeded })) : [];
     }
     if (activeScope === "modifier") {
-      const opt = recipeData.modifierOptions.find((item) => item.modifierOptionId === selectedOptionId) || recipeData.modifierOptions[0];
+      if (!recipeData.modifierOptions || recipeData.modifierOptions.length === 0) return [];
+      const opt =
+        recipeData.modifierOptions.find((item) => item.modifierOptionId === selectedOptionId) ||
+        recipeData.modifierOptions[0];
       return opt ? opt.items.map((i) => ({ ingredientId: i.ingredientId, quantityNeeded: i.quantityNeeded })) : [];
     }
     return [];
@@ -312,11 +448,20 @@ export default function MenuBomPage() {
   const handleSaveScope = async (itemsToSave: RecipeItemRequest[]) => {
     if (!selectedProductId) return;
 
-    // Validate nguyên liệu không trùng
-    const ids = itemsToSave.map((i) => i.ingredientId);
-    if (new Set(ids).size !== ids.length) {
-      toast.error("Lỗi công thức", "Có nguyên liệu bị trùng lặp trong danh sách");
-      return;
+    if (activeScope === "variant") {
+      const targetVariantId = selectedVariantId ?? recipeData?.variants[0]?.variantId;
+      if (!targetVariantId) {
+        toast.error("Lỗi", "Món này không có biến thể Size để lưu");
+        return;
+      }
+    }
+
+    if (activeScope === "modifier") {
+      const targetOptionId = selectedOptionId ?? recipeData?.modifierOptions[0]?.modifierOptionId;
+      if (!targetOptionId) {
+        toast.error("Lỗi", "Món này không có Topping / tùy chọn để lưu");
+        return;
+      }
     }
 
     try {
@@ -327,7 +472,7 @@ export default function MenuBomPage() {
         items: itemsToSave,
       });
       toast.success("Thành công", "Đã lưu công thức định lượng!");
-      loadRecipe(selectedProductId);
+      reloadRecipe(selectedProductId);
     } catch (err: unknown) {
       toast.error("Lưu thất bại", err instanceof Error ? err.message : "Lỗi hệ thống");
     } finally {
@@ -340,18 +485,21 @@ export default function MenuBomPage() {
   const currentTitle = useMemo(() => {
     if (activeScope === "base") return `Định lượng Món gốc: ${currentProduct?.name || ""}`;
     if (activeScope === "variant") {
-      const v = recipeData?.variants.find((item) => item.variantId === selectedVariantId) || recipeData?.variants[0];
+      const v = recipeData?.variants?.find((item) => item.variantId === selectedVariantId) || recipeData?.variants?.[0];
       return `Định lượng cộng thêm cho Size: ${v?.sizeName || ""}`;
     }
     if (activeScope === "modifier") {
-      const opt = recipeData?.modifierOptions.find((item) => item.modifierOptionId === selectedOptionId) || recipeData?.modifierOptions[0];
+      const opt = recipeData?.modifierOptions?.find((item) => item.modifierOptionId === selectedOptionId) || recipeData?.modifierOptions?.[0];
       return `Định lượng cho Topping: ${opt ? `${opt.groupName} - ${opt.optionName}` : ""}`;
     }
     return "";
   }, [activeScope, currentProduct, recipeData, selectedVariantId, selectedOptionId]);
 
-  const activeVariantId = selectedVariantId ?? recipeData?.variants[0]?.variantId ?? null;
-  const activeOptionId = selectedOptionId ?? recipeData?.modifierOptions[0]?.modifierOptionId ?? null;
+  const activeVariantId = selectedVariantId ?? recipeData?.variants?.[0]?.variantId ?? null;
+  const activeOptionId = selectedOptionId ?? recipeData?.modifierOptions?.[0]?.modifierOptionId ?? null;
+
+  const hasVariants = Boolean(recipeData?.variants && recipeData.variants.length > 0);
+  const hasModifiers = Boolean(recipeData?.modifierOptions && recipeData.modifierOptions.length > 0);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -371,7 +519,7 @@ export default function MenuBomPage() {
           <label className="text-xs font-bold uppercase text-gray-600 shrink-0">Chọn món:</label>
           <select
             value={selectedProductId || ""}
-            onChange={(e) => setSelectedProductId(Number(e.target.value))}
+            onChange={(e) => handleSelectProduct(Number(e.target.value))}
             className="bg-gray-50 border border-gray-300 rounded-xl px-4 py-2 text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer"
           >
             {products.map((p) => (
@@ -386,6 +534,7 @@ export default function MenuBomPage() {
       {/* Tabs Phân Vùng Cấu hình: Món gốc / Size / Topping */}
       <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
         <button
+          type="button"
           onClick={() => setActiveScope("base")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
             activeScope === "base"
@@ -401,6 +550,7 @@ export default function MenuBomPage() {
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveScope("variant")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
             activeScope === "variant"
@@ -415,6 +565,7 @@ export default function MenuBomPage() {
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveScope("modifier")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
             activeScope === "modifier"
@@ -431,70 +582,99 @@ export default function MenuBomPage() {
       </div>
 
       {/* Sub-selector khi chọn Size hoặc Topping */}
-      {activeScope === "variant" && (
+      {activeScope === "variant" && hasVariants && (
         <div className="flex items-center gap-2 bg-blue-50/60 p-3 rounded-xl border border-blue-100">
           <span className="text-xs font-bold text-blue-900">Chọn biến thể Size:</span>
-          {recipeData?.variants && recipeData.variants.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {recipeData.variants.map((v) => (
-                <button
-                  key={v.variantId}
-                  onClick={() => setSelectedVariantId(v.variantId)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    activeVariantId === v.variantId
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-blue-800 border border-blue-200 hover:bg-blue-100/50"
-                  }`}
-                >
-                  {v.sizeName} ({v.items.length} nguyên liệu)
-                </button>
-              ))}
-            </div>
-          ) : (
-            <span className="text-xs text-gray-500">Món này không có biến thể Size</span>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {recipeData?.variants.map((v) => (
+              <button
+                key={v.variantId}
+                type="button"
+                onClick={() => setSelectedVariantId(v.variantId)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  activeVariantId === v.variantId
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-white text-blue-800 border border-blue-200 hover:bg-blue-100/50"
+                }`}
+              >
+                {v.sizeName} ({v.items.length} nguyên liệu)
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      {activeScope === "modifier" && (
+      {activeScope === "modifier" && hasModifiers && (
         <div className="flex items-center gap-2 bg-amber-50/60 p-3 rounded-xl border border-amber-100">
           <span className="text-xs font-bold text-amber-900">Chọn Topping/Tùy chọn:</span>
-          {recipeData?.modifierOptions && recipeData.modifierOptions.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {recipeData.modifierOptions.map((opt) => (
-                <button
-                  key={opt.modifierOptionId}
-                  onClick={() => setSelectedOptionId(opt.modifierOptionId)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    activeOptionId === opt.modifierOptionId
-                      ? "bg-amber-600 text-white"
-                      : "bg-white text-amber-800 border border-amber-200 hover:bg-amber-100/50"
-                  }`}
-                >
-                  {opt.groupName}: {opt.optionName} ({opt.items.length})
-                </button>
-              ))}
-            </div>
-          ) : (
-            <span className="text-xs text-gray-500">Món này chưa liên kết nhóm Topping nào</span>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {recipeData?.modifierOptions.map((opt) => (
+              <button
+                key={opt.modifierOptionId}
+                type="button"
+                onClick={() => setSelectedOptionId(opt.modifierOptionId)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  activeOptionId === opt.modifierOptionId
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "bg-white text-amber-800 border border-amber-200 hover:bg-amber-100/50"
+                }`}
+              >
+                {opt.groupName}: {opt.optionName} ({opt.items.length})
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Bảng chỉnh sửa danh sách nguyên liệu tiêu hao - Mount fresh with key */}
+      {/* Nội dung bảng chỉnh sửa định lượng hoặc Empty State an toàn */}
       {loading ? (
         <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center text-gray-400">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-orange-500" />
           Đang tải công thức...
         </div>
+      ) : activeScope === "variant" && !hasVariants ? (
+        <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center text-gray-500">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl w-fit mx-auto mb-3">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h4 className="font-bold text-gray-800 text-base">Món này không có biến thể Size</h4>
+          <p className="text-xs text-gray-500 mt-1.5 max-w-md mx-auto leading-relaxed">
+            Món ăn này hiện chỉ có kích thước tiêu chuẩn mặc định. Để cấu hình nguyên liệu, vui lòng chuyển sang tab{" "}
+            <button
+              type="button"
+              onClick={() => setActiveScope("base")}
+              className="text-orange-600 font-bold hover:underline cursor-pointer"
+            >
+              &quot;Công thức Món gốc&quot;
+            </button>{" "}
+            hoặc thêm Size trong trang{" "}
+            <Link href="/admin/products" className="text-blue-600 font-bold hover:underline">
+              Món ăn & Thực đơn
+            </Link>.
+          </p>
+        </div>
+      ) : activeScope === "modifier" && !hasModifiers ? (
+        <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center text-gray-500">
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl w-fit mx-auto mb-3">
+            <Sparkles className="w-7 h-7" />
+          </div>
+          <h4 className="font-bold text-gray-800 text-base">Món này chưa có Topping / Nhóm tùy chọn</h4>
+          <p className="text-xs text-gray-500 mt-1.5 max-w-md mx-auto leading-relaxed">
+            Món ăn này chưa được gán bất kỳ nhóm tùy chọn nào (Topping, Mức đá, Mức ngọt...). Bạn hãy vào trang{" "}
+            <Link href="/admin/products" className="text-orange-600 font-bold hover:underline">
+              Món ăn & Thực đơn
+            </Link>{" "}
+            để liên kết nhóm tùy chọn cho món trước khi định lượng.
+          </p>
+        </div>
       ) : (
         <BomTableEditor
-          key={`${selectedProductId}-${activeScope}-${activeVariantId}-${activeOptionId}`}
+          key={`${selectedProductId}-${activeScope}-${activeVariantId}-${activeOptionId}-rev-${revision}`}
           title={currentTitle}
           initialItems={currentScopeItems}
           ingredients={ingredients}
           onSave={handleSaveScope}
-          onReset={() => selectedProductId && loadRecipe(selectedProductId)}
+          onReset={() => selectedProductId && reloadRecipe(selectedProductId)}
           saving={saving}
         />
       )}

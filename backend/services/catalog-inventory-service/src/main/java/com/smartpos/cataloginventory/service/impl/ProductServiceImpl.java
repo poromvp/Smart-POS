@@ -74,8 +74,10 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public List<ProductSummaryResponse> getProducts(Long categoryId, Boolean activeOnly, String search) {
-        String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
-        List<Product> products = productRepository.searchProducts(categoryId, activeOnly, cleanSearch);
+        String pattern = (search != null && !search.isBlank())
+                ? "%" + search.trim().toLowerCase() + "%"
+                : null;
+        List<Product> products = productRepository.searchProducts(categoryId, activeOnly, pattern);
         return productMapper.toSummaryResponseList(products);
     }
 

@@ -31,3 +31,5 @@ spring:
 app:
   upload:
     dir: uploads/products/ # Thư mục lưu ảnh trên máy tính
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}

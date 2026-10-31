@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
-import { Flame, Minus, Plus, ShoppingBag } from "lucide-react";
+import { Minus, Plus, Search, ShoppingBag, ArrowLeft } from "lucide-react";
 import type { RestaurantTable } from "./TableMap";
 
 export interface MenuItem {
@@ -10,7 +10,6 @@ export interface MenuItem {
   price: number;
   spicyLevels?: string[];
 }
-
 export interface OrderItem {
   id: string;
   menuItemId: string;
@@ -19,7 +18,6 @@ export interface OrderItem {
   quantity: number;
   spicyLevel?: string;
 }
-
 export interface InvoicePanelProps {
   table: RestaurantTable | null;
   orderItems: OrderItem[];
@@ -28,139 +26,45 @@ export interface InvoicePanelProps {
   onChangeQuantity: (orderItemId: string, quantity: number) => void;
   onPayment: () => void;
 }
-
 export const formatCurrency = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`;
 
-export default function InvoicePanel({
-  table,
-  orderItems,
-  menuItems,
-  onAddItem,
-  onChangeQuantity,
-  onPayment,
-}: InvoicePanelProps) {
-  const [spicyLevel, setSpicyLevel] = useState("Cấp 3");
+export default function InvoicePanel({ table, orderItems, menuItems, onAddItem, onChangeQuantity, onPayment }: InvoicePanelProps) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [query, setQuery] = useState("");
+  const [pendingItem, setPendingItem] = useState<MenuItem | null>(null);
+  const [removeId, setRemoveId] = useState<string | null>(null);
   const total = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const itemCount = orderItems.reduce((sum, item) => sum + item.quantity, 0);
-  const hasOrder = orderItems.length > 0;
+  const count = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase();
+  const filteredMenu = menuItems.filter((item) => normalize(item.name).includes(normalize(query.trim())));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="border-b border-slate-100 px-4 py-4 lg:px-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400 lg:text-xs">Hóa đơn tại bàn</p>
-            <h2 className="mt-1 text-[20px] font-bold tracking-tight text-slate-900 lg:text-2xl">{table?.name ?? "Chưa chọn bàn"}</h2>
-          </div>
-          <span className={`rounded-full px-2.5 py-1.5 text-[11px] font-bold lg:px-3 lg:text-xs ${table?.status === "occupied" ? "bg-orange-50 text-orange-700" : "bg-slate-100 text-slate-500"}`}>
-            {table?.status === "occupied" ? "Đang phục vụ" : "Bàn trống"}
-          </span>
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 lg:px-5 lg:py-4">
-        {hasOrder ? (
-          <div className="space-y-2.5 lg:space-y-3">
-            {orderItems.map((item) => (
-              <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-3 lg:p-3.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-[15px] font-bold text-slate-800 lg:text-base">{item.name}</p>
-                    {item.spicyLevel && (
-                      <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-orange-600 lg:text-xs">
-                        <Flame size={13} aria-hidden="true" /> {item.spicyLevel}
-                      </p>
-                    )}
-                    <p className="mt-1 text-[11px] text-slate-500 lg:text-xs">{formatCurrency(item.price)} / phần</p>
-                  </div>
-                  <p className="shrink-0 text-[15px] font-bold text-slate-900 lg:text-base">{formatCurrency(item.price * item.quantity)}</p>
-                </div>
-                <div className="mt-2.5 flex items-center justify-between lg:mt-3">
-                  <div className="flex items-center rounded-xl border border-slate-200 bg-white">
-                    <button
-                      type="button"
-                      aria-label={`Giảm số lượng ${item.name}`}
-                      onClick={() => onChangeQuantity(item.id, item.quantity - 1)}
-                      className="flex size-7 items-center justify-center rounded-l-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 lg:size-8"
-                    >
-                      <Minus size={15} aria-hidden="true" />
-                    </button>
-                    <span className="w-7 text-center text-[13px] font-bold lg:w-8 lg:text-sm">{item.quantity}</span>
-                    <button
-                      type="button"
-                      aria-label={`Tăng số lượng ${item.name}`}
-                      onClick={() => onChangeQuantity(item.id, item.quantity + 1)}
-                      className="flex size-7 items-center justify-center rounded-r-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 lg:size-8"
-                    >
-                      <Plus size={15} aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 text-center lg:min-h-36">
-            <ShoppingBag size={28} className="text-slate-300" aria-hidden="true" />
-            <p className="mt-2 text-[13px] font-semibold text-slate-600 lg:text-sm">Chưa có món trong hóa đơn</p>
-            <p className="mt-1 text-[11px] text-slate-400 lg:text-xs">Chọn món nhanh ở bên dưới để bắt đầu đơn hàng.</p>
-          </div>
-        )}
-
-        <div className="mt-4 border-t border-slate-100 pt-3 lg:mt-5 lg:pt-4">
-          <div className="mb-2.5 flex items-center justify-between lg:mb-3">
-            <h3 className="text-[15px] font-bold text-slate-800 lg:text-base">Thêm món nhanh</h3>
-            <label className="flex items-center gap-1.5 text-[11px] font-semibold text-orange-600 lg:text-xs">
-              <Flame size={14} aria-hidden="true" />
-              <select
-                value={spicyLevel}
-                onChange={(event) => setSpicyLevel(event.target.value)}
-                className="rounded-lg border border-orange-200 bg-orange-50 px-2 py-1 text-orange-700 outline-none focus:ring-2 focus:ring-orange-300"
-                aria-label="Cấp độ cay cho món mì cay"
-              >
-                {Array.from({ length: 8 }, (_, index) => `Cấp ${index}`).map((level) => (
-                  <option key={level} value={level}>{level}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="grid grid-cols-2 gap-2 lg:gap-2.5">
-            {menuItems.map((menuItem) => {
-              const isSpicyDish = Boolean(menuItem.spicyLevels);
-
-              return (
-                <button
-                  key={menuItem.id}
-                  type="button"
-                  onClick={() => onAddItem(menuItem, isSpicyDish ? spicyLevel : undefined)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-orange-300 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-300 lg:py-2.5"
-                >
-                  <span className="block truncate text-[13px] font-bold text-slate-800 lg:text-sm">{menuItem.name}</span>
-                  <span className="mt-0.5 block text-[11px] font-semibold text-orange-600 lg:text-xs">{formatCurrency(menuItem.price)}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="border-t border-slate-200 bg-white p-4 lg:p-5">
-        <div className="mb-3 flex items-end justify-between lg:mb-4">
-          <div>
-            <p className="text-[13px] font-medium text-slate-500 lg:text-sm">Tổng thanh toán</p>
-            <p className="mt-0.5 text-[11px] text-slate-400 lg:text-xs">{itemCount} món trong hóa đơn</p>
-          </div>
-          <p className="text-[22px] font-extrabold tracking-tight text-orange-600 lg:text-2xl">{formatCurrency(total)}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onPayment}
-          disabled={!table || !hasOrder}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-orange-500 px-4 py-3.5 text-[15px] font-extrabold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none lg:py-4 lg:text-base"
-        >
-          <ShoppingBag size={20} aria-hidden="true" />
-          Tính tiền
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 p-4">
+        <div><h2 className="text-xl font-bold">{table?.name}</h2><p className="mt-1 text-xs text-slate-500">{orderItems.length} loại món · {count} phần</p></div>
+        <button type="button" onClick={() => { setShowMenu(!showMenu); setPendingItem(null); }} className="flex min-h-11 items-center gap-2 rounded-xl bg-orange-50 px-4 text-sm font-bold text-orange-700 hover:bg-orange-100">
+          {showMenu ? <ArrowLeft size={18} /> : <Plus size={18} />}{showMenu ? "Về hóa đơn" : "Thêm món"}
         </button>
+      </div>
+      {showMenu ? (
+        <div className="flex min-h-0 flex-1 flex-col p-4">
+          <label className="mb-3 flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 px-3"><Search size={18} className="text-slate-400" /><input autoFocus aria-label="Tìm món" placeholder="Tìm tên món…" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 min-w-0 flex-1 outline-none" /></label>
+          {pendingItem ? <div className="overflow-y-auto rounded-xl bg-slate-50 p-4"><h3 className="font-bold">{pendingItem.name}</h3><p className="mt-1 text-sm text-slate-500">Chọn tùy chọn để thêm món</p><div className="mt-4 flex flex-wrap gap-2">{pendingItem.spicyLevels?.map((level) => <button key={level} type="button" onClick={() => { onAddItem(pendingItem, level); setPendingItem(null); }} className="min-h-11 rounded-lg border border-orange-200 bg-white px-4 text-sm font-semibold text-orange-700 hover:bg-orange-50">{level}</button>)}</div><button type="button" onClick={() => setPendingItem(null)} className="mt-4 min-h-11 text-sm text-slate-600">Quay lại danh mục</button></div> : <div className="min-h-0 flex-1 overflow-y-auto"><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{filteredMenu.map((item) => <button key={item.id} type="button" onClick={() => item.spicyLevels?.length ? setPendingItem(item) : onAddItem(item)} className="flex min-h-20 items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-orange-300 hover:bg-orange-50"><span><span className="block text-sm font-semibold">{item.name}</span><span className="mt-1 block text-sm text-orange-700">{formatCurrency(item.price)}</span></span><Plus size={18} className="shrink-0 text-orange-600" /></button>)}</div>{filteredMenu.length === 0 && <p className="py-8 text-center text-sm text-slate-500">Không tìm thấy món phù hợp.</p>}</div>}
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto px-4">
+          <div className="flex justify-between border-b border-slate-100 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"><span>Món / số lượng</span><span>Thành tiền</span></div>
+          {orderItems.map((item) => <div key={item.id} className="border-b border-slate-100 py-3">
+            <div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="text-sm font-bold">{item.name}</p><p className="mt-1 text-xs text-slate-500">{item.spicyLevel && `${item.spicyLevel} · `}{formatCurrency(item.price)} / phần</p></div><p className="shrink-0 text-sm font-bold tabular-nums">{formatCurrency(item.price * item.quantity)}</p></div>
+            <div className="mt-2 flex items-center gap-3"><div className="inline-flex items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${item.name}`} onClick={() => item.quantity === 1 ? setRemoveId(item.id) : onChangeQuantity(item.id, item.quantity - 1)} className="flex size-11 items-center justify-center rounded-l-lg hover:bg-slate-100"><Minus size={16} /></button><span className="w-9 text-center text-sm font-bold tabular-nums">{item.quantity}</span><button type="button" aria-label={`Tăng số lượng ${item.name}`} onClick={() => onChangeQuantity(item.id, item.quantity + 1)} className="flex size-11 items-center justify-center rounded-r-lg hover:bg-slate-100"><Plus size={16} /></button></div></div>
+            {removeId === item.id && <div className="mt-2 rounded-lg bg-red-50 p-3 text-sm text-red-800"><p>Xóa {item.name} khỏi hóa đơn?</p><div className="mt-2 flex gap-2"><button type="button" onClick={() => { onChangeQuantity(item.id, 0); setRemoveId(null); }} className="min-h-11 rounded-lg bg-red-600 px-4 font-semibold text-white">Xóa món</button><button type="button" onClick={() => setRemoveId(null)} className="min-h-11 rounded-lg bg-white px-4">Giữ lại</button></div></div>}
+          </div>)}
+          {orderItems.length === 0 && <div className="py-16 text-center"><ShoppingBag size={32} className="mx-auto text-slate-300" /><p className="mt-3 font-semibold text-slate-600">Chưa có món trong hóa đơn</p><button type="button" onClick={() => setShowMenu(true)} className="mt-3 min-h-11 text-sm font-bold text-orange-600">+ Thêm món đầu tiên</button></div>}
+        </div>
+      )}
+      <div className="shrink-0 border-t border-slate-200 bg-slate-50/60 p-4">
+        <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-sm font-semibold text-slate-600">Tổng thanh toán</p><p className="mt-1 text-xs text-slate-500">{count} phần · {orderItems.length} loại món</p></div><p className="text-2xl font-extrabold tabular-nums text-orange-600">{formatCurrency(total)}</p></div>
+        <button type="button" onClick={onPayment} disabled={!table || orderItems.length === 0} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 font-bold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"><ShoppingBag size={20} />Thanh toán</button>
       </div>
     </div>
   );

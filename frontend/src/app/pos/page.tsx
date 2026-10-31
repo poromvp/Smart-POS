@@ -14,6 +14,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
 import { fetchMenu } from "@/lib/api";
 
+
 const SPICY_LEVELS = Array.from({ length: 8 }, (_, index) => `Cấp ${index}`);
 
 const MENU_ITEMS: MenuItem[] = [
@@ -105,28 +106,22 @@ export default function PosPage() {
   const toast = useToast();
 
   useEffect(() => {
-    fetchMenu()
-      .then((categories) => {
-        if (categories && categories.length > 0) {
-          const items: MenuItem[] = categories.flatMap((cat) =>
-            cat.products.map((p) => ({
-              id: String(p.id),
-              name: p.name,
-              price: p.basePrice,
-              spicyLevels:
-                p.variants && p.variants.length > 0
-                  ? p.variants.map((v) => v.sizeName)
-                  : undefined,
-            }))
-          );
-          if (items.length > 0) {
-            setMenuItems(items);
-          }
-        }
-      })
-      .catch(() => {
-        // Fallback to static mock menu when backend is unreachable
-      });
+    let active = true;
+    fetchMenu().then((categories) => {
+      const items: MenuItem[] = categories.flatMap((category) =>
+        category.products.filter((product) => product.isActive).flatMap((product) =>
+          product.variants?.length
+            ? product.variants.map((variant) => ({
+                id: `${product.id}-${variant.id}`,
+                name: `${product.name} · ${variant.sizeName}`,
+                price: variant.finalPrice,
+              }))
+            : [{ id: String(product.id), name: product.name, price: product.basePrice }]
+        )
+      );
+      if (active && items.length) setMenuItems(items);
+    }).catch(() => { /* Keep the sample menu available in demo mode. */ });
+    return () => { active = false; };
   }, []);
 
   const selectedTable = useMemo(
@@ -141,7 +136,7 @@ export default function PosPage() {
   );
 
   const handleSelectTable = (table: RestaurantTable) => {
-    setSelectedTableId((prevId) => (prevId === table.id ? null : table.id));
+    setSelectedTableId(table.id);
   };
 
   const handleAddItem = (menuItem: MenuItem, spicyLevel?: string) => {
@@ -186,7 +181,16 @@ export default function PosPage() {
   };
 
   const handleChangeQuantity = (orderItemId: string, quantity: number) => {
-    if (!selectedTableId) return;
+    if (!selectedTableId || !Number.isSafeInteger(quantity) || quantity < 0) return;
+
+    const remainingItems = selectedOrder
+      .map((item) => item.id === orderItemId ? { ...item, quantity } : item)
+      .filter((item) => item.quantity > 0);
+    setTables((currentTables) => currentTables.map((table) =>
+      table.id === selectedTableId
+        ? { ...table, status: remainingItems.length ? "occupied" : "empty" }
+        : table
+    ));
 
     setOrdersByTable((currentOrders) => {
       const nextTableOrder = (currentOrders[selectedTableId] ?? [])
@@ -213,8 +217,8 @@ export default function PosPage() {
     setSelectedTableId(null);
 
     toast.success(
-      `Thanh toán thành công ${paidTableName}`,
-      `Tổng thu: ${selectedTotal.toLocaleString("vi-VN")}đ. Bàn đã chuyển về trạng thái trống.`
+      `Đã hoàn tất demo ${paidTableName}`,
+      `Hóa đơn mẫu: ${selectedTotal.toLocaleString("vi-VN")}đ. Bàn đã chuyển về trạng thái trống.`
     );
   };
 
@@ -223,21 +227,22 @@ export default function PosPage() {
       <TopHeader
         title="Màn hình thu ngân (POS)"
         branchName="Chi nhánh 01"
-        rightContent={<StatusBadge label="Ca đang hoạt động" variant="serving" />}
+        rightContent={<StatusBadge label="Phiên demo" variant="serving" />}
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <WorkspaceSidebar defaultCollapsed={true} />
 
         <main className="mx-auto flex w-full max-w-[1800px] flex-1 min-h-0 flex-col p-3.5 lg:p-5">
+          <p className="mb-3 shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Hóa đơn demo · Thao tác chỉ áp dụng trong phiên này, tải lại trang sẽ đặt lại hóa đơn.</p>
           <div
-            className={`grid h-full min-h-0 gap-4 transition-all duration-300 ${
+            className={`grid flex-1 min-h-0 gap-4 ${
               selectedTable
-                ? "lg:grid-cols-[1fr_440px] xl:grid-cols-[1fr_480px]"
+                ? "grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
                 : "grid-cols-1"
             }`}
           >
-            <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
+            <section className={`${selectedTable ? "hidden lg:flex" : "flex"} min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs`}>
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 text-sm font-semibold text-slate-600">
                 <div className="flex items-center gap-2">
                   <LayoutGrid size={18} className="text-orange-500" aria-hidden="true" />
@@ -250,13 +255,14 @@ export default function PosPage() {
 
               <TableMap
                 tables={tables}
+                totals={Object.fromEntries(Object.entries(ordersByTable).map(([id, items]) => [id, items.reduce((sum, item) => sum + item.price * item.quantity, 0)]))}
                 selectedTableId={selectedTableId}
                 onSelectTable={handleSelectTable}
               />
             </section>
 
             {selectedTable && (
-              <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-orange-200 bg-white shadow-lg shadow-orange-500/5">
+              <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-lg shadow-orange-500/5">
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 text-sm font-semibold text-slate-700 bg-orange-50/40">
                   <div className="flex items-center gap-2">
                     <ReceiptText size={18} className="text-orange-600" aria-hidden="true" />
@@ -268,14 +274,15 @@ export default function PosPage() {
                     type="button"
                     onClick={() => setSelectedTableId(null)}
                     title="Đóng chi tiết bàn"
-                    className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-orange-100 hover:text-orange-600 transition-colors cursor-pointer"
+                    className="flex min-h-11 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-orange-100 hover:text-orange-600 transition-colors cursor-pointer"
                   >
-                    <span>Đóng</span>
+                    <span>Về sơ đồ bàn</span>
                     <X size={15} />
                   </button>
                 </div>
 
                 <InvoicePanel
+                  key={selectedTable.id}
                   table={selectedTable}
                   orderItems={selectedOrder}
                   menuItems={menuItems}

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { X, Plus, Trash2, Edit2, Check, AlertCircle, LoaderCircle } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { CategoryResponse } from "@/lib/types/menu";
-import { createCategory, updateCategory, deleteCategory } from "@/lib/api";
+import { createCategory, updateCategory, deleteCategory, toggleCategoryStatus } from "@/lib/api";
 
 interface CategoryModalProps {
   open: boolean;
@@ -46,6 +46,7 @@ function CategoryModalDialog({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editOrder, setEditOrder] = useState<number>(1);
+  const [editIsActive, setEditIsActive] = useState<boolean>(true);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +78,7 @@ function CategoryModalDialog({
     setEditingId(cat.id);
     setEditName(cat.name);
     setEditOrder(cat.displayOrder);
+    setEditIsActive(cat.isActive);
   };
 
   const handleSaveEdit = async (id: number) => {
@@ -88,13 +90,32 @@ function CategoryModalDialog({
       await updateCategory(id, {
         name: editName.trim(),
         displayOrder: editOrder,
-        isActive: true,
+        isActive: editIsActive,
       });
       toast.success("Thành công", "Đã cập nhật danh mục.");
       setEditingId(null);
       onChanged();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Cập nhật danh mục thất bại");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (cat: CategoryResponse) => {
+    setLoading(true);
+    try {
+      await toggleCategoryStatus(cat.id, !cat.isActive);
+      toast.success(
+        "Thành công",
+        `Đã ${!cat.isActive ? "kích hoạt" : "ngừng dùng"} danh mục '${cat.name}'.`
+      );
+      onChanged();
+    } catch (err: unknown) {
+      toast.error(
+        "Lỗi đổi trạng thái",
+        err instanceof Error ? err.message : "Thao tác thất bại"
+      );
     } finally {
       setLoading(false);
     }
@@ -209,8 +230,21 @@ function CategoryModalDialog({
                         min="1"
                         value={editOrder}
                         onChange={(e) => setEditOrder(Number(e.target.value))}
+                        title="Thứ tự hiển thị"
                         className="w-16 px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-center focus:ring-2 focus:ring-orange-500 outline-none"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setEditIsActive(!editIsActive)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          editIsActive
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                            : "bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200"
+                        }`}
+                        title="Bật/tắt trạng thái"
+                      >
+                        {editIsActive ? "Đang dùng" : "Ngừng dùng"}
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleSaveEdit(cat.id)}
@@ -241,15 +275,39 @@ function CategoryModalDialog({
                       <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-gray-100 text-[11px] font-bold text-gray-500">
                         {cat.displayOrder}
                       </span>
-                      <span className="text-xs font-bold text-gray-800">{cat.name}</span>
+                      <span
+                        className={`text-xs font-bold ${
+                          cat.isActive ? "text-gray-800" : "text-gray-400 line-through"
+                        }`}
+                      >
+                        {cat.name}
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(cat)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition cursor-pointer ${
+                          cat.isActive
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                            : "bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200"
+                        }`}
+                        title="Nhấn để đổi trạng thái danh mục"
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            cat.isActive ? "bg-emerald-500" : "bg-gray-400"
+                          }`}
+                        />
+                        {cat.isActive ? "Đang dùng" : "Ngừng dùng"}
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => handleStartEdit(cat)}
                         className="p-1.5 text-gray-400 hover:text-orange-600 rounded-lg hover:bg-orange-50 transition cursor-pointer"
-                        title="Sửa tên"
+                        title="Sửa danh mục"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>

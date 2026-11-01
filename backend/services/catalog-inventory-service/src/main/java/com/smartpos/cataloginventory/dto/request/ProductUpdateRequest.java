@@ -2,6 +2,7 @@ package com.smartpos.cataloginventory.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -29,6 +30,7 @@ public class ProductUpdateRequest {
 
     @NotNull(message = "Giá gốc không được để trống")
     @DecimalMin(value = "0.0", message = "Giá gốc không được âm")
+    @Digits(integer = 10, fraction = 2, message = "Giá gốc tối đa 10 chữ số nguyên và 2 chữ số thập phân")
     private BigDecimal basePrice;
 
     private String imageUrl;

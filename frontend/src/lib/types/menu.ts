@@ -24,6 +24,7 @@ export interface ModifierGroupResponse {
   name: string;
   isMultiple: boolean;
   isRequired: boolean;
+  isActive: boolean;
   options: ModifierOptionResponse[];
 }
 
@@ -102,5 +103,13 @@ export interface ModifierGroupCreateRequest {
   name: string;
   isMultiple: boolean;
   isRequired: boolean;
+  isActive?: boolean;
   options?: ModifierOptionInput[];
+}
+
+export interface ModifierGroupUpdateRequest {
+  name?: string;
+  isMultiple?: boolean;
+  isRequired?: boolean;
+  isActive?: boolean;
 }

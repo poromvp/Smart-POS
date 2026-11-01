@@ -14,7 +14,8 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO modifier_groups (id, name, is_multiple, is_required) VALUES
 (1, 'Topping Mì Cay', true, false),
 (2, 'Lượng Đường', false, false),
-(3, 'Topping Thức Uống', true, false)
+(3, 'Topping Thức Uống', true, false),
+(4, 'Lượng Đá', false, false)
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. CÁC TÙY CHỌN CON (MODIFIER OPTIONS)
@@ -30,7 +31,10 @@ INSERT INTO modifier_options (id, group_id, name, price) VALUES
 (9, 2, 'Không đường', 0),
 (10, 3, 'Miếng đào giòn thêm', 10000),
 (11, 3, 'Thạch nha đam', 8000),
-(12, 3, 'Trân châu đen', 8000)
+(12, 3, 'Trân châu đen', 8000),
+(13, 4, '100% đá', 0),
+(14, 4, '50% đá', 0),
+(15, 4, 'Không đá', 0)
 ON CONFLICT (id) DO NOTHING;
 
 -- 4. MÓN ĂN (PRODUCTS)
@@ -67,7 +71,10 @@ INSERT INTO product_modifier_groups (product_id, modifier_group_id) VALUES
 (4, 3),
 (5, 2),
 (5, 3),
-(6, 2)
+(4, 4),
+(5, 4),
+(6, 2),
+(6, 4)
 ON CONFLICT DO NOTHING;
 
 -- CẬP NHẬT LẠI SEQUENCE ĐỂ TRÁNH TRÙNG LẶP ID KHI THÊM MỚI BẰNG API

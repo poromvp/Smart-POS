@@ -29,8 +29,9 @@ public class IngredientController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<IngredientResponse>>> getAllIngredients(
-            @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponse.ok(ingredientService.getAllIngredients(search)));
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "false") Boolean activeOnly) {
+        return ResponseEntity.ok(ApiResponse.ok(ingredientService.getAllIngredients(search, activeOnly)));
     }
 
     @GetMapping("/{id}")
@@ -44,6 +45,14 @@ public class IngredientController {
             @Valid @RequestBody IngredientUpdateRequest request) {
         IngredientResponse response = ingredientService.updateIngredient(id, request);
         return ResponseEntity.ok(ApiResponse.ok(response, "Cập nhật nguyên liệu thành công"));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<Void>> toggleStatus(
+            @PathVariable Long id,
+            @RequestParam Boolean isActive) {
+        ingredientService.toggleIngredientStatus(id, isActive);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Cập nhật trạng thái nguyên liệu thành công"));
     }
 
     @DeleteMapping("/{id}")

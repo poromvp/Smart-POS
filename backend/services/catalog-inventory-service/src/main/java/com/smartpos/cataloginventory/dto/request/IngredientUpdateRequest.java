@@ -33,4 +33,5 @@ public class IngredientUpdateRequest {
     @PositiveOrZero(message = "Giá vốn không được âm")
     @Digits(integer = 10, fraction = 2, message = "Giá vốn tối đa 10 chữ số nguyên và 2 chữ số thập phân")
     private BigDecimal costPerUnit;
+    private Boolean isActive;
 }

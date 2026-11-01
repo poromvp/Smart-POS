@@ -67,12 +67,12 @@ function BomTableEditor({
     }
 
     const existingIds = new Set(items.map((i) => i.ingredientId));
-    const available = ingredients.find((ing) => !existingIds.has(ing.id));
+    const available = ingredients.find((ing) => ing.isActive && !existingIds.has(ing.id));
 
     if (!available) {
       toast.warning(
         "Đã dùng hết nguyên liệu",
-        "Tất cả nguyên liệu hiện có trong kho đều đã được thêm vào công thức này."
+        "Tất cả nguyên liệu đang sử dụng trong kho đều đã được thêm vào công thức này."
       );
       return;
     }
@@ -200,13 +200,16 @@ function BomTableEditor({
                           const isUsedElsewhere = items.some(
                             (it, itIdx) => itIdx !== index && it.ingredientId === ingItem.id
                           );
+                          const isInactive = !ingItem.isActive && ingItem.id !== item.ingredientId;
                           return (
                             <option
                               key={ingItem.id}
                               value={ingItem.id}
-                              disabled={isUsedElsewhere}
+                              disabled={isUsedElsewhere || isInactive}
                             >
-                              {ingItem.name} ({ingItem.unit}){isUsedElsewhere ? " - [Đã chọn]" : ""}
+                              {ingItem.name} ({ingItem.unit})
+                              {!ingItem.isActive ? " - [Ngừng dùng]" : ""}
+                              {isUsedElsewhere ? " - [Đã chọn]" : ""}
                             </option>
                           );
                         })}
@@ -323,7 +326,9 @@ export default function MenuBomPage() {
           setProducts(prods);
           setIngredients(ings);
           if (prods.length > 0) {
-            setSelectedProductId(prods[0].id);
+            setSelectedProductId((prev) =>
+              prev && prods.some((p) => p.id === prev) ? prev : prods[0].id
+            );
           }
         }
       })

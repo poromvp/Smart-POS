@@ -27,6 +27,7 @@ export default function IngredientModal({
   const [currentStock, setCurrentStock] = useState<number | string>(ingredientToEdit?.currentStock ?? 0);
   const [minThreshold, setMinThreshold] = useState<number | string>(ingredientToEdit?.minThreshold ?? 0);
   const [costPerUnit, setCostPerUnit] = useState<number | string>(ingredientToEdit?.costPerUnit ?? 0);
+  const [isActive, setIsActive] = useState<boolean>(ingredientToEdit?.isActive ?? true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +55,7 @@ export default function IngredientModal({
           unit: unit.trim(),
           minThreshold: Number(minThreshold) || 0,
           costPerUnit: Number(costPerUnit) || 0,
+          isActive,
         });
       } else {
         await onSaveCreate({
@@ -63,6 +65,7 @@ export default function IngredientModal({
           currentStock: Number(currentStock) || 0,
           minThreshold: Number(minThreshold) || 0,
           costPerUnit: Number(costPerUnit) || 0,
+          isActive,
         });
       }
       onClose();
@@ -187,6 +190,25 @@ export default function IngredientModal({
                 className="w-full rounded-xl border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
               />
             </div>
+          </div>
+
+          {/* Trạng thái hoạt động */}
+          <div className="flex items-center justify-between rounded-xl bg-gray-50 p-3 border border-gray-200">
+            <div>
+              <p className="text-xs font-bold uppercase text-gray-700">Trạng thái sử dụng</p>
+              <p className="text-xs text-gray-500">
+                {isActive ? "Đang sử dụng trong kho và công thức" : "Ngừng sử dụng (tạm ẩn)"}
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+            </label>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">

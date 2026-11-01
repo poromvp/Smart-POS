@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -16,7 +17,12 @@ public class DeductItemRequest {
 
     private Long variantId;
 
+    @NotNull(message = "Danh sách tùy chọn không được null")
     private Set<Long> modifierOptionIds = new HashSet<>();
+
+    public Set<Long> getModifierOptionIds() {
+        return modifierOptionIds != null ? modifierOptionIds : Collections.emptySet();
+    }
 
     @NotNull(message = "Số lượng không được để trống")
     @Min(value = 1, message = "Số lượng phải lớn hơn 0")

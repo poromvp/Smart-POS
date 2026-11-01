@@ -29,7 +29,7 @@ public class Category {
     @Builder.Default
     private Boolean isActive = true;
 
-    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "category")
     @ToString.Exclude
     @Builder.Default
     private List<Product> products = new ArrayList<>();

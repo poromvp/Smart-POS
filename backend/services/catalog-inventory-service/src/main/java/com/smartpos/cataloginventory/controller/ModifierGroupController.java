@@ -31,8 +31,9 @@ public class ModifierGroupController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ModifierGroupResponse>>> getAllGroups() {
-        List<ModifierGroupResponse> response = modifierGroupService.getAllGroups();
+    public ResponseEntity<ApiResponse<List<ModifierGroupResponse>>> getAllGroups(
+            @RequestParam(required = false, defaultValue = "false") Boolean activeOnly) {
+        List<ModifierGroupResponse> response = modifierGroupService.getAllGroups(activeOnly);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
@@ -48,6 +49,14 @@ public class ModifierGroupController {
             @Valid @RequestBody ModifierGroupUpdateRequest request) {
         ModifierGroupResponse response = modifierGroupService.updateGroup(id, request);
         return ResponseEntity.ok(ApiResponse.ok(response, "Cập nhật nhóm tùy chọn thành công"));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<Void>> toggleStatus(
+            @PathVariable Long id,
+            @RequestParam Boolean isActive) {
+        modifierGroupService.toggleGroupStatus(id, isActive);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Cập nhật trạng thái nhóm tùy chọn thành công"));
     }
 
     @DeleteMapping("/{id}")

@@ -57,8 +57,11 @@ public class RecipeServiceImpl implements RecipeService {
                             "Không tìm thấy tùy chọn ID " + request.getModifierOptionId()
                                     + " trong các nhóm tùy chọn của món '" + product.getName() + "'"));
 
-            recipeRepository.deleteByModifierOptionId(option.getId());
-            saveItems(request.getItems(), ingredients, recipe -> recipe.setModifierOption(option));
+            recipeRepository.deleteByProductIdAndModifierOptionId(product.getId(), option.getId());
+            saveItems(request.getItems(), ingredients, recipe -> {
+                recipe.setProduct(product);
+                recipe.setModifierOption(option);
+            });
 
         } else {
             recipeRepository.deleteByProductId(product.getId());
@@ -127,12 +130,27 @@ public class RecipeServiceImpl implements RecipeService {
                 .map(ModifierOption::getId)
                 .toList();
 
-        Map<Long, List<RecipeItemResponse>> itemsByOption = optionIds.isEmpty()
-                ? Map.of()
-                : recipeRepository.findByModifierOptionIdInWithIngredient(optionIds).stream()
-                        .collect(Collectors.groupingBy(
-                                r -> r.getModifierOption().getId(),
-                                Collectors.collectingAndThen(Collectors.toList(), this::toItems)));
+        List<Recipe> modifierRecipes = optionIds.isEmpty()
+                ? List.of()
+                : recipeRepository.findModifierRecipesByProductAndOptionIds(productId, optionIds);
+
+        Map<Long, List<RecipeItemResponse>> itemsByOption = new HashMap<>();
+        for (Long optionId : optionIds) {
+            List<Recipe> forThisProduct = modifierRecipes.stream()
+                    .filter(r -> r.getModifierOption().getId().equals(optionId)
+                            && r.getProduct() != null && r.getProduct().getId().equals(productId))
+                    .toList();
+            if (!forThisProduct.isEmpty()) {
+                itemsByOption.put(optionId, toItems(forThisProduct));
+            } else {
+                List<Recipe> global = modifierRecipes.stream()
+                        .filter(r -> r.getModifierOption().getId().equals(optionId) && r.getProduct() == null)
+                        .toList();
+                if (!global.isEmpty()) {
+                    itemsByOption.put(optionId, toItems(global));
+                }
+            }
+        }
 
         List<RecipeResponse.VariantRecipe> variants = product.getVariants().stream()
                 .sorted(Comparator.comparing(ProductVariant::getId))

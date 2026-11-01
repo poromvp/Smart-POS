@@ -39,7 +39,7 @@ flowchart TD
         Rec --> Deduct
     end
 
-    subgraph Phase3["⏳ Giai đoạn 3: Nhập Kho & NCC (Tiếp theo)"]
+    subgraph Phase3["✅ Giai đoạn 3: Nhập Kho & NCC (Xong)"]
         Sup["3.1 Supplier (Nhà cung cấp)"]
         PO["3.2 Purchase Order (Phiếu nhập kho)"]
         CompletePO["3.3 Nhập kho & Cộng tồn kho"]
@@ -172,12 +172,12 @@ flowchart TD
 
 ---
 
-### ⏳ Giai Đoạn 3: Nhà Cung Cấp & Nhập Kho (Purchasing) - *CHƯA THỰC HIỆN*
+### ✅ Giai Đoạn 3: Nhà Cung Cấp & Nhập Kho (Purchasing) - *HOÀN THÀNH*
 
 #### 3.1. Phân hệ Nhà cung cấp (`Supplier`)
-- [ ] Tạo `SupplierRepository` (kiểm tra trùng mã số thuế, số điện thoại, tên).
-- [ ] Tạo DTO: `SupplierCreateRequest`, `SupplierUpdateRequest`, `SupplierResponse`.
-- [ ] Tạo `SupplierMapper`, `SupplierService` & `SupplierController`:
+- [x] Tạo `SupplierRepository` (kiểm tra trùng mã số thuế, số điện thoại, tên).
+- [x] Tạo DTO: `SupplierCreateRequest`, `SupplierUpdateRequest`, `SupplierResponse`.
+- [x] Tạo `SupplierMapper`, `SupplierService` & `SupplierController`:
   - `POST /api/suppliers`
   - `GET /api/suppliers` (tìm kiếm, lọc active)
   - `GET /api/suppliers/{id}`
@@ -185,19 +185,19 @@ flowchart TD
   - `DELETE /api/suppliers/{id}` (chặn xóa nếu nhà cung cấp đã có phiếu nhập)
 
 #### 3.2. Lập Phiếu nhập kho (`PurchaseOrder`)
-- [ ] Hoàn thiện `PurchaseOrderRepository` & `PurchaseOrderItemRepository`.
-- [ ] Tạo DTO:
+- [x] Hoàn thiện `PurchaseOrderRepository` & `PurchaseOrderItemRepository`.
+- [x] Tạo DTO:
   - `PurchaseOrderItemRequest` (`ingredientId`, `quantity`, `unitPrice`, `expiryDate`).
   - `PurchaseOrderCreateRequest` (`supplierId`, `staffId`, `orderDate`, `items`, `note`).
   - `PurchaseOrderUpdateRequest` (chỉ cho phép sửa khi còn là `DRAFT`).
   - `PurchaseOrderResponse`, `PurchaseOrderItemResponse`.
-- [ ] Tạo `PurchaseOrderService`:
+- [x] Tạo `PurchaseOrderService`:
   - Tạo phiếu nhập ở trạng thái `DRAFT`, tự động tính `totalPrice` từng dòng và tổng tiền phiếu nhập.
   - Sửa phiếu khi ở trạng thái `DRAFT`.
   - Hủy phiếu (`CANCELLED`).
 
 #### 3.3. Hoàn tất nhập kho & Cộng tồn kho tự động
-- [ ] Viết logic method `completePurchaseOrder(Long poId)`:
+- [x] Viết logic method `completePurchaseOrder(Long poId)`:
   - Kiểm tra trạng thái hiện tại (chỉ thực hiện khi đang là `DRAFT`).
   - Dùng khóa bi quan trên các nguyên liệu nhập kho.
   - Duyệt qua từng item:
@@ -206,16 +206,21 @@ flowchart TD
       $$\text{Giá vốn mới} = \frac{(\text{Tồn cũ} \times \text{Giá vốn cũ}) + (\text{Số lượng nhập} \times \text{Đơn giá nhập})}{\text{Tồn cũ} + \text{Số lượng nhập}}$$
     - Ghi bản ghi vào `inventory_transactions` với `transaction_type = IMPORT` (số lượng dương), liên kết `purchase_order_item_id`.
   - Cập nhật trạng thái phiếu thành `COMPLETED`.
-- [ ] Tạo `PurchaseOrderController`:
+- [x] Tạo `PurchaseOrderController`:
   - `POST /api/purchase-orders`
   - `GET /api/purchase-orders`
   - `GET /api/purchase-orders/{id}`
   - `PATCH /api/purchase-orders/{id}/complete`
   - `PATCH /api/purchase-orders/{id}/cancel`
 
+#### 3.4. Giao diện Quản lý Nhập kho & NCC (Frontend)
+- [x] TypeScript contracts: `frontend/src/lib/types/purchasing.ts`.
+- [x] API Client: `frontend/src/lib/api.ts` bổ sung toàn bộ API Suppliers và Purchase Orders.
+- [x] Màn hình hợp nhất `/admin/purchasing`: Quản lý danh sách đơn nhập kho, duyệt nhập kho, hủy đơn, CRUD nhà cung cấp.
+
 ---
 
-### ⏳ Giai Đoạn 4: Cảnh Báo & Báo Cáo Thẻ Kho (Audit & Alerts) - *CHƯA THỰC HIỆN*
+### ⏳ Giai Đoạn 4: Cảnh Báo & Báo Cáo Thẻ Kho (Audit & Alerts) - *TIẾP THEO*
 
 #### 4.1. Cảnh báo nguyên liệu sắp hết
 - [ ] Tạo Endpoint: `GET /api/inventory/low-stock`:

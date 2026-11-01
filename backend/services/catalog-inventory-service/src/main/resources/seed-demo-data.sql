@@ -98,7 +98,8 @@ INSERT INTO ingredients (id, code, name, unit, cost_per_unit, current_stock, min
 (18, 'NL-MATCHA', 'Bột Matcha Uji Nhật Bản', 'g', 1200, 1200.000, 300.000),
 (19, 'NL-TRAN-CHAU', 'Trân châu đen tươi Gia Thịnh', 'g', 60, 6000.000, 1500.000),
 (20, 'NL-NHA-DAM', 'Thạch nha đam Aloka', 'kg', 40000, 15.000, 3.000),
-(21, 'NL-GA', 'Gà phi lê tươi CP', 'kg', 85000, 2.500, 5.000) -- Cảnh báo lowStock (2.5 <= 5.0)
+(21, 'NL-GA', 'Gà phi lê tươi CP', 'kg', 85000, 2.500, 5.000),
+(22, 'NL-RAU', 'Rau củ tươi Đà Lạt', 'kg', 35000, 30.000, 10.000) -- Cảnh báo lowStock (2.5 <= 5.0)
 ON CONFLICT (id) DO NOTHING;
 
 -- 5. Công thức định lượng (Recipes - BOM 3 tầng)
@@ -153,6 +154,26 @@ SELECT id, 'INIT-STOCK-2026', current_stock, 'IMPORT', NOW()
 FROM ingredients
 ON CONFLICT DO NOTHING;
 
+-- 7. Nhà cung cấp (Suppliers - Phase 3)
+INSERT INTO suppliers (id, name, phone, email, address, is_active) VALUES
+(1, 'Công ty TNHH Thực Phẩm Tươi Sống Nam An', '0901234567', 'contact@namanfood.vn', '123 Kha Vạn Cân, TP. Thủ Đức, TP. HCM', true),
+(2, 'Nhà Cung Cấp Nông Sản Đà Lạt Xanh', '0988776655', 'sales@dalatxanh.com', '45 Lê Hồng Phong, TP. Đà Lạt', true),
+(3, 'Đại Lý Gia Vị & Đồ Khô Tân Bình', '0912348899', 'giavi.tanbinh@gmail.com', '78 Lý Thường Kiệt, Q. Tân Bình, TP. HCM', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 8. Phiếu nhập kho (Purchase Orders - Phase 3)
+INSERT INTO purchase_orders (id, po_number, supplier_id, staff_id, order_date, delivery_date, total_amount, status, note, created_at) VALUES
+(1, 'PO-20261028-1001', 1, 1, '2026-10-28', '2026-10-28', 4430000.00, 'COMPLETED', 'Đơn nhập thịt tươi đầu tuần phục vụ cơ sở chính', NOW() - INTERVAL '2 days'),
+(2, 'PO-20261030-1002', 2, 1, '2026-10-30', '2026-10-31', 750000.00, 'DRAFT', 'Dự trù nấm và rau củ tươi cho cuối tuần', NOW())
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO purchase_order_items (id, purchase_order_id, ingredient_id, quantity, unit_price, total_price) VALUES
+(1, 1, 1, 20.000, 175000.00, 3500000.00),
+(2, 1, 2, 15.000, 62000.00, 930000.00),
+(3, 2, 8, 10.000, 40000.00, 400000.00),
+(4, 2, 22, 25.000, 14000.00, 350000.00)
+ON CONFLICT (id) DO NOTHING;
+
 -- Cập nhật sequence tự tăng cho PostgreSQL sau khi chèn ID cố định
 SELECT setval('categories_id_seq', (SELECT COALESCE(MAX(id), 1) FROM categories));
 SELECT setval('modifier_groups_id_seq', (SELECT COALESCE(MAX(id), 1) FROM modifier_groups));
@@ -162,3 +183,6 @@ SELECT setval('product_variants_id_seq', (SELECT COALESCE(MAX(id), 1) FROM produ
 SELECT setval('ingredients_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ingredients));
 SELECT setval('recipes_id_seq', (SELECT COALESCE(MAX(id), 1) FROM recipes));
 SELECT setval('inventory_transactions_id_seq', (SELECT COALESCE(MAX(id), 1) FROM inventory_transactions));
+SELECT setval('suppliers_id_seq', (SELECT COALESCE(MAX(id), 1) FROM suppliers));
+SELECT setval('purchase_orders_id_seq', (SELECT COALESCE(MAX(id), 1) FROM purchase_orders));
+SELECT setval('purchase_order_items_id_seq', (SELECT COALESCE(MAX(id), 1) FROM purchase_order_items));

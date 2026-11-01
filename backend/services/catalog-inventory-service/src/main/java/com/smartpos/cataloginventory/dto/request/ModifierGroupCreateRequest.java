@@ -18,7 +18,8 @@ public class ModifierGroupCreateRequest {
 
     private Boolean isMultiple = false; // true: chọn nhiều, false: chọn 1
 
-    private Boolean isRequired = false; // true: bắt buộc, false: không
+    private Boolean isRequired = false;
+    private Boolean isActive = true; // true: bắt buộc, false: không
 
     @Valid
     private List<ModifierOptionRequest> options = new ArrayList<>(); // Danh sách các tùy chọn tạo kèm

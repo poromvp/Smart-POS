@@ -8,8 +8,9 @@ import java.util.List;
 
 public interface IngredientService {
     IngredientResponse createIngredient(IngredientCreateRequest request);
-    List<IngredientResponse> getAllIngredients(String search);
+    List<IngredientResponse> getAllIngredients(String search, Boolean activeOnly);
     IngredientResponse getIngredientById(Long id);
     IngredientResponse updateIngredient(Long id, IngredientUpdateRequest request);
+    void toggleIngredientStatus(Long id, Boolean isActive);
     void deleteIngredient(Long id);
 }

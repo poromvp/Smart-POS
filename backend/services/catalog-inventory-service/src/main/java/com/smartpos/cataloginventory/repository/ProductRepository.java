@@ -40,6 +40,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findAllWithModifiersById(@Param("ids") Collection<Long> ids);
 
     // Tìm kiếm và lọc danh sách sản phẩm (sử dụng pattern định dạng trước để tránh lỗi PostgreSQL lower(bytea))
+    @EntityGraph(attributePaths = {"category", "variants"})
     @Query("SELECT p FROM Product p WHERE " +
            "(:categoryId IS NULL OR p.category.id = :categoryId) AND " +
            "(:activeOnly IS NULL OR :activeOnly = false OR p.isActive = true) AND " +

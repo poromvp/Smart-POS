@@ -33,7 +33,7 @@ public class PurchaseOrderItem {
     @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
 
-    @Column(name = "total_price", nullable = false, precision = 12, scale = 2)
+    @Column(name = "total_price", nullable = false, precision = 14, scale = 2)
     private BigDecimal totalPrice;
 
     @Column(name = "expiry_date")

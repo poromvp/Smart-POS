@@ -37,4 +37,8 @@ public class Ingredient {
     @Column(name = "cost_per_unit", nullable = false, precision = 12, scale = 2)
     @Builder.Default
     private BigDecimal costPerUnit = BigDecimal.ZERO;
+
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    private Boolean isActive = true;
 }

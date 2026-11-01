@@ -65,16 +65,22 @@ public class IngredientServiceImpl implements IngredientService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<IngredientResponse> getAllIngredients(String search) {
-        List<Ingredient> ingredients = (search == null || search.isBlank())
-                ? ingredientRepository.findAllByOrderByNameAsc()
-                : ingredientRepository
-                        .findByNameContainingIgnoreCaseOrCodeContainingIgnoreCaseOrderByNameAsc(
-                                search.trim(), search.trim());
-
+    public List<IngredientResponse> getAllIngredients(String search, Boolean activeOnly) {
+        String pattern = (search != null && !search.isBlank())
+                ? "%" + search.trim().toLowerCase() + "%"
+                : null;
+        List<Ingredient> ingredients = ingredientRepository.searchIngredients(pattern, activeOnly);
         return ingredients.stream()
                 .map(ingredientMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public void toggleIngredientStatus(Long id, Boolean isActive) {
+        Ingredient ingredient = findIngredientOrThrow(id);
+        ingredient.setIsActive(Boolean.TRUE.equals(isActive));
+        ingredientRepository.save(ingredient);
     }
 
     @Override
@@ -113,6 +119,9 @@ public class IngredientServiceImpl implements IngredientService {
         if (codeProvided) {
             ingredient.setCode(code);
         }
+        if (request.getIsActive() != null) {
+            ingredient.setIsActive(request.getIsActive());
+        }
 
         return ingredientMapper.toResponse(ingredient);
     }
@@ -124,7 +133,7 @@ public class IngredientServiceImpl implements IngredientService {
 
         if (isInUse(id)) {
             throw new InvalidOperationException(
-                    "Không thể xóa nguyên liệu đã được dùng trong công thức, phiếu nhập hoặc thẻ kho");
+                    "Không thể xóa nguyên liệu '" + ingredient.getName() + "' đã được dùng trong công thức, phiếu nhập hoặc thẻ kho. Bạn có thể chuyển trạng thái sang 'Ngừng sử dụng'.");
         }
 
         ingredientRepository.delete(ingredient);

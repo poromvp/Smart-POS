@@ -14,6 +14,9 @@ import com.smartpos.cataloginventory.repository.PurchaseOrderRepository;
 import com.smartpos.cataloginventory.repository.SupplierRepository;
 import com.smartpos.cataloginventory.service.PurchaseOrderService;
 import lombok.RequiredArgsConstructor;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -149,7 +152,28 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Transactional(readOnly = true)
     public List<PurchaseOrderResponse> getPurchaseOrders(
             PurchaseOrderStatus status, Long supplierId, LocalDate fromDate, LocalDate toDate) {
-        List<PurchaseOrder> list = purchaseOrderRepository.searchPurchaseOrders(status, supplierId, fromDate, toDate);
+
+        Specification<PurchaseOrder> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (status != null) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (supplierId != null) {
+                predicates.add(cb.equal(root.get("supplier").get("id"), supplierId));
+            }
+            if (fromDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("orderDate"), fromDate));
+            }
+            if (toDate != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("orderDate"), toDate));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Sort sort = Sort.by(Sort.Order.desc("id"));
+        List<PurchaseOrder> list = purchaseOrderRepository.findAll(spec, sort);
         return purchaseOrderMapper.toResponseList(list);
     }
 

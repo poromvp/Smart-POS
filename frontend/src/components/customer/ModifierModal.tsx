@@ -75,13 +75,20 @@ function ModifierModalDialog({
   const handleToggleOption = (
     groupId: number,
     optionId: number,
-    isMultiple: boolean
+    isMultiple: boolean,
+    isRequired?: boolean
   ) => {
     setSelectedOptions((prev) => {
       const current = prev[groupId] || [];
 
       if (!isMultiple) {
-        // Chọn 1: thay thế bằng option mới
+        if (current.includes(optionId)) {
+          // Bỏ chọn radio nếu không bắt buộc
+          if (!isRequired) {
+            return { ...prev, [groupId]: [] };
+          }
+          return prev;
+        }
         return { ...prev, [groupId]: [optionId] };
       }
 
@@ -135,9 +142,17 @@ function ModifierModalDialog({
 
   const totalPrice = basePrice + modifierTotal;
 
-  if (!open || !item) return null;
+  const missingRequiredGroups = useMemo(() => {
+    if (!item?.modifierGroups) return [];
+    return item.modifierGroups.filter(
+      (g) =>
+        g.isRequired &&
+        (!selectedOptions[g.id] || selectedOptions[g.id].length === 0)
+    );
+  }, [item, selectedOptions]);
 
   const handleAdd = () => {
+    if (missingRequiredGroups.length > 0) return;
     onAddToCart({
       variant: selectedVariant || undefined,
       modifiers: selectedModifierList,
@@ -295,7 +310,8 @@ function ModifierModalDialog({
                                 handleToggleOption(
                                   group.id,
                                   opt.id,
-                                  group.isMultiple
+                                  group.isMultiple,
+                                  group.isRequired
                                 )
                               }
                               className="h-4 w-4 accent-[#b42318]"
@@ -338,9 +354,14 @@ function ModifierModalDialog({
           <button
             type="button"
             onClick={handleAdd}
-            className="flex min-h-12 w-full items-center justify-between rounded-xl bg-[#b42318] px-5 text-white shadow-lg shadow-red-200 transition active:scale-[0.98] hover:bg-[#8f1d15]"
+            disabled={missingRequiredGroups.length > 0}
+            className="flex min-h-12 w-full items-center justify-between rounded-xl bg-[#b42318] px-5 text-white shadow-lg shadow-red-200 transition active:scale-[0.98] hover:bg-[#8f1d15] disabled:bg-stone-300 disabled:shadow-none disabled:cursor-not-allowed"
           >
-            <span className="font-semibold text-sm">Thêm vào giỏ hàng</span>
+            <span className="font-semibold text-sm">
+              {missingRequiredGroups.length > 0
+                ? `Vui lòng chọn: ${missingRequiredGroups[0].name}`
+                : "Thêm vào giỏ hàng"}
+            </span>
             <span className="text-base font-bold">
               {totalPrice.toLocaleString("vi-VN")}₫
             </span>

@@ -43,7 +43,9 @@ public class SupplierServiceImpl implements SupplierService {
 
         request.setName(trimmedName);
         Supplier supplier = supplierMapper.toEntity(request);
-        return supplierMapper.toResponse(supplierRepository.save(supplier));
+        supplier.setEmail(trimToNull(request.getEmail()));
+        supplier.setAddress(trimToNull(request.getAddress()));
+                return supplierMapper.toResponse(supplierRepository.save(supplier));
     }
 
     @Override
@@ -67,7 +69,9 @@ public class SupplierServiceImpl implements SupplierService {
 
         request.setName(trimmedName);
         supplierMapper.updateEntityFromDto(request, supplier);
-        return supplierMapper.toResponse(supplierRepository.save(supplier));
+        supplier.setEmail(trimToNull(request.getEmail()));
+        supplier.setAddress(trimToNull(request.getAddress()));
+                return supplierMapper.toResponse(supplierRepository.save(supplier));
     }
 
     @Override
@@ -110,5 +114,12 @@ public class SupplierServiceImpl implements SupplierService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhà cung cấp với ID: " + id));
         supplier.setIsActive(isActive);
         supplierRepository.save(supplier);
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return value.trim();
     }
 }

@@ -17,5 +17,6 @@ public class IngredientResponse {
     private BigDecimal currentStock;
     private BigDecimal minThreshold;
     private BigDecimal costPerUnit;
-    private Boolean lowStock; // currentStock <= minThreshold
+    private Boolean lowStock;
+    private Boolean isActive; // currentStock <= minThreshold
 }

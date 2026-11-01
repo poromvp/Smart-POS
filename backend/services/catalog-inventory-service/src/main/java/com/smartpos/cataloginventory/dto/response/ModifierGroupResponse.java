@@ -14,5 +14,6 @@ public class ModifierGroupResponse {
     private String name;
     private Boolean isMultiple;
     private Boolean isRequired;
+    private Boolean isActive;
     private List<ModifierOptionResponse> options;
 }

@@ -8,6 +8,7 @@ import {
   UtensilsCrossed,
   Layers,
   Package,
+  Truck,
   Users,
   LogOut,
   ChevronRight,
@@ -42,6 +43,11 @@ const adminNavItems: AdminNavItem[] = [
     label: "Quản lý kho",
     href: "/admin/inventory",
     icon: Package,
+  },
+  {
+    label: "Nhập kho & NCC",
+    href: "/admin/purchasing",
+    icon: Truck,
   },
   {
     label: "Nhân sự & chi nhánh",

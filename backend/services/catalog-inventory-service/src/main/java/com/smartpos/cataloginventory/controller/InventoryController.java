@@ -2,6 +2,8 @@ package com.smartpos.cataloginventory.controller;
 
 import com.smartpos.cataloginventory.domain.InventoryTransactionType;
 import com.smartpos.cataloginventory.dto.request.DeductInventoryRequest;
+import com.smartpos.cataloginventory.dto.request.InventoryAdjustmentRequest;
+import com.smartpos.cataloginventory.dto.response.InventoryAdjustmentResponse;
 import com.smartpos.cataloginventory.dto.response.ApiResponse;
 import com.smartpos.cataloginventory.dto.response.DeductInventoryResponse;
 import com.smartpos.cataloginventory.dto.response.InventoryTransactionResponse;
@@ -30,6 +32,16 @@ public class InventoryController {
             @Valid @RequestBody DeductInventoryRequest request) {
         DeductInventoryResponse response = inventoryService.deductInventory(request);
         return ResponseEntity.ok(ApiResponse.ok(response, "Trừ kho thành công"));
+    }
+
+    @PostMapping("/adjust")
+    public ResponseEntity<ApiResponse<InventoryAdjustmentResponse>> adjustInventory(
+            @Valid @RequestBody InventoryAdjustmentRequest request) {
+        InventoryAdjustmentResponse response = inventoryService.adjustInventory(request);
+        String message = request.getType() == InventoryTransactionType.SPOILAGE
+                ? "Ghi nhận xuất hủy hỏng hóc thành công"
+                : "Cân bằng tồn kho kiểm kê thành công";
+        return ResponseEntity.ok(ApiResponse.ok(response, message));
     }
 
     @GetMapping("/low-stock")

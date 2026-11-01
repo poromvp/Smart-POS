@@ -30,7 +30,17 @@ public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
     List<Ingredient> findByNameContainingIgnoreCaseOrCodeContainingIgnoreCaseOrderByNameAsc(
             String name, String code);
 
+    @Query("SELECT i FROM Ingredient i WHERE " +
+           "(:activeOnly IS NULL OR :activeOnly = false OR i.isActive = true) AND " +
+           "(:pattern IS NULL OR LOWER(i.name) LIKE :pattern OR LOWER(i.code) LIKE :pattern) " +
+           "ORDER BY i.name ASC")
+    List<Ingredient> searchIngredients(@Param("pattern") String pattern, @Param("activeOnly") Boolean activeOnly);
+
     // Khóa bi quan chống Race Condition khi nhiều đơn hàng trừ kho cùng lúc
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM Ingredient i WHERE i.id = :id")
+    Optional<Ingredient> findByIdWithLock(@Param("id") Long id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Ingredient i WHERE i.id IN :ids ORDER BY i.id")
     List<Ingredient> findAllByIdWithLock(@Param("ids") Collection<Long> ids);

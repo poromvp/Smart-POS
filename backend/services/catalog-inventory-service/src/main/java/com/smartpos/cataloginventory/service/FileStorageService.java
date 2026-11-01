@@ -58,11 +58,8 @@ public class FileStorageService {
             Path targetLocation = this.fileStorageLocation.resolve(storedFileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
-            // Tạo link URL đầy đủ (ví dụ: http://localhost:8082/uploads/products/uuid.png)
-            String fileUrl = ServletUriComponentsBuilder.fromRequestUri(request)
-                    .replacePath("/uploads/products/" + storedFileName)
-                    .build()
-                    .toUriString();
+            // Trả về đường dẫn tương đối để tương thích mạng LAN qua Next.js proxy
+            String fileUrl = "/uploads/products/" + storedFileName;
 
             return FileUploadResponse.builder()
                     .originalFileName(originalFileName)

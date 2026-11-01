@@ -15,4 +15,5 @@ public class ModifierGroupUpdateRequest {
     private Boolean isMultiple;
 
     private Boolean isRequired;
+    private Boolean isActive;
 }

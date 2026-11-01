@@ -13,6 +13,7 @@ const HEADER_TITLES: Record<string, string> = {
   "/admin/products": "Quản lý món ăn & danh mục thực đơn",
   "/admin/menu-bom": "Thiết lập thực đơn & định lượng nguyên vật liệu",
   "/admin/inventory": "Quản lý kho hàng",
+  "/admin/purchasing": "Quản lý nhập kho & nhà cung cấp",
   "/admin/staff": "Nhân sự, chi nhánh & mã QR",
 };
 

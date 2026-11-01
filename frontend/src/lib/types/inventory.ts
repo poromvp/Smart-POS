@@ -9,6 +9,7 @@ export interface IngredientResponse {
   minThreshold: number;
   costPerUnit: number;
   lowStock: boolean;
+  isActive: boolean;
 }
 
 export interface IngredientCreateRequest {
@@ -18,6 +19,7 @@ export interface IngredientCreateRequest {
   currentStock: number;
   minThreshold: number;
   costPerUnit: number;
+  isActive?: boolean;
 }
 
 export interface IngredientUpdateRequest {
@@ -26,6 +28,7 @@ export interface IngredientUpdateRequest {
   unit: string;
   minThreshold?: number;
   costPerUnit?: number;
+  isActive?: boolean;
 }
 
 export interface RecipeItemResponse {
@@ -106,4 +109,61 @@ export interface ProductSummaryResponse {
   categoryId: number;
   categoryName: string;
   variantCount: number;
+}
+
+// ==================== GIAI ĐOẠN 4: CẢNH BÁO & THẺ KHO (AUDIT & ALERTS) ====================
+
+export type InventoryTransactionType =
+  | "IMPORT"
+  | "SALE_DEDUCT"
+  | "AUDIT_ADJUST"
+  | "SPOILAGE";
+
+export interface LowStockAlertResponse {
+  ingredientId: number;
+  ingredientName: string;
+  ingredientCode: string | null;
+  unit: string;
+  currentStock: number;
+  minThreshold: number;
+  deficit: number;
+  stockPercentage: number;
+  costPerUnit: number;
+  estimatedReorderCost: number;
+  suggestedReorderQuantity: number;
+}
+
+export interface InventoryTransactionResponse {
+  id: number;
+  ingredientId: number;
+  ingredientName: string;
+  ingredientCode: string | null;
+  unit: string;
+  quantity: number;
+  transactionType: InventoryTransactionType;
+  orderCode: string | null;
+  orderItemId: number | null;
+  purchaseOrderItemId: number | null;
+  createdAt: string;
+}
+
+export interface InventoryAdjustmentRequest {
+  ingredientId: number;
+  type: "AUDIT_ADJUST" | "SPOILAGE";
+  actualStock?: number;
+  quantity?: number;
+  reason?: string;
+}
+
+export interface InventoryAdjustmentResponse {
+  transactionId: number;
+  ingredientId: number;
+  ingredientName: string;
+  unit: string;
+  stockBefore: number;
+  stockAfter: number;
+  diffQuantity: number;
+  type: "AUDIT_ADJUST" | "SPOILAGE";
+  reason: string;
+  createdAt: string;
 }

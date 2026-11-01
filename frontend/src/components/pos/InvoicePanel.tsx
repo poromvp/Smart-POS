@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { Flame, Minus, Plus, ShoppingBag } from "lucide-react";
 import type { RestaurantTable } from "./TableMap";
+import type { ProductDetailResponse } from "@/lib/types/menu";
 
 export interface MenuItem {
   id: string;
   name: string;
   price: number;
+  rawProduct?: ProductDetailResponse;
   spicyLevels?: string[];
 }
 
@@ -17,6 +19,9 @@ export interface OrderItem {
   name: string;
   price: number;
   quantity: number;
+  sizeName?: string;
+  toppings?: string[];
+  note?: string;
   spicyLevel?: string;
 }
 
@@ -25,6 +30,7 @@ export interface InvoicePanelProps {
   orderItems: OrderItem[];
   menuItems: MenuItem[];
   onAddItem: (menuItem: MenuItem, spicyLevel?: string) => void;
+  onSelectItem?: (menuItem: MenuItem) => void;
   onChangeQuantity: (orderItemId: string, quantity: number) => void;
   onPayment: () => void;
 }
@@ -36,6 +42,7 @@ export default function InvoicePanel({
   orderItems,
   menuItems,
   onAddItem,
+  onSelectItem,
   onChangeQuantity,
   onPayment,
 }: InvoicePanelProps) {
@@ -65,8 +72,23 @@ export default function InvoicePanel({
               <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-3 lg:p-3.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[15px] font-bold text-slate-800 lg:text-base">{item.name}</p>
-                    {item.spicyLevel && (
+                    <p className="truncate text-[15px] font-bold text-slate-800 lg:text-base">
+                      {item.name}
+                      {item.sizeName && (
+                        <span className="ml-1.5 text-xs font-semibold text-orange-600">({item.sizeName})</span>
+                      )}
+                    </p>
+                    {item.toppings && item.toppings.length > 0 && (
+                      <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-1">
+                        + {item.toppings.join(", ")}
+                      </p>
+                    )}
+                    {item.note && (
+                      <p className="mt-0.5 text-[11px] italic text-slate-400">
+                        * {item.note}
+                      </p>
+                    )}
+                    {item.spicyLevel && !item.sizeName && (
                       <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-orange-600 lg:text-xs">
                         <Flame size={13} aria-hidden="true" /> {item.spicyLevel}
                       </p>
@@ -132,7 +154,7 @@ export default function InvoicePanel({
                 <button
                   key={menuItem.id}
                   type="button"
-                  onClick={() => onAddItem(menuItem, isSpicyDish ? spicyLevel : undefined)}
+                  onClick={() => onSelectItem ? onSelectItem(menuItem) : onAddItem(menuItem, isSpicyDish ? spicyLevel : undefined)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-orange-300 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-300 lg:py-2.5"
                 >
                   <span className="block truncate text-[13px] font-bold text-slate-800 lg:text-sm">{menuItem.name}</span>

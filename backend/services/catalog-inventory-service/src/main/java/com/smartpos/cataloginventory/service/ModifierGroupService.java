@@ -10,9 +10,10 @@ import java.util.List;
 
 public interface ModifierGroupService {
     ModifierGroupResponse createGroup(ModifierGroupCreateRequest request);
-    List<ModifierGroupResponse> getAllGroups();
+    List<ModifierGroupResponse> getAllGroups(Boolean activeOnly);
     ModifierGroupResponse getGroupById(Long id);
     ModifierGroupResponse updateGroup(Long id, ModifierGroupUpdateRequest request);
+    void toggleGroupStatus(Long id, Boolean isActive);
     void deleteGroup(Long id);
 
     ModifierOptionResponse addOptionToGroup(Long groupId, ModifierOptionRequest request);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -46,13 +46,33 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [removeToast]
   );
 
-  const contextValue: ToastContextType = {
-    showToast,
-    success: (title, message) => showToast("success", title, message),
-    error: (title, message) => showToast("error", title, message),
-    warning: (title, message) => showToast("warning", title, message),
-    info: (title, message) => showToast("info", title, message),
-  };
+  const success = useCallback(
+    (title: string, message?: string) => showToast("success", title, message),
+    [showToast]
+  );
+  const error = useCallback(
+    (title: string, message?: string) => showToast("error", title, message),
+    [showToast]
+  );
+  const warning = useCallback(
+    (title: string, message?: string) => showToast("warning", title, message),
+    [showToast]
+  );
+  const info = useCallback(
+    (title: string, message?: string) => showToast("info", title, message),
+    [showToast]
+  );
+
+  const contextValue: ToastContextType = useMemo(
+    () => ({
+      showToast,
+      success,
+      error,
+      warning,
+      info,
+    }),
+    [showToast, success, error, warning, info]
+  );
 
   const getToastStyles = (type: ToastType) => {
     switch (type) {

@@ -56,9 +56,17 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ModifierGroupResponse> getAllGroups() {
-        List<ModifierGroup> groups = modifierGroupRepository.findAllByOrderByNameAsc();
+    public List<ModifierGroupResponse> getAllGroups(Boolean activeOnly) {
+        List<ModifierGroup> groups = modifierGroupRepository.findAllByActiveFilter(activeOnly);
         return modifierMapper.toResponseList(groups);
+    }
+
+    @Override
+    @Transactional
+    public void toggleGroupStatus(Long id, Boolean isActive) {
+        ModifierGroup group = findGroupOrThrow(id);
+        group.setIsActive(Boolean.TRUE.equals(isActive));
+        modifierGroupRepository.save(group);
     }
 
     @Override
@@ -82,6 +90,9 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
         if (request.getName() != null) {
             group.setName(request.getName().trim());
         }
+        if (request.getIsActive() != null) {
+            group.setIsActive(request.getIsActive());
+        }
 
         return modifierMapper.toResponse(group);
     }
@@ -93,7 +104,7 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
 
         // Chặn xóa nếu nhóm tùy chọn này đang được liên kết với sản phẩm
         if (group.getProducts() != null && !group.getProducts().isEmpty()) {
-            throw new InvalidOperationException("Không thể xóa nhóm tùy chọn đang được gắn vào món ăn. Hãy gỡ khỏi món ăn trước");
+            throw new InvalidOperationException("Không thể xóa nhóm tùy chọn '" + group.getName() + "' đang được gắn vào món ăn. Bạn có thể chuyển trạng thái sang 'Ngừng hoạt động'.");
         }
 
         if (recipeRepository.existsByModifierOptionGroupId(id)) {

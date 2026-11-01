@@ -6,6 +6,8 @@ import InvoicePanel, {
   type MenuItem,
   type OrderItem,
 } from "@/components/pos/InvoicePanel";
+import PosItemModal, { type PosItemSelection } from "@/components/pos/PosItemModal";
+import type { ProductDetailResponse } from "@/lib/types/menu";
 import PaymentQRModal from "@/components/pos/PaymentQRModal";
 import TableMap, { type RestaurantTable } from "@/components/pos/TableMap";
 import TopHeader from "@/components/layout/TopHeader";
@@ -102,6 +104,8 @@ export default function PosPage() {
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
+  const [isPosItemModalOpen, setIsPosItemModalOpen] = useState(false);
+  const [selectedModalProduct, setSelectedModalProduct] = useState<ProductDetailResponse | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -113,6 +117,7 @@ export default function PosPage() {
               id: String(p.id),
               name: p.name,
               price: p.basePrice,
+              rawProduct: p,
               spicyLevels:
                 p.variants && p.variants.length > 0
                   ? p.variants.map((v) => v.sizeName)
@@ -142,6 +147,75 @@ export default function PosPage() {
 
   const handleSelectTable = (table: RestaurantTable) => {
     setSelectedTableId((prevId) => (prevId === table.id ? null : table.id));
+  };
+
+  const handleSelectItem = (menuItem: MenuItem) => {
+    if (!selectedTableId) {
+      toast.warning("Chưa chọn bàn", "Vui lòng bấm chọn một bàn trước khi thêm món");
+      return;
+    }
+    const raw = menuItem.rawProduct;
+    const hasVariants = raw?.variants && raw.variants.length > 0;
+    const hasModifiers = raw?.modifierGroups && raw.modifierGroups.length > 0;
+
+    if (raw && (hasVariants || hasModifiers)) {
+      setSelectedModalProduct(raw);
+      setIsPosItemModalOpen(true);
+    } else {
+      handleAddItem(menuItem);
+    }
+  };
+
+  const handleConfirmModalSelection = (selection: PosItemSelection) => {
+    if (!selectedTableId) return;
+
+    const toppingIds = selection.modifiers.map((m) => m.optionId).sort().join("-");
+    const variantPart = selection.variant ? `-${selection.variant.id}` : "";
+    const modifierPart = toppingIds ? `-mod-${toppingIds}` : "";
+    const orderItemId = `${selection.product.id}${variantPart}${modifierPart}`;
+
+    const toppingsList = selection.modifiers.map((m) => m.optionName);
+
+    setOrdersByTable((currentOrders) => {
+      const currentTableOrder = currentOrders[selectedTableId] ?? [];
+      const existingIndex = currentTableOrder.findIndex((item) => item.id === orderItemId);
+      let nextTableOrder: OrderItem[];
+
+      if (existingIndex >= 0) {
+        nextTableOrder = currentTableOrder.map((item, idx) =>
+          idx === existingIndex
+            ? { ...item, quantity: item.quantity + selection.quantity }
+            : item
+        );
+      } else {
+        nextTableOrder = [
+          ...currentTableOrder,
+          {
+            id: orderItemId,
+            menuItemId: String(selection.product.id),
+            name: selection.product.name,
+            price: selection.unitPrice,
+            quantity: selection.quantity,
+            sizeName: selection.variant?.sizeName,
+            toppings: toppingsList.length > 0 ? toppingsList : undefined,
+            note: selection.note || undefined,
+          },
+        ];
+      }
+
+      return { ...currentOrders, [selectedTableId]: nextTableOrder };
+    });
+
+    setTables((currentTables) =>
+      currentTables.map((table) =>
+        table.id === selectedTableId ? { ...table, status: "occupied" } : table
+      )
+    );
+
+    toast.info(
+      `Đã thêm: ${selection.product.name}`,
+      `${selectedTable?.name ?? "Bàn"}${selection.variant ? ` • ${selection.variant.sizeName}` : ""}`
+    );
   };
 
   const handleAddItem = (menuItem: MenuItem, spicyLevel?: string) => {
@@ -280,6 +354,7 @@ export default function PosPage() {
                   orderItems={selectedOrder}
                   menuItems={menuItems}
                   onAddItem={handleAddItem}
+                  onSelectItem={handleSelectItem}
                   onChangeQuantity={handleChangeQuantity}
                   onPayment={() => setIsPaymentModalOpen(true)}
                 />
@@ -288,6 +363,13 @@ export default function PosPage() {
           </div>
         </main>
       </div>
+
+      <PosItemModal
+        product={selectedModalProduct}
+        isOpen={isPosItemModalOpen}
+        onClose={() => setIsPosItemModalOpen(false)}
+        onConfirm={handleConfirmModalSelection}
+      />
 
       <PaymentQRModal
         key={isPaymentModalOpen ? "payment-open" : "payment-closed"}

@@ -10,6 +10,14 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/uploads/:path*",
+        destination: "http://localhost:8082/uploads/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

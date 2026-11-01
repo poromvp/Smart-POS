@@ -1,10 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Plus, Trash2, AlertCircle, LoaderCircle } from "lucide-react";
+import { X, Plus, Trash2, Edit2, Check, AlertCircle, LoaderCircle } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ModifierGroupResponse, ModifierOptionInput } from "@/lib/types/menu";
-import { createModifierGroup, deleteModifierGroup } from "@/lib/api";
+import {
+  createModifierGroup,
+  updateModifierGroup,
+  deleteModifierGroup,
+  toggleModifierGroupStatus,
+  addOptionToGroup,
+  deleteOptionFromGroup,
+} from "@/lib/api";
 
 interface ModifierGroupModalProps {
   open: boolean;
@@ -50,6 +57,11 @@ function ModifierGroupModalDialog({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addingOptionGroupId, setAddingOptionGroupId] = useState<number | null>(null);
+  const [newOptionName, setNewOptionName] = useState("");
+  const [newOptionPrice, setNewOptionPrice] = useState<number>(0);
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState("");
 
   const handleAddOption = () => {
     setOptions([...options, { name: "", price: 0 }]);
@@ -118,6 +130,74 @@ function ModifierGroupModalDialog({
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteOption = async (groupId: number, optionId: number, optionName: string) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa tùy chọn '${optionName}'?`)) return;
+    try {
+      await deleteOptionFromGroup(groupId, optionId);
+      toast.success("Thành công", `Đã xóa tùy chọn '${optionName}'.`);
+      onChanged();
+    } catch (err: unknown) {
+      toast.error("Lỗi xóa tùy chọn", err instanceof Error ? err.message : "Thao tác thất bại");
+    }
+  };
+
+  const handleAddOptionToExisting = async (groupId: number) => {
+    if (!newOptionName.trim()) {
+      toast.warning("Thiếu thông tin", "Vui lòng nhập tên tùy chọn");
+      return;
+    }
+    try {
+      await addOptionToGroup(groupId, {
+        name: newOptionName.trim(),
+        price: Number(newOptionPrice) || 0,
+      });
+      toast.success("Thành công", `Đã thêm tùy chọn '${newOptionName}'.`);
+      setNewOptionName("");
+      setNewOptionPrice(0);
+      setAddingOptionGroupId(null);
+      onChanged();
+    } catch (err: unknown) {
+      toast.error("Lỗi thêm tùy chọn", err instanceof Error ? err.message : "Thao tác thất bại");
+    }
+  };
+
+  const handleSaveGroupName = async (group: ModifierGroupResponse) => {
+    if (!editingGroupName.trim()) {
+      toast.warning("Thiếu thông tin", "Tên nhóm không được để trống");
+      return;
+    }
+    setLoading(true);
+    try {
+      await updateModifierGroup(group.id, {
+        name: editingGroupName.trim(),
+        isMultiple: group.isMultiple,
+        isRequired: group.isRequired,
+        isActive: group.isActive,
+      });
+      toast.success("Thành công", `Đã đổi tên nhóm thành '${editingGroupName.trim()}'.`);
+      setEditingGroupId(null);
+      onChanged();
+    } catch (err: unknown) {
+      toast.error("Lỗi cập nhật", err instanceof Error ? err.message : "Thao tác thất bại");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (group: ModifierGroupResponse) => {
+    const nextStatus = !group.isActive;
+    try {
+      await toggleModifierGroupStatus(group.id, nextStatus);
+      toast.success(
+        "Cập nhật trạng thái",
+        `Đã chuyển nhóm "${group.name}" sang ${nextStatus ? "Đang hoạt động" : "Ngừng hoạt động"}`
+      );
+      onChanged();
+    } catch (err: unknown) {
+      toast.error("Lỗi cập nhật", err instanceof Error ? err.message : "Thao tác thất bại");
     }
   };
 
@@ -272,39 +352,170 @@ function ModifierGroupModalDialog({
                   className="p-3.5 bg-white border border-gray-200 rounded-2xl hover:border-gray-300 transition space-y-2"
                 >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-900">{group.name}</h4>
-                      <p className="text-[11px] text-gray-400 mt-0.5">
-                        {group.isMultiple ? "Cho chọn nhiều" : "Chỉ chọn 1"} •{" "}
-                        {group.isRequired ? "Bắt buộc chọn" : "Không bắt buộc"}
-                      </p>
-                    </div>
+                    {editingGroupId === group.id ? (
+                      <div className="flex items-center gap-1.5 flex-1 max-w-sm mr-2">
+                        <input
+                          type="text"
+                          value={editingGroupName}
+                          onChange={(e) => setEditingGroupName(e.target.value)}
+                          placeholder="Tên nhóm mới..."
+                          className="flex-1 px-2.5 py-1 bg-white border border-orange-300 rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 outline-none"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSaveGroupName(group);
+                            } else if (e.key === "Escape") {
+                              setEditingGroupId(null);
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveGroupName(group)}
+                          disabled={loading || !editingGroupName.trim()}
+                          className="p-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition cursor-pointer"
+                          title="Lưu tên nhóm"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingGroupId(null)}
+                          className="p-1 text-gray-500 rounded-lg hover:bg-gray-200 transition cursor-pointer"
+                          title="Hủy"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-xs font-bold text-gray-900">{group.name}</h4>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingGroupId(group.id);
+                              setEditingGroupName(group.name);
+                            }}
+                            className="p-1 text-gray-400 hover:text-orange-600 rounded-md hover:bg-orange-50 transition cursor-pointer"
+                            title="Đổi tên nhóm"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          {group.isMultiple ? "Cho chọn nhiều" : "Chỉ chọn 1"} •{" "}
+                          {group.isRequired ? "Bắt buộc chọn" : "Không bắt buộc"}
+                        </p>
+                      </div>
+                    )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(group)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition cursor-pointer"
-                      title="Xóa nhóm"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(group)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition cursor-pointer ${
+                          group.isActive
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                            : "bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200"
+                        }`}
+                        title="Nhấn để đổi trạng thái nhóm"
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            group.isActive ? "bg-emerald-500" : "bg-gray-400"
+                          }`}
+                        />
+                        {group.isActive ? "Đang dùng" : "Ngừng dùng"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(group)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                        title="Xóa nhóm"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5 pt-1">
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     {group.options.map((opt) => (
                       <span
                         key={opt.id}
-                        className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-medium text-gray-700"
+                        className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg bg-gray-100 text-[11px] font-medium text-gray-700 group/opt hover:bg-gray-200 transition"
                       >
-                        {opt.name}
+                        <span>{opt.name}</span>
                         {opt.price > 0 && (
-                          <span className="ml-1 text-orange-600 font-semibold">
+                          <span className="text-orange-600 font-semibold">
                             (+{opt.price.toLocaleString("vi-VN")}đ)
                           </span>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOption(group.id, opt.id, opt.name)}
+                          className="p-0.5 text-gray-400 hover:text-red-600 rounded transition cursor-pointer"
+                          title="Xóa tùy chọn này"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </span>
                     ))}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingOptionGroupId(addingOptionGroupId === group.id ? null : group.id);
+                        setNewOptionName("");
+                        setNewOptionPrice(0);
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-dashed border-orange-300 text-[11px] font-bold text-orange-600 hover:bg-orange-50 transition cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Thêm tùy chọn</span>
+                    </button>
                   </div>
+
+                  {addingOptionGroupId === group.id && (
+                    <div className="flex items-center gap-2 p-2.5 bg-orange-50/60 border border-orange-200 rounded-xl animate-in fade-in duration-150">
+                      <input
+                        type="text"
+                        placeholder="Tên tùy chọn mới..."
+                        value={newOptionName}
+                        onChange={(e) => setNewOptionName(e.target.value)}
+                        className="flex-1 px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:ring-1 focus:ring-orange-500"
+                        autoFocus
+                      />
+                      <div className="w-24 relative">
+                        <input
+                          type="number"
+                          step="1000"
+                          min="0"
+                          placeholder="+0"
+                          value={newOptionPrice || ""}
+                          onChange={(e) => setNewOptionPrice(Number(e.target.value))}
+                          className="w-full pl-2 pr-5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-right font-semibold text-orange-600 outline-none"
+                        />
+                        <span className="absolute right-1.5 top-1.5 text-xs text-gray-400 font-semibold">đ</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAddOptionToExisting(group.id)}
+                        className="px-3 py-1.5 bg-orange-600 text-white font-bold text-xs rounded-lg hover:bg-orange-700 transition cursor-pointer"
+                      >
+                        Lưu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAddingOptionGroupId(null)}
+                        className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg transition cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}

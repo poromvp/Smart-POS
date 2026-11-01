@@ -45,9 +45,9 @@ public class ProductServiceImpl implements ProductService {
 
         Product product = productMapper.toEntity(request);
         product.setName(request.getName().trim());
-        if (request.getCode() != null) {
-            product.setCode(request.getCode().trim().toUpperCase());
-        }
+        product.setCode(trimToNullUpper(request.getCode()));
+        product.setDescription(trimToNull(request.getDescription()));
+        product.setImageUrl(trimToNull(request.getImageUrl()));
         product.setCategory(category);
 
         // 1. Gắn các nhóm Topping/Modifier
@@ -107,6 +107,14 @@ public class ProductServiceImpl implements ProductService {
             List<Product> prods = productsByCategory.getOrDefault(cat.getId(), Collections.emptyList());
             List<ProductDetailResponse> productResponses = prods.stream()
                     .map(productMapper::toDetailResponse)
+                    .map(resp -> {
+                        if (resp.getModifierGroups() != null) {
+                            resp.setModifierGroups(resp.getModifierGroups().stream()
+                                    .filter(g -> Boolean.TRUE.equals(g.getIsActive()))
+                                    .toList());
+                        }
+                        return resp;
+                    })
                     .toList();
 
             return CategoryMenuResponse.builder()
@@ -137,9 +145,9 @@ public class ProductServiceImpl implements ProductService {
 
         productMapper.updateEntityFromDto(request, product);
         product.setName(request.getName().trim());
-        if (request.getCode() != null) {
-            product.setCode(request.getCode().trim().toUpperCase());
-        }
+        product.setCode(trimToNullUpper(request.getCode()));
+        product.setDescription(trimToNull(request.getDescription()));
+        product.setImageUrl(trimToNull(request.getImageUrl()));
 
         // Cập nhật lại Modifier Groups
         attachModifierGroups(product, request.getModifierGroupIds());
@@ -287,5 +295,17 @@ public class ProductServiceImpl implements ProductService {
         if (sku != null && !sku.isBlank() && productVariantRepository.existsBySkuIgnoreCase(sku.trim())) {
             throw new DuplicateResourceException("Mã SKU biến thể '" + sku + "' đã tồn tại");
         }
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private String trimToNullUpper(String value) {
+        String trimmed = trimToNull(value);
+        return trimmed != null ? trimmed.toUpperCase() : null;
     }
 }

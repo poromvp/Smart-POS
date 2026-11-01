@@ -1,6 +1,7 @@
 package com.smartpos.cataloginventory.dto.request;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -20,6 +21,7 @@ public class ProductVariantRequest {
 
     @NotNull(message = "Mức điều chỉnh giá không được để trống")
     @DecimalMin(value = "0.0", message = "Mức điều chỉnh giá không được âm")
+    @Digits(integer = 10, fraction = 2, message = "Mức điều chỉnh giá tối đa 10 chữ số nguyên và 2 chữ số thập phân")
     private BigDecimal priceAdjustment = BigDecimal.ZERO;
 
     @Size(max = 50, message = "Mã SKU tối đa 50 ký tự")

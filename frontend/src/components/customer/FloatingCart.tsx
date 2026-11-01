@@ -74,6 +74,11 @@ export default function FloatingCart({
                       <div className="min-w-0">
                         <h3 className="font-semibold text-[var(--foreground)]">
                           {item.name}
+                          {item.sizeName && (
+                            <span className="ml-1.5 text-xs font-semibold text-orange-600">
+                              ({item.sizeName})
+                            </span>
+                          )}
                         </h3>
 
                         <p className="mt-1 text-sm text-[var(--muted)]">
@@ -86,9 +91,11 @@ export default function FloatingCart({
                           </p>
                         )}
 
-                        <p className="mt-1 text-xs text-[var(--muted)]">
-                          Độ ngọt: {item.sweetness}
-                        </p>
+                        {item.sweetness && (
+                          <p className="mt-1 text-xs text-[var(--muted)]">
+                            Độ ngọt: {item.sweetness}
+                          </p>
+                        )}
 
                         {item.note && (
                           <p className="mt-1 text-xs italic text-[var(--muted)]">

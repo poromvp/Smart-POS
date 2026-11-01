@@ -501,7 +501,14 @@ function ProductModalDialog({
                         className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
                       />
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-gray-900">{g.name}</p>
+                        <p className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                          <span>{g.name}</span>
+                          {!g.isActive && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">
+                              Ngừng dùng
+                            </span>
+                          )}
+                        </p>
                         <p className="text-[11px] text-gray-500 truncate mt-0.5">
                           {g.options.map((o) => o.name).join(", ") || "(chưa có options)"}
                         </p>

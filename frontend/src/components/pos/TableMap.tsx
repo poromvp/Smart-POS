@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
-import React from "react";
-import { Armchair, Users } from "lucide-react";
+import { useState } from "react";
+import { Armchair, Search } from "lucide-react";
 
 export interface RestaurantTable {
   id: string;
@@ -12,96 +12,42 @@ export interface RestaurantTable {
 interface TableMapProps {
   tables: RestaurantTable[];
   selectedTableId: string | null;
+  totals?: Record<string, number>;
   onSelectTable: (table: RestaurantTable) => void;
 }
 
-export default function TableMap({
-  tables,
-  selectedTableId,
-  onSelectTable,
-}: TableMapProps) {
-  const emptyCount = tables.filter((t) => t.status === "empty").length;
-  const occupiedCount = tables.filter((t) => t.status === "occupied").length;
-  const hasSelection = Boolean(selectedTableId);
+export default function TableMap({ tables, selectedTableId, totals = {}, onSelectTable }: TableMapProps) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const occupied = tables.filter((table) => table.status === "occupied").length;
+  const visible = tables.filter((table) => (filter === "all" || table.status === filter) && table.name.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi")));
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col p-5 lg:p-6 overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-5 shrink-0">
-        <div>
-          <h2 className="text-lg font-extrabold text-slate-900">Sơ đồ bàn</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {hasSelection
-              ? "Nhấn vào bàn khác để chuyển hóa đơn, hoặc nhấn lại vào bàn đang chọn để đóng."
-              : "Chọn một bàn bất kỳ trên sơ đồ để mở chi tiết hóa đơn tương ứng."}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs font-bold">
-          <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-700">
-            {emptyCount} bàn trống
-          </span>
-          <span className="px-3 py-1.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200/60">
-            {occupiedCount} đang dùng
-          </span>
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col p-4">
+      <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 text-slate-500 focus-within:ring-2 focus-within:ring-orange-300">
+        <Search size={18} aria-hidden="true" />
+        <input aria-label="Tìm bàn" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm tên hoặc số bàn…" className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none" />
+      </label>
+      <div className="my-3 flex flex-wrap gap-2">
+        {[["all", `Tất cả (${tables.length})`], ["occupied", `Đang dùng (${occupied})`], ["empty", `Trống (${tables.length - occupied})`]].map(([value, label]) => (
+          <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className={`min-h-11 rounded-lg px-3 text-xs font-semibold ${filter === value ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{label}</button>
+        ))}
       </div>
-
-      <div className="flex-1 overflow-y-auto pr-1">
-        <div
-          className={`grid gap-3.5 transition-all duration-300 ${
-            hasSelection
-              ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-4"
-              : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-          }`}
-        >
-          {tables.map((table) => {
-            const isSelected = table.id === selectedTableId;
-            const isOccupied = table.status === "occupied";
-
+      <p className="mb-3 text-xs text-slate-500">Chọn bàn để xem và kiểm tra hóa đơn.</p>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+          {visible.map((table) => {
+            const selected = selectedTableId === table.id;
             return (
-              <button
-                key={table.id}
-                type="button"
-                onClick={() => onSelectTable(table)}
-                className={`group relative flex flex-col items-center justify-center rounded-2xl p-5 min-h-[132px] border text-center transition-all duration-200 cursor-pointer active:scale-[0.98] ${
-                  isSelected
-                    ? "bg-orange-500 text-white border-orange-600 shadow-lg shadow-orange-500/25"
-                    : isOccupied
-                    ? "bg-orange-50/70 text-orange-950 border-orange-200 hover:border-orange-400 hover:bg-orange-100/50"
-                    : "bg-slate-50/70 text-slate-700 border-slate-200/80 hover:border-orange-300 hover:bg-white hover:shadow-xs"
-                }`}
-              >
-                <Armchair
-                  size={24}
-                  className={`mb-2 transition-transform group-hover:scale-110 ${
-                    isSelected
-                      ? "text-white"
-                      : isOccupied
-                      ? "text-orange-700"
-                      : "text-slate-600"
-                  }`}
-                />
-
-                <span className="text-sm font-extrabold tracking-tight">
-                  {table.name}
-                </span>
-
-                <span
-                  className={`mt-1 inline-flex items-center gap-1 text-[11px] font-semibold ${
-                    isSelected
-                      ? "text-orange-50"
-                      : isOccupied
-                      ? "text-orange-700"
-                      : "text-slate-400"
-                  }`}
-                >
-                  {isOccupied && <Users size={12} />}
-                  {isOccupied ? "Đang dùng" : "Trống"}
-                </span>
+              <button key={table.id} type="button" aria-pressed={selected} onClick={() => onSelectTable(table)} className={`flex min-h-24 flex-col items-start justify-center rounded-xl border p-3 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${selected ? "border-orange-600 bg-orange-500 text-white shadow-sm" : table.status === "occupied" ? "border-orange-200 bg-orange-50 text-orange-950 hover:bg-orange-100" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
+                <span className="flex w-full items-center justify-between gap-2 font-bold"><span>{table.name}</span><Armchair size={18} aria-hidden="true" /></span>
+                <span className={`mt-1 text-xs ${selected ? "text-orange-50" : "text-slate-500"}`}>{table.status === "occupied" ? "Đang dùng" : "Trống"}</span>
+                {table.status === "occupied" && <span className="mt-1 text-sm font-semibold tabular-nums">{(totals[table.id] ?? 0).toLocaleString("vi-VN")}đ</span>}
               </button>
             );
           })}
         </div>
+        {visible.length === 0 && <p className="py-10 text-center text-sm text-slate-500">Không tìm thấy bàn phù hợp.</p>}
       </div>
     </div>
   );

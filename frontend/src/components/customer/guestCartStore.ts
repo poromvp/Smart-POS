@@ -6,6 +6,9 @@ export interface CartItem {
   id: string;
   itemId: string;
   name: string;
+  sizeName?: string;
+  variantId?: number;
+  modifierOptionIds?: number[];
   basePrice: number;
   modifierTotal: number;
   toppings: string[];
@@ -17,10 +20,13 @@ export interface CartItem {
 export interface CartItemInput {
   itemId: string;
   name: string;
+  sizeName?: string;
+  variantId?: number;
+  modifierOptionIds?: number[];
   basePrice: number;
   modifierTotal: number;
-  toppings: string[];
-  sweetness: string;
+  toppings?: string[];
+  sweetness?: string;
   note: string;
 }
 
@@ -29,11 +35,11 @@ const CART_STORAGE_KEY = "guest-cart-v1";
 const createCartItemId = () =>
   `cart-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-const readCartItems = (): CartItem[] => {
+const readCartItems = (storageKey: string): CartItem[] => {
   if (typeof window === "undefined") return [];
 
   try {
-    const rawValue = window.localStorage.getItem(CART_STORAGE_KEY);
+    const rawValue = window.localStorage.getItem(storageKey);
     if (!rawValue) return [];
 
     const parsedValue = JSON.parse(rawValue) as unknown;
@@ -43,37 +49,47 @@ const readCartItems = (): CartItem[] => {
   }
 };
 
-const writeCartItems = (items: CartItem[]) => {
-  window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+const writeCartItems = (storageKey: string, items: CartItem[]) => {
+  window.localStorage.setItem(storageKey, JSON.stringify(items));
 };
 
-export function useGuestCart() {
+export function useGuestCart(tableId: string) {
+  const storageKey = `${CART_STORAGE_KEY}:${tableId}`;
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [isReady, setIsReady] = useState(false);
+  const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
 
   useEffect(() => {
     const hydrateTimer = window.setTimeout(() => {
-      setCartItems(readCartItems());
-      setIsReady(true);
+      setCartItems(readCartItems(storageKey));
+      setLoadedStorageKey(storageKey);
     }, 0);
 
     return () => {
       window.clearTimeout(hydrateTimer);
     };
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
-    if (!isReady) return;
+    if (loadedStorageKey !== storageKey) return;
 
-    writeCartItems(cartItems);
-  }, [cartItems, isReady]);
+    writeCartItems(storageKey, cartItems);
+  }, [cartItems, loadedStorageKey, storageKey]);
 
   const addItem = useCallback((input: CartItemInput) => {
     setCartItems((currentItems) => [
       ...currentItems,
       {
         id: createCartItemId(),
-        ...input,
+        itemId: input.itemId,
+        name: input.name,
+        sizeName: input.sizeName,
+        variantId: input.variantId,
+        modifierOptionIds: input.modifierOptionIds || [],
+        basePrice: input.basePrice,
+        modifierTotal: input.modifierTotal,
+        toppings: input.toppings || [],
+        sweetness: input.sweetness || "",
+        note: input.note,
         quantity: 1,
       },
     ]);
@@ -114,7 +130,8 @@ export function useGuestCart() {
   const totalPrice = useMemo(
     () =>
       cartItems.reduce(
-        (sum, item) => sum + (item.basePrice + item.modifierTotal) * item.quantity,
+        (sum, item) =>
+          sum + (item.basePrice + (item.modifierTotal || 0)) * item.quantity,
         0,
       ),
     [cartItems],

@@ -1,83 +1,84 @@
 "use client";
 
-export type StationId = "hot" | "cold" | "bar";
-
-export interface MenuItemData {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  stationId: StationId;
-}
+import Image from "next/image";
+import { Utensils } from "lucide-react";
+import type { ProductDetailResponse } from "@/lib/types/menu";
 
 interface MenuItemProps {
-  item: MenuItemData;
+  item: ProductDetailResponse;
   onClick: () => void;
 }
 
-const STATION_CONFIG: Record<
-  StationId,
-  {
-    label: string;
-    className: string;
-  }
-> = {
-  hot: {
-    label: "Món nóng",
-    className: "bg-orange-100 text-orange-700",
-  },
-  cold: {
-    label: "Đồ lạnh",
-    className: "bg-sky-100 text-sky-700",
-  },
-  bar: {
-    label: "Đồ uống",
-    className: "bg-emerald-100 text-emerald-700",
-  },
-};
-
 export default function MenuItem({ item, onClick }: MenuItemProps) {
-  const station = STATION_CONFIG[item.stationId];
+  // Tìm mức giá khởi điểm (giá thấp nhất)
+  const displayPrice =
+    item.variants && item.variants.length > 0
+      ? Math.min(...item.variants.map((v) => v.finalPrice))
+      : item.basePrice;
+
+  const hasMultipleSizes = item.variants && item.variants.length > 1;
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group w-full overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-slate-200 transition active:scale-[0.98] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      className="group flex w-full items-center gap-3 rounded-2xl border border-orange-100 bg-white p-3 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md active:scale-[0.99]"
     >
-      {/* Image */}
-      <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
-        <img
-          src={item.image}
-          alt={item.name}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-        />
+      {/* Hình ảnh món ăn */}
+      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-orange-50/70 sm:h-28 sm:w-28 flex items-center justify-center">
+        {item.imageUrl ? (
+          <Image
+            src={item.imageUrl}
+            alt={item.name}
+            fill
+            sizes="(min-width: 640px) 112px, 96px"
+            className="object-cover transition duration-300 group-hover:scale-105"
+            unoptimized={item.imageUrl.startsWith("http")}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center text-orange-300">
+            <Utensils size={32} />
+          </div>
+        )}
 
-        <div
-          className={`absolute left-3 top-3 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm ${station.className}`}
-        >
-          {station.label}
-        </div>
+        {/* Mã món nếu có */}
+        {item.code && (
+          <div className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-bold text-white tracking-wider">
+            {item.code}
+          </div>
+        )}
       </div>
 
-      {/* Content */}
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="line-clamp-2 text-base font-semibold text-slate-900">
-              {item.name}
-            </h2>
+      {/* Tên món, mô tả & Giá */}
+      <div className="min-w-0 flex-1">
+        <h2 className="line-clamp-1 text-sm font-bold text-stone-900 group-hover:text-[#b42318] transition">
+          {item.name}
+        </h2>
 
-            <p className="mt-2 text-lg font-bold text-emerald-600">
-              {item.price.toLocaleString("vi-VN")}₫
-            </p>
-          </div>
+        {item.description ? (
+          <p className="mt-0.5 line-clamp-2 text-xs text-stone-500">
+            {item.description}
+          </p>
+        ) : (
+          <p className="mt-0.5 text-xs text-stone-400 italic">
+            Chưa có mô tả
+          </p>
+        )}
 
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xl text-white shadow-sm">
-            +
+        <div className="mt-2 flex items-baseline gap-1">
+          {hasMultipleSizes && (
+            <span className="text-[11px] text-stone-400">Từ</span>
+          )}
+          <span className="text-sm font-extrabold text-[#b42318]">
+            {displayPrice.toLocaleString("vi-VN")}₫
           </span>
         </div>
       </div>
+
+      {/* Nút Thêm (+) */}
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#b42318] text-lg font-bold text-white shadow-sm shadow-red-200 transition group-hover:bg-[#8f1d15] group-hover:scale-105">
+        +
+      </span>
     </button>
   );
 }

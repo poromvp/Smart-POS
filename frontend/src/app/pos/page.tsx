@@ -1,1 +1,403 @@
-export { default } from "../cashier/page";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { LayoutGrid, ReceiptText, X } from "lucide-react";
+import InvoicePanel, {
+  type MenuItem,
+  type OrderItem,
+} from "@/components/pos/InvoicePanel";
+import PosItemModal, { type PosItemSelection } from "@/components/pos/PosItemModal";
+import type { ProductDetailResponse } from "@/lib/types/menu";
+import PaymentQRModal from "@/components/pos/PaymentQRModal";
+import TableMap, { type RestaurantTable } from "@/components/pos/TableMap";
+import TopHeader from "@/components/layout/TopHeader";
+import WorkspaceSidebar from "@/components/layout/WorkspaceSidebar";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { useToast } from "@/components/ui/ToastProvider";
+import { fetchMenu } from "@/lib/api";
+
+
+const SPICY_LEVELS = Array.from({ length: 8 }, (_, index) => `Cấp ${index}`);
+
+const MENU_ITEMS: MenuItem[] = [
+  { id: "spicy-beef-noodles", name: "Mì cay bò", price: 75000, spicyLevels: SPICY_LEVELS },
+  { id: "spicy-seafood-noodles", name: "Mì cay hải sản", price: 85000, spicyLevels: SPICY_LEVELS },
+  { id: "peach-lemongrass-tea", name: "Trà đào cam sả", price: 25000 },
+  { id: "pepsi", name: "Pepsi", price: 15000 },
+];
+
+const INITIAL_TABLES: RestaurantTable[] = Array.from({ length: 20 }, (_, index) => {
+  const tableNumber = index + 1;
+  const occupiedTableNumbers = [1, 3, 6, 9, 14, 18];
+
+  return {
+    id: `table-${tableNumber}`,
+    name: `Bàn ${tableNumber}`,
+    status: occupiedTableNumbers.includes(tableNumber) ? "occupied" : "empty",
+  };
+});
+
+const INITIAL_ORDERS: Record<string, OrderItem[]> = {
+  "table-1": [
+    {
+      id: "spicy-beef-noodles-cap-3",
+      menuItemId: "spicy-beef-noodles",
+      name: "Mì cay bò",
+      price: 75000,
+      quantity: 2,
+      spicyLevel: "Cấp 3",
+    },
+    {
+      id: "peach-lemongrass-tea",
+      menuItemId: "peach-lemongrass-tea",
+      name: "Trà đào cam sả",
+      price: 25000,
+      quantity: 2,
+    },
+  ],
+  "table-3": [
+    {
+      id: "spicy-seafood-noodles-cap-1",
+      menuItemId: "spicy-seafood-noodles",
+      name: "Mì cay hải sản",
+      price: 85000,
+      quantity: 1,
+      spicyLevel: "Cấp 1",
+    },
+  ],
+  "table-6": [
+    { id: "pepsi", menuItemId: "pepsi", name: "Pepsi", price: 15000, quantity: 3 },
+  ],
+  "table-9": [
+    {
+      id: "spicy-beef-noodles-cap-5",
+      menuItemId: "spicy-beef-noodles",
+      name: "Mì cay bò",
+      price: 75000,
+      quantity: 1,
+      spicyLevel: "Cấp 5",
+    },
+  ],
+  "table-14": [
+    {
+      id: "spicy-seafood-noodles-cap-2",
+      menuItemId: "spicy-seafood-noodles",
+      name: "Mì cay hải sản",
+      price: 85000,
+      quantity: 2,
+      spicyLevel: "Cấp 2",
+    },
+  ],
+  "table-18": [
+    {
+      id: "peach-lemongrass-tea",
+      menuItemId: "peach-lemongrass-tea",
+      name: "Trà đào cam sả",
+      price: 25000,
+      quantity: 4,
+    },
+  ],
+};
+
+export default function PosPage() {
+  const [tables, setTables] = useState<RestaurantTable[]>(INITIAL_TABLES);
+  const [ordersByTable, setOrdersByTable] = useState<Record<string, OrderItem[]>>(INITIAL_ORDERS);
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
+  const [isPosItemModalOpen, setIsPosItemModalOpen] = useState(false);
+  const [selectedModalProduct, setSelectedModalProduct] = useState<ProductDetailResponse | null>(null);
+  const toast = useToast();
+
+  useEffect(() => {
+    let active = true;
+    fetchMenu()
+      .then((categories) => {
+        if (categories && categories.length > 0) {
+          const items: MenuItem[] = categories.flatMap((cat) =>
+            cat.products
+              .filter((p) => p.isActive)
+              .map((p) => ({
+                id: String(p.id),
+                name: p.name,
+                price: p.basePrice,
+                rawProduct: p,
+                spicyLevels:
+                  p.variants && p.variants.length > 0
+                    ? p.variants.map((v) => v.sizeName)
+                    : undefined,
+              }))
+          );
+          if (active && items.length > 0) {
+            setMenuItems(items);
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback to static mock menu when backend is unreachable
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedTable = useMemo(
+    () => tables.find((table) => table.id === selectedTableId) ?? null,
+    [selectedTableId, tables]
+  );
+
+  const selectedOrder = selectedTableId ? ordersByTable[selectedTableId] ?? [] : [];
+  const selectedTotal = selectedOrder.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0
+  );
+
+  const handleSelectTable = (table: RestaurantTable) => {
+    setSelectedTableId(table.id);
+  };
+
+  const handleSelectItem = (menuItem: MenuItem) => {
+    if (!selectedTableId) {
+      toast.warning("Chưa chọn bàn", "Vui lòng bấm chọn một bàn trước khi thêm món");
+      return;
+    }
+    const raw = menuItem.rawProduct;
+    const hasVariants = raw?.variants && raw.variants.length > 0;
+    const hasModifiers = raw?.modifierGroups && raw.modifierGroups.length > 0;
+
+    if (raw && (hasVariants || hasModifiers)) {
+      setSelectedModalProduct(raw);
+      setIsPosItemModalOpen(true);
+    } else {
+      handleAddItem(menuItem);
+    }
+  };
+
+  const handleConfirmModalSelection = (selection: PosItemSelection) => {
+    if (!selectedTableId) return;
+
+    const toppingIds = selection.modifiers.map((m) => m.optionId).sort().join("-");
+    const variantPart = selection.variant ? `-${selection.variant.id}` : "";
+    const modifierPart = toppingIds ? `-mod-${toppingIds}` : "";
+    const orderItemId = `${selection.product.id}${variantPart}${modifierPart}`;
+
+    const toppingsList = selection.modifiers.map((m) => m.optionName);
+
+    setOrdersByTable((currentOrders) => {
+      const currentTableOrder = currentOrders[selectedTableId] ?? [];
+      const existingIndex = currentTableOrder.findIndex((item) => item.id === orderItemId);
+      let nextTableOrder: OrderItem[];
+
+      if (existingIndex >= 0) {
+        nextTableOrder = currentTableOrder.map((item, idx) =>
+          idx === existingIndex
+            ? { ...item, quantity: item.quantity + selection.quantity }
+            : item
+        );
+      } else {
+        nextTableOrder = [
+          ...currentTableOrder,
+          {
+            id: orderItemId,
+            menuItemId: String(selection.product.id),
+            name: selection.product.name,
+            price: selection.unitPrice,
+            quantity: selection.quantity,
+            sizeName: selection.variant?.sizeName,
+            toppings: toppingsList.length > 0 ? toppingsList : undefined,
+            note: selection.note || undefined,
+          },
+        ];
+      }
+
+      return { ...currentOrders, [selectedTableId]: nextTableOrder };
+    });
+
+    setTables((currentTables) =>
+      currentTables.map((table) =>
+        table.id === selectedTableId ? { ...table, status: "occupied" } : table
+      )
+    );
+
+    toast.info(
+      `Đã thêm: ${selection.product.name}`,
+      `${selectedTable?.name ?? "Bàn"}${selection.variant ? ` • ${selection.variant.sizeName}` : ""}`
+    );
+  };
+
+  const handleAddItem = (menuItem: MenuItem, spicyLevel?: string) => {
+    if (!selectedTableId) return;
+
+    const orderItemId = `${menuItem.id}${
+      spicyLevel ? `-${spicyLevel.toLowerCase().replace(" ", "-")}` : ""
+    }`;
+
+    setOrdersByTable((currentOrders) => {
+      const currentTableOrder = currentOrders[selectedTableId] ?? [];
+      const existingItem = currentTableOrder.find((item) => item.id === orderItemId);
+      const nextTableOrder = existingItem
+        ? currentTableOrder.map((item) =>
+            item.id === orderItemId ? { ...item, quantity: item.quantity + 1 } : item
+          )
+        : [
+            ...currentTableOrder,
+            {
+              id: orderItemId,
+              menuItemId: menuItem.id,
+              name: menuItem.name,
+              price: menuItem.price,
+              quantity: 1,
+              spicyLevel,
+            },
+          ];
+
+      return { ...currentOrders, [selectedTableId]: nextTableOrder };
+    });
+
+    setTables((currentTables) =>
+      currentTables.map((table) =>
+        table.id === selectedTableId ? { ...table, status: "occupied" } : table
+      )
+    );
+
+    toast.info(
+      `Đã thêm: ${menuItem.name}`,
+      `${selectedTable?.name ?? "Bàn"}${spicyLevel ? ` • ${spicyLevel}` : ""}`
+    );
+  };
+
+  const handleChangeQuantity = (orderItemId: string, quantity: number) => {
+    if (!selectedTableId || !Number.isSafeInteger(quantity) || quantity < 0) return;
+
+    const remainingItems = selectedOrder
+      .map((item) => item.id === orderItemId ? { ...item, quantity } : item)
+      .filter((item) => item.quantity > 0);
+    setTables((currentTables) => currentTables.map((table) =>
+      table.id === selectedTableId
+        ? { ...table, status: remainingItems.length ? "occupied" : "empty" }
+        : table
+    ));
+
+    setOrdersByTable((currentOrders) => {
+      const nextTableOrder = (currentOrders[selectedTableId] ?? [])
+        .map((item) => (item.id === orderItemId ? { ...item, quantity } : item))
+        .filter((item) => item.quantity > 0);
+
+      return { ...currentOrders, [selectedTableId]: nextTableOrder };
+    });
+  };
+
+  const handlePaymentSuccess = () => {
+    if (!selectedTableId) return;
+
+    const paidTableId = selectedTableId;
+    const paidTableName = selectedTable?.name ?? "Bàn";
+
+    setOrdersByTable((currentOrders) => ({ ...currentOrders, [paidTableId]: [] }));
+    setTables((currentTables) =>
+      currentTables.map((table) =>
+        table.id === paidTableId ? { ...table, status: "empty" } : table
+      )
+    );
+    setIsPaymentModalOpen(false);
+    setSelectedTableId(null);
+
+    toast.success(
+      `Đã hoàn tất demo ${paidTableName}`,
+      `Hóa đơn mẫu: ${selectedTotal.toLocaleString("vi-VN")}đ. Bàn đã chuyển về trạng thái trống.`
+    );
+  };
+
+  return (
+    <div className="flex h-dvh flex-col overflow-hidden bg-slate-50 text-slate-900">
+      <TopHeader
+        title="Màn hình thu ngân (POS)"
+        branchName="Chi nhánh 01"
+        rightContent={<StatusBadge label="Phiên demo" variant="serving" />}
+      />
+
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <WorkspaceSidebar defaultCollapsed={true} />
+
+        <main className="mx-auto flex w-full max-w-[1800px] flex-1 min-h-0 flex-col p-3.5 lg:p-5">
+          <p className="mb-3 shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Hóa đơn demo · Thao tác chỉ áp dụng trong phiên này, tải lại trang sẽ đặt lại hóa đơn.</p>
+          <div
+            className={`grid flex-1 min-h-0 gap-4 ${
+              selectedTable
+                ? "grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
+                : "grid-cols-1"
+            }`}
+          >
+            <section className={`${selectedTable ? "hidden lg:flex" : "flex"} min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs`}>
+              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 text-sm font-semibold text-slate-600">
+                <div className="flex items-center gap-2">
+                  <LayoutGrid size={18} className="text-orange-500" aria-hidden="true" />
+                  <span>Khu vực phục vụ</span>
+                </div>
+                <span className="text-xs font-bold text-orange-600">
+                  Đang dùng: {tables.filter((t) => t.status === "occupied").length}/{tables.length} bàn
+                </span>
+              </div>
+
+              <TableMap
+                tables={tables}
+                totals={Object.fromEntries(Object.entries(ordersByTable).map(([id, items]) => [id, items.reduce((sum, item) => sum + item.price * item.quantity, 0)]))}
+                selectedTableId={selectedTableId}
+                onSelectTable={handleSelectTable}
+              />
+            </section>
+
+            {selectedTable && (
+              <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-lg shadow-orange-500/5">
+                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 text-sm font-semibold text-slate-700 bg-orange-50/40">
+                  <div className="flex items-center gap-2">
+                    <ReceiptText size={18} className="text-orange-600" aria-hidden="true" />
+                    <span className="font-bold text-slate-800">
+                      Chi tiết của {selectedTable.name}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTableId(null)}
+                    title="Đóng chi tiết bàn"
+                    className="flex min-h-11 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-orange-100 hover:text-orange-600 transition-colors cursor-pointer"
+                  >
+                    <span>Về sơ đồ bàn</span>
+                    <X size={15} />
+                  </button>
+                </div>
+
+                <InvoicePanel
+                  key={selectedTable.id}
+                  table={selectedTable}
+                  orderItems={selectedOrder}
+                  menuItems={menuItems}
+                  onAddItem={handleAddItem}
+                  onSelectItem={handleSelectItem}
+                  onChangeQuantity={handleChangeQuantity}
+                  onPayment={() => setIsPaymentModalOpen(true)}
+                />
+              </section>
+            )}
+          </div>
+        </main>
+      </div>
+
+      <PosItemModal
+        product={selectedModalProduct}
+        isOpen={isPosItemModalOpen}
+        onClose={() => setIsPosItemModalOpen(false)}
+        onConfirm={handleConfirmModalSelection}
+      />
+
+      <PaymentQRModal
+        key={isPaymentModalOpen ? "payment-open" : "payment-closed"}
+        isOpen={isPaymentModalOpen}
+        table={selectedTable}
+        total={selectedTotal}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
+    </div>
+  );
+}

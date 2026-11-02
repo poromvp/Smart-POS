@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Builder
@@ -13,6 +14,9 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class OrderItemResponse {
     private Long id;
+    private Long productId;
+    private Long variantId;
+    private List<Long> modifierOptionIds;
     private String itemId;
     private String name;
     private Integer quantity;

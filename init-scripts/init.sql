@@ -277,9 +277,15 @@ CREATE TABLE "order_items" (
                                "order_id" bigint NOT NULL,
                                "product_id" bigint NOT NULL, -- Logical ID từ Catalog Service (bảng products)
                                "variant_id" bigint,          -- Logical ID từ Catalog Service (bảng product_variants)
+                               "item_id" varchar(64),
+                               "name" varchar(255) NOT NULL,
                                "quantity" int NOT NULL DEFAULT 1,
                                "unit_price" decimal(12,2) NOT NULL,
-                               "total_price" decimal(12,2) NOT NULL,
+                               "modifier_total" decimal(12,2) DEFAULT 0,
+                               "modifier_option_ids" jsonb DEFAULT '[]'::jsonb,
+                               "toppings" varchar(500),
+                               "sweetness" varchar(50),
+                               "total_price" decimal(12,2),
                                "note" text,
                                "kds_status" varchar(30) NOT NULL DEFAULT 'PENDING',
                                "created_at" timestamp DEFAULT (now()),

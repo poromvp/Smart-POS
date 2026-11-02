@@ -23,6 +23,11 @@ spring:
         jdbc:
           time_zone: UTC
 
+# Cấu hình kết nối liên dịch vụ nội bộ
+app:
+  services:
+    catalog-inventory-url: ${CATALOG_INVENTORY_URL:http://localhost:8082}
+
 # Cấu hình Swagger / OpenAPI Docs
 springdoc:
   api-docs:

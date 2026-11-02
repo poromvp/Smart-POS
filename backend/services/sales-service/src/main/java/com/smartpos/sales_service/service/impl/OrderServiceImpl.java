@@ -1,32 +1,44 @@
 package com.smartpos.sales_service.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartpos.sales_service.client.InventoryClient;
+import com.smartpos.sales_service.client.dto.DeductInventoryRequest;
+import com.smartpos.sales_service.client.dto.DeductInventoryResponse;
+import com.smartpos.sales_service.client.dto.DeductItemRequest;
 import com.smartpos.sales_service.dto.request.CreateOrderItemRequest;
 import com.smartpos.sales_service.dto.request.CreateOrderRequest;
 import com.smartpos.sales_service.dto.request.UpdatePaymentRequest;
+import com.smartpos.sales_service.dto.response.ApiResponse;
 import com.smartpos.sales_service.dto.response.OrderItemResponse;
 import com.smartpos.sales_service.dto.response.OrderResponse;
 import com.smartpos.sales_service.entity.Order;
 import com.smartpos.sales_service.entity.OrderItem;
 import com.smartpos.sales_service.entity.OrderStatus;
+import com.smartpos.sales_service.exception.BusinessException;
 import com.smartpos.sales_service.exception.ResourceNotFoundException;
 import com.smartpos.sales_service.repository.OrderRepository;
 import com.smartpos.sales_service.service.OrderService;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
+    private final InventoryClient inventoryClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional
@@ -53,8 +65,27 @@ public class OrderServiceImpl implements OrderService {
                     ? String.join(", ", itemReq.getToppings())
                     : null;
 
+            Long productId = itemReq.getProductId();
+            if (productId == null && itemReq.getItemId() != null) {
+                try {
+                    productId = Long.parseLong(itemReq.getItemId());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+
+            List<Long> modifierOptionIds = itemReq.getModifierOptionIds() != null
+                    ? new ArrayList<>(itemReq.getModifierOptionIds())
+                    : new ArrayList<>();
+
+            String itemIdStr = itemReq.getItemId() != null
+                    ? itemReq.getItemId()
+                    : (productId != null ? String.valueOf(productId) : null);
+
             OrderItem orderItem = OrderItem.builder()
-                    .itemId(itemReq.getItemId())
+                    .productId(productId)
+                    .variantId(itemReq.getVariantId())
+                    .modifierOptionIds(modifierOptionIds)
+                    .itemId(itemIdStr)
                     .name(itemReq.getName())
                     .quantity(itemReq.getQuantity())
                     .unitPrice(itemReq.getBasePrice())
@@ -110,7 +141,33 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse updateOrderStatus(Long id, OrderStatus status) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + id));
+
+        OrderStatus oldStatus = order.getStatus();
         order.setStatus(status);
+
+        // Tự động kích hoạt trừ kho khi đơn hàng chuyển sang trạng thái COMPLETED
+        if (status == OrderStatus.COMPLETED && oldStatus != OrderStatus.COMPLETED) {
+            deductInventoryForOrder(order);
+        }
+
+        Order updated = orderRepository.save(order);
+        return mapToOrderResponse(updated);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse completeOrder(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + id));
+
+        OrderStatus oldStatus = order.getStatus();
+        order.setStatus(OrderStatus.COMPLETED);
+
+        // Kích hoạt trừ kho tự động nếu chưa hoàn tất trước đó
+        if (oldStatus != OrderStatus.COMPLETED) {
+            deductInventoryForOrder(order);
+        }
+
         Order updated = orderRepository.save(order);
         return mapToOrderResponse(updated);
     }
@@ -137,6 +194,57 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
     }
 
+    /**
+     * Thực hiện trừ kho tự động qua FeignClient gọi catalog-inventory-service
+     */
+    private void deductInventoryForOrder(Order order) {
+        if (order.getItems() == null || order.getItems().isEmpty()) {
+            log.warn("Đơn hàng {} không có món ăn nào để trừ kho", order.getOrderCode());
+            return;
+        }
+
+        List<DeductItemRequest> items = order.getItems().stream().map(item -> DeductItemRequest.builder()
+                .productId(item.getProductId())
+                .variantId(item.getVariantId())
+                .modifierOptionIds(item.getModifierOptionIds() != null
+                        ? new HashSet<>(item.getModifierOptionIds())
+                        : new HashSet<>())
+                .quantity(item.getQuantity())
+                .build()
+        ).collect(Collectors.toList());
+
+        DeductInventoryRequest deductRequest = DeductInventoryRequest.builder()
+                .orderCode(order.getOrderCode())
+                .items(items)
+                .build();
+
+        try {
+            log.info("Bắt đầu gọi API trừ kho cho đơn hàng {} với {} món ăn", order.getOrderCode(), items.size());
+            ApiResponse<DeductInventoryResponse> response = inventoryClient.deductInventory(deductRequest);
+            log.info("Trừ kho tự động thành công cho đơn hàng: {}. Phản hồi: {}", order.getOrderCode(), response.getMessage());
+        } catch (FeignException e) {
+            String errorMsg = extractErrorMessage(e);
+            log.error("Lỗi tồn kho khi trừ kho cho đơn {}: {}", order.getOrderCode(), errorMsg);
+            throw new BusinessException("Không thể hoàn tất đơn hàng: " + errorMsg, e);
+        } catch (Exception e) {
+            log.error("Lỗi không mong muốn khi gọi catalog-inventory-service cho đơn {}: {}", order.getOrderCode(), e.getMessage());
+            throw new BusinessException("Lỗi kết nối tới Catalog & Inventory Service: " + e.getMessage(), e);
+        }
+    }
+
+    private String extractErrorMessage(FeignException e) {
+        try {
+            if (e.contentUTF8() != null && !e.contentUTF8().isBlank()) {
+                JsonNode root = objectMapper.readTree(e.contentUTF8());
+                if (root.has("message") && !root.get("message").asText().isBlank()) {
+                    return root.get("message").asText();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return e.getMessage();
+    }
+
     private String generateOrderCode() {
         String datePrefix = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String randomSuffix = UUID.randomUUID().toString().substring(0, 5).toUpperCase();
@@ -151,6 +259,9 @@ public class OrderServiceImpl implements OrderService {
                             .multiply(BigDecimal.valueOf(item.getQuantity()));
                     return OrderItemResponse.builder()
                             .id(item.getId())
+                            .productId(item.getProductId())
+                            .variantId(item.getVariantId())
+                            .modifierOptionIds(item.getModifierOptionIds())
                             .itemId(item.getItemId())
                             .name(item.getName())
                             .quantity(item.getQuantity())

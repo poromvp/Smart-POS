@@ -14,7 +14,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5433/pos_catalog_inventory_db
     username: ${POSTGRES_USER:pos_admin}
-    password: ${POSTGRES_PASSWORD:123}
+    password: ${POSTGRES_PASSWORD:pos_password123}
     driver-class-name: org.postgresql.Driver
 
   jpa:

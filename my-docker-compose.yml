@@ -4,9 +4,11 @@ services:
     container_name: smart-pos-db
     restart: "no"
     environment:
-      POSTGRES_PASSWORD: 123456
+      POSTGRES_USER: ${POSTGRES_USER:-pos_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password123}
     ports:
       - "5432:5432"
+      - "5433:5432"
     volumes:
       - ./init-scripts:/docker-entrypoint-initdb.d/
       - pos_db_data:/var/lib/postgresql/data

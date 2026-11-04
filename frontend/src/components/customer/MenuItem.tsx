@@ -6,7 +6,7 @@ import type { ProductDetailResponse } from "@/lib/types/menu";
 
 interface MenuItemProps {
   item: ProductDetailResponse;
-  onClick: () => void;
+  onClick?: () => void;
 }
 
 export default function MenuItem({ item, onClick }: MenuItemProps) {
@@ -18,12 +18,8 @@ export default function MenuItem({ item, onClick }: MenuItemProps) {
 
   const hasMultipleSizes = item.variants && item.variants.length > 1;
 
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex w-full items-center gap-3 rounded-2xl border border-orange-100 bg-white p-3 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md active:scale-[0.99]"
-    >
+  const content = (
+    <>
       {/* Hình ảnh món ăn */}
       <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-orange-50/70 sm:h-28 sm:w-28 flex items-center justify-center">
         {item.imageUrl ? (
@@ -75,10 +71,29 @@ export default function MenuItem({ item, onClick }: MenuItemProps) {
         </div>
       </div>
 
-      {/* Nút Thêm (+) */}
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#b42318] text-lg font-bold text-white shadow-sm shadow-red-200 transition group-hover:bg-[#8f1d15] group-hover:scale-105">
-        +
-      </span>
+      {onClick && (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#b42318] text-lg font-bold text-white shadow-sm shadow-red-200 transition group-hover:bg-[#8f1d15] group-hover:scale-105">
+          +
+        </span>
+      )}
+    </>
+  );
+
+  if (!onClick) {
+    return (
+      <div className="group flex w-full items-center gap-3 rounded-2xl border border-orange-100 bg-white p-3 text-left shadow-sm">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full items-center gap-3 rounded-2xl border border-orange-100 bg-white p-3 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md active:scale-[0.99]"
+    >
+      {content}
     </button>
   );
 }

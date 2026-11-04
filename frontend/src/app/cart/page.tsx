@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGuestCart } from "@/components/customer/guestCartStore";
 import { getGuestTableId, getGuestTableLabel, getGuestTableQuery } from "@/components/customer/guestTable";
+import { createOrder } from "@/lib/api";
 
 const formatCurrency = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`;
 
@@ -23,18 +24,57 @@ function GuestCartContent() {
   const tableLabel = getGuestTableLabel(tableId);
   const tableQuery = getGuestTableQuery(tableId);
   const { cartItems, totalPrice, updateNote, updateQuantity: changeQuantity, clearCart } = useGuestCart(tableId ?? "unassigned");
-  const [submissionState, setSubmissionState] = useState<"idle" | "submitting" | "success">("idle");
+  const [submissionState, setSubmissionState] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
 
-  const handleSubmitOrder = () => {
+  if (!tableId) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#fffaf5] px-4 text-center text-stone-900">
+        <section className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-7 shadow-xl shadow-orange-100/60">
+          <h1 className="text-xl font-extrabold">Giỏ hàng chỉ dùng khi quét mã QR</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Vui lòng quét mã QR trên bàn để chọn món và đặt hàng.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push("/menu")}
+            className="mt-6 min-h-12 w-full rounded-xl bg-[#b42318] px-5 font-bold text-white"
+          >
+            Xem thực đơn
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  const handleSubmitOrder = async () => {
     if (!tableId || cartItems.length === 0 || submissionState !== "idle") return;
 
     setSubmissionState("submitting");
-
-    // Local demo only: no order API or kitchen integration exists yet.
-    window.setTimeout(() => {
+    setSubmissionError(null);
+    try {
+      await createOrder({
+        tableNumber: tableId,
+        orderType: "DINE_IN",
+        items: cartItems.map((item) => ({
+          itemId: item.itemId,
+          name: item.name,
+          quantity: item.quantity,
+          basePrice: item.basePrice,
+          modifierTotal: item.modifierTotal,
+          toppings: item.toppings,
+          sweetness: item.sweetness,
+          note: item.note,
+        })),
+      });
       clearCart();
       setSubmissionState("success");
-    }, 650);
+    } catch (error) {
+      setSubmissionState("error");
+      setSubmissionError(
+        error instanceof Error ? error.message : "Không thể gửi đơn hàng. Vui lòng thử lại."
+      );
+    }
   };
 
   const handleBackToMenu = () => {
@@ -55,7 +95,7 @@ function GuestCartContent() {
             Yêu cầu gọi món đã được ghi nhận trong phiên bản demo cho {tableLabel ?? "bàn chưa xác định"} trên thiết bị này.
           </p>
           <p className="mt-2 text-xs leading-5 text-slate-400">
-            Hệ thống hiện chưa kết nối gửi đơn trực tiếp đến bếp.
+            Đơn hàng đã được chuyển đến khu vực bếp để tiếp nhận.
           </p>
           <button
             type="button"
@@ -188,8 +228,13 @@ function GuestCartContent() {
             className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#b42318] px-4 text-sm font-bold text-white shadow-lg shadow-red-200 transition active:scale-[0.98] hover:bg-[#8f1d15] disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none"
           >
             {submissionState === "submitting" ? <LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> : <ShoppingBag size={18} aria-hidden="true" />}
-            {submissionState === "submitting" ? "Đang ghi nhận..." : tableLabel ? "Xác nhận gọi món" : "Quét mã QR để xác nhận đơn"}
+            {submissionState === "submitting" ? "Đang gửi đơn..." : tableLabel ? "Xác nhận gọi món" : "Quét mã QR để xác nhận đơn"}
           </button>
+          {submissionState === "error" && (
+            <p role="alert" className="text-sm font-medium text-red-600">
+              {submissionError}
+            </p>
+          )}
         </div>
       </footer>
     </main>

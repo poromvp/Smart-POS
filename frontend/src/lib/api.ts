@@ -36,7 +36,88 @@ import {
 } from "./types/purchasing";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082/api";
+  process.env.NEXT_PUBLIC_API_URL || "/api/catalog";
+export const SALES_API_BASE_URL =
+  process.env.NEXT_PUBLIC_SALES_API_URL || "/api/sales";
+
+export type OrderStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "PREPARING"
+  | "READY"
+  | "SERVED"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export interface OrderItemRequest {
+  itemId: string;
+  name: string;
+  quantity: number;
+  basePrice: number;
+  modifierTotal: number;
+  toppings: string[];
+  sweetness?: string;
+  note?: string;
+}
+
+export interface CreateOrderRequest {
+  tableNumber: string;
+  orderType: "DINE_IN" | "TAKEAWAY";
+  items: OrderItemRequest[];
+}
+
+export interface OrderItemResponse {
+  id: number;
+  itemId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  modifierTotal: number;
+  toppings?: string;
+  sweetness?: string;
+  note?: string;
+}
+
+export interface OrderResponse {
+  id: number;
+  orderCode: string;
+  tableNumber?: string;
+  orderType: "DINE_IN" | "TAKEAWAY";
+  status: OrderStatus;
+  totalAmount: number;
+  items: OrderItemResponse[];
+  createdAt: string;
+}
+
+export async function createOrder(
+  data: CreateOrderRequest
+): Promise<OrderResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<OrderResponse>(res);
+}
+
+export async function fetchOrders(): Promise<OrderResponse[]> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders`, {
+    cache: "no-store",
+  });
+  return handleResponse<OrderResponse[]>(res);
+}
+
+export async function updateOrderStatus(
+  orderId: number,
+  status: OrderStatus
+): Promise<OrderResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/${orderId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  return handleResponse<OrderResponse>(res);
+}
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -77,11 +158,19 @@ async function handleResponse<T>(res: Response): Promise<T> {
  * Lấy toàn bộ thực đơn theo danh mục (Menu POS / QR Order)
  */
 export async function fetchMenu(): Promise<CategoryMenuResponse[]> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 10_000);
+
+  try {
   const res = await fetch(`${API_BASE_URL}/products/menu`, {
     cache: "no-store",
     headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
   });
   return handleResponse<CategoryMenuResponse[]>(res);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 // ==================== GIAI ĐOẠN 2.1: NGUYÊN LIỆU (INGREDIENT) ====================

@@ -55,9 +55,11 @@ public class OrderServiceImpl implements OrderService {
 
             OrderItem orderItem = OrderItem.builder()
                     .itemId(itemReq.getItemId())
+                    .productId(parseProductId(itemReq.getItemId()))
                     .name(itemReq.getName())
                     .quantity(itemReq.getQuantity())
                     .unitPrice(itemReq.getBasePrice())
+                    .totalPrice(itemTotal)
                     .modifierTotal(modifierTotal)
                     .toppings(toppingsStr)
                     .sweetness(itemReq.getSweetness())
@@ -141,6 +143,14 @@ public class OrderServiceImpl implements OrderService {
         String datePrefix = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String randomSuffix = UUID.randomUUID().toString().substring(0, 5).toUpperCase();
         return "ORD-" + datePrefix + "-" + randomSuffix;
+    }
+
+    private Long parseProductId(String itemId) {
+        try {
+            return Long.valueOf(itemId);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Mã món ăn không hợp lệ: " + itemId);
+        }
     }
 
     private OrderResponse mapToOrderResponse(Order order) {

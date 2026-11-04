@@ -6,9 +6,9 @@ spring:
     name: sales-service
 
   datasource:
-    url: ${SALES_DB_URL:jdbc:postgresql://localhost:5432/pos_sales_db}
+    url: ${SALES_DB_URL:jdbc:postgresql://127.0.0.1:5433/pos_sales_db}
     username: ${POSTGRES_USER:pos_admin}
-    password: ${POSTGRES_PASSWORD:pos_password123}
+    password: ${POSTGRES_PASSWORD:123}
     driver-class-name: org.postgresql.Driver
 
   jpa:

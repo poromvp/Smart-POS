@@ -27,6 +27,9 @@ public class OrderItem {
     @Column(name = "item_id", nullable = false, length = 64)
     private String itemId;
 
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
     @Column(name = "name", nullable = false, length = 255)
     private String name;
 
@@ -35,6 +38,9 @@ public class OrderItem {
 
     @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
+
+    @Column(name = "total_price", nullable = false, precision = 12, scale = 2)
+    private BigDecimal totalPrice;
 
     @Column(name = "modifier_total", precision = 12, scale = 2)
     @Builder.Default

@@ -1,23 +1,31 @@
 server:
-  port: 8083 # Port gợi ý: Identity (8081), Catalog-Inventory (8082), Sales (8083)
+  port: ${PORT:8083}
 
 spring:
   application:
     name: sales-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/pos_sales_db
+    url: ${SALES_DB_URL:jdbc:postgresql://localhost:5432/pos_sales_db}
     username: ${POSTGRES_USER:pos_admin}
     password: ${POSTGRES_PASSWORD:pos_password123}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      # Vì database đã được dựng sẵn bởi Docker script, dùng 'validate' để kiểm tra khớp schema
-      ddl-auto: validate
+      # Mặc định là update để tự động sinh/cập nhật bảng lúc phát triển, có thể set JPA_DDL_AUTO=validate khi chạy production
+      ddl-auto: ${JPA_DDL_AUTO:update}
     show-sql: true
+    open-in-view: false
     properties:
       hibernate:
         format_sql: true
         jdbc:
           time_zone: UTC
+
+# Cấu hình Swagger / OpenAPI Docs
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

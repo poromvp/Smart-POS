@@ -1,0 +1,334 @@
+// ==========================================
+// 1. PHÂN QUYỀN LINH ĐỘNG & NGƯỜI DÙNG (DYNAMIC RBAC)
+// ==========================================
+
+Table roles {
+  id bigint [pk, increment]
+  name varchar(50) [not null, unique, note: 'ADMIN, CASHIER, KITCHEN_LEAD...']
+  description varchar(255)
+}
+
+Table permissions {
+  id bigint [pk, increment]
+  code varchar(100) [not null, unique, note: 'ORDER_CREATE, INVENTORY_IMPORT, REPORT_VIEW...']
+  name varchar(150) [not null, note: 'Tên quyền hiển thị trên UI']
+  module varchar(50) [not null, note: 'ORDER, INVENTORY, KDS, REPORT, SYSTEM...']
+}
+
+Table role_permissions {
+  role_id bigint [ref: > roles.id]
+  permission_id bigint [ref: > permissions.id]
+
+  indexes {
+    (role_id, permission_id) [pk]
+  }
+}
+
+Table users {
+  id bigint [pk, increment]
+  username varchar(50) [not null, unique]
+  password_hash varchar(255) [not null]
+  full_name varchar(100) [not null]
+  phone varchar(20)
+  is_active boolean [not null, default: true]
+  created_at timestamp [default: `now()`]
+}
+
+Table user_roles {
+  user_id bigint [ref: > users.id]
+  role_id bigint [ref: > roles.id]
+
+  indexes {
+    (user_id, role_id) [pk]
+  }
+}
+
+// ==========================================
+// 2. BÀN & KHU VỰC (TABLES & AREAS)
+// ==========================================
+
+Table areas {
+  id bigint [pk, increment]
+  name varchar(100) [not null, note: 'Tầng 1, Ngoài trời, Sân thượng...']
+  description varchar(255)
+}
+
+Table dining_tables {
+  id bigint [pk, increment]
+  area_id bigint [not null, ref: > areas.id]
+  table_number varchar(50) [not null, note: 'Bàn 01, Bàn 02...']
+  capacity int [default: 4]
+  status varchar(30) [not null, default: 'EMPTY', note: 'EMPTY, OCCUPIED, RESERVED']
+  qr_code_token varchar(100) [unique, note: 'Token UUID sinh mã QR tĩnh tại bàn']
+}
+
+// ==========================================
+// 3. THỰC ĐƠN, BIẾN THỂ & TOPPING (MENU & MODIFIERS)
+// ==========================================
+
+Table categories {
+  id bigint [pk, increment]
+  name varchar(100) [not null]
+  display_order int [default: 0]
+  is_active boolean [default: true]
+}
+
+Table products {
+  id bigint [pk, increment]
+  category_id bigint [not null, ref: > categories.id]
+  name varchar(150) [not null]
+  code varchar(50) [unique]
+  base_price decimal(12,2) [not null, default: 0]
+  image_url text
+  description text
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+}
+
+Table product_variants {
+  id bigint [pk, increment]
+  product_id bigint [not null, ref: > products.id]
+  size_name varchar(50) [not null, note: 'Size S, Size M, Size L...']
+  price_adjustment decimal(12,2) [not null, default: 0, note: 'Chênh lệch giá cộng thêm']
+  sku varchar(50) [unique]
+}
+
+Table modifier_groups {
+  id bigint [pk, increment]
+  name varchar(100) [not null, note: 'Topping, Mức đường, Lượng đá...']
+  is_multiple boolean [default: true, note: 'true: chọn nhiều, false: chọn 1']
+  is_required boolean [default: false, note: 'Bắt buộc chọn hay không']
+}
+
+Table modifier_options {
+  id bigint [pk, increment]
+  group_id bigint [not null, ref: > modifier_groups.id]
+  name varchar(100) [not null, note: 'Trân châu đen, 50% Đường, Không đá...']
+  price decimal(12,2) [default: 0, note: 'Phụ thu nếu có']
+}
+
+Table product_modifier_groups {
+  product_id bigint [ref: > products.id]
+  modifier_group_id bigint [ref: > modifier_groups.id]
+
+  indexes {
+    (product_id, modifier_group_id) [pk]
+  }
+}
+
+// ==========================================
+// 4. KHÁCH HÀNG & TÍCH ĐIỂM (LOYALTY POINTS)
+// ==========================================
+
+Table customers {
+  id bigint [pk, increment]
+  phone varchar(20) [unique, not null]
+  full_name varchar(100)
+  current_points int [default: 0]
+  total_spent decimal(14,2) [default: 0]
+  created_at timestamp [default: `now()`]
+}
+
+Table point_transactions {
+  id bigint [pk, increment]
+  customer_id bigint [not null, ref: > customers.id]
+  order_id bigint [ref: > orders.id]
+  points_change int [not null, note: '+ tích điểm, - tiêu điểm']
+  type varchar(20) [not null, note: 'EARN, REDEEM, ADJUST']
+  created_at timestamp [default: `now()`]
+}
+
+// ==========================================
+// 5. KHUYẾN MÃI (PROMOTIONS)
+// ==========================================
+
+Table promotions {
+  id bigint [pk, increment]
+  code varchar(50) [unique, not null]
+  name varchar(150) [not null]
+  discount_percent decimal(5,2) [not null, note: 'Tỷ lệ % giảm (ví dụ: 10.00 cho 10%)']
+  max_discount_amount decimal(12,2) [note: 'Mức chặn số tiền giảm tối đa']
+  min_order_amount decimal(12,2) [default: 0, note: 'Giá trị đơn tối thiểu']
+  start_date timestamp [not null]
+  end_date timestamp [not null]
+  usage_limit int [note: 'Tổng số lượt dùng tối đa']
+  used_count int [default: 0]
+  is_active boolean [default: true]
+}
+
+// ==========================================
+// 6. ĐƠN HÀNG & MÀN HÌNH BẾP (ORDERS & KDS)
+// ==========================================
+
+Table orders {
+  id bigint [pk, increment]
+  order_code varchar(50) [unique, not null, note: 'Mã hiển thị: ORD-20260920-001']
+  table_id bigint [ref: > dining_tables.id, note: 'Null nếu mang về']
+  customer_id bigint [ref: > customers.id, note: 'Null nếu khách vãng lai']
+  promotion_id bigint [ref: > promotions.id, note: 'Mã khuyến mãi áp dụng']
+  staff_id bigint [ref: > users.id, note: 'Thu ngân/phục vụ phụ trách']
+  order_type varchar(30) [not null, default: 'DINE_IN', note: 'DINE_IN, TAKE_AWAY']
+  status varchar(30) [not null, default: 'PENDING_APPROVAL', note: 'PENDING_APPROVAL, SERVING, COMPLETED, CANCELLED']
+
+  subtotal decimal(12,2) [not null, default: 0, note: 'Tổng tiền gốc món ăn']
+  discount_amount decimal(12,2) [default: 0, note: 'Tiền giảm từ % khuyến mãi']
+  points_discount_amount decimal(12,2) [default: 0, note: 'Tiền giảm quy đổi từ điểm']
+  total_amount decimal(12,2) [not null, default: 0, note: 'Tiền thanh toán thực tế']
+
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table order_items {
+  id bigint [pk, increment]
+  order_id bigint [not null, ref: > orders.id]
+  product_id bigint [not null, ref: > products.id]
+  variant_id bigint [ref: > product_variants.id, note: 'Size món']
+  quantity int [not null, default: 1]
+  unit_price decimal(12,2) [not null]
+  total_price decimal(12,2) [not null]
+  note text [note: 'Ghi chú cho bếp']
+  kds_status varchar(30) [not null, default: 'PENDING', note: 'PENDING, COOKING, READY, SERVED, CANCELLED']
+  created_at timestamp [default: `now()`]
+}
+
+Table order_item_modifiers {
+  id bigint [pk, increment]
+  order_item_id bigint [not null, ref: > order_items.id]
+  modifier_option_id bigint [not null, ref: > modifier_options.id]
+  extra_price decimal(12,2) [not null, default: 0]
+}
+
+// ==========================================
+// 7. THANH TOÁN (PAYMENTS)
+// ==========================================
+
+Table payments {
+  id bigint [pk, increment]
+  order_id bigint [not null, ref: > orders.id]
+  payment_method varchar(30) [not null, note: 'CASH, VIETQR']
+  amount decimal(12,2) [not null]
+  status varchar(30) [not null, default: 'PENDING', note: 'PENDING, SUCCESS, FAILED']
+  transaction_ref varchar(100) [note: 'Mã giao dịch ngân hàng/webhook']
+  paid_at timestamp
+}
+
+// ==========================================
+// 8. NHÀ CUNG CẤP & NHẬP KHO (SUPPLIERS & PURCHASING)
+// ==========================================
+
+Table suppliers {
+  id bigint [pk, increment]
+  name varchar(150) [not null]
+  phone varchar(20)
+  email varchar(100)
+  address text
+  is_active boolean [default: true]
+}
+
+Table purchase_orders {
+  id bigint [pk, increment]
+  po_number varchar(50) [unique, not null, note: 'Số chứng từ nhập: PO-20260920-001']
+  supplier_id bigint [not null, ref: > suppliers.id]
+  staff_id bigint [not null, ref: > users.id, note: 'Người lập/ký nhận']
+  order_date date [not null]
+  delivery_date date
+  total_amount decimal(14,2) [not null, default: 0]
+  status varchar(30) [not null, default: 'DRAFT', note: 'DRAFT, COMPLETED, CANCELLED']
+  note text
+  created_at timestamp [default: `now()`]
+}
+
+Table purchase_order_items {
+  id bigint [pk, increment]
+  purchase_order_id bigint [not null, ref: > purchase_orders.id]
+  ingredient_id bigint [not null, ref: > ingredients.id]
+  quantity decimal(10,3) [not null]
+  unit_price decimal(12,2) [not null]
+  total_price decimal(14,2) [not null]
+  expiry_date date
+}
+
+// ==========================================
+// 9. ĐỊNH LƯỢNG & QUẢN LÝ KHO (BOM & INVENTORY)
+// ==========================================
+
+Table ingredients {
+  id bigint [pk, increment]
+  name varchar(100) [not null, note: 'Cà phê hạt, Sữa tươi, Trân châu khô...']
+  code varchar(50) [unique]
+  unit varchar(20) [not null, note: 'g, ml, lon, cái...']
+  current_stock decimal(12,2) [not null, default: 0]
+  min_threshold decimal(12,2) [not null, default: 0, note: 'Ngưỡng cảnh báo sắp hết']
+  cost_per_unit decimal(12,2) [default: 0]
+}
+
+Table recipes {
+  id bigint [pk, increment]
+  product_id bigint [ref: > products.id, note: 'Gán định lượng món cơ bản']
+  variant_id bigint [ref: > product_variants.id, note: 'Hoặc gán theo từng size']
+  modifier_option_id bigint [ref: > modifier_options.id, note: 'Hoặc gán theo từng Topping']
+  ingredient_id bigint [not null, ref: > ingredients.id]
+  quantity_needed decimal(10,3) [not null, note: 'Lượng tiêu hao cho 1 đơn vị']
+}
+
+Table inventory_transactions {
+  id bigint [pk, increment]
+  ingredient_id bigint [not null, ref: > ingredients.id]
+  order_item_id bigint [ref: > order_items.id, note: 'Trừ kho khi bán món']
+  purchase_order_item_id bigint [ref: > purchase_order_items.id, note: 'Cộng tồn khi nhập hàng']
+  quantity decimal(10,3) [not null, note: 'Số âm (-) khi xuất, số dương (+) khi nhập']
+  transaction_type varchar(30) [not null, note: 'SALE_DEDUCT, IMPORT, SPOILAGE, AUDIT_ADJUST']
+  created_at timestamp [default: `now()`]
+}
+
+// ==========================================
+// GOM NHÓM HIỂN THỊ (TABLE GROUPS)
+// ==========================================
+
+TableGroup Dynamic_RBAC {
+  roles
+  permissions
+  role_permissions
+  users
+  user_roles
+}
+
+TableGroup Tables_Areas {
+  areas
+  dining_tables
+}
+
+TableGroup Menu_Catalog {
+  categories
+  products
+  product_variants
+  modifier_groups
+  modifier_options
+  product_modifier_groups
+}
+
+TableGroup Orders_KDS {
+  orders
+  order_items
+  order_item_modifiers
+  payments
+}
+
+TableGroup Loyalty_Promotions {
+  customers
+  point_transactions
+  promotions
+}
+
+TableGroup Purchasing_Suppliers {
+  suppliers
+  purchase_orders
+  purchase_order_items
+}
+
+TableGroup BOM_Inventory {
+  ingredients
+  recipes
+  inventory_transactions
+}

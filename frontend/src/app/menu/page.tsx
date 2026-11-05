@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -48,6 +48,7 @@ function MenuPageContent() {
   const tableId = getGuestTableId(searchParams.get("table"));
   const tableLabel = getGuestTableLabel(tableId);
   const tableQuery = getGuestTableQuery(tableId);
+  const canOrder = Boolean(tableId);
 
   // States dữ liệu menu từ Backend
   const [menuCategories, setMenuCategories] = useState<CategoryMenuResponse[]>([]);
@@ -61,52 +62,33 @@ function MenuPageContent() {
 
   const { cartItems, addItem } = useGuestCart(tableId ?? "unassigned");
 
-  // Hàm tải dữ liệu thực đơn từ Backend khi thử lại
-  const loadMenu = async () => {
+  const loadMenu = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await fetchMenu();
       setMenuCategories(data);
     } catch (err) {
-      const message =
-        err instanceof Error
+      const message = err instanceof DOMException && err.name === "AbortError"
+        ? "Máy chủ phản hồi quá lâu. Vui lòng kiểm tra Wi-Fi và thử lại."
+        : err instanceof Error
           ? err.message
           : "Không thể kết nối tới máy chủ thực đơn.";
       setError(
-        `Không thể kết nối tới máy chủ Backend (http://localhost:8082/api/products/menu). Chi tiết: ${message}`
+        `Không thể tải thực đơn. Chi tiết: ${message}`
       );
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let ignore = false;
-    fetchMenu()
-      .then((data) => {
-        if (!ignore) {
-          setMenuCategories(data);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!ignore) {
-          const message =
-            err instanceof Error
-              ? err.message
-              : "Không thể kết nối tới máy chủ thực đơn.";
-          setError(
-            `Không thể kết nối tới máy chủ Backend (http://localhost:8082/api/products/menu). Chi tiết: ${message}`
-          );
-          setLoading(false);
-        }
-      });
+    const timer = window.setTimeout(() => {
+      void loadMenu();
+    }, 0);
 
-    return () => {
-      ignore = true;
-    };
-  }, []);
+    return () => window.clearTimeout(timer);
+  }, [loadMenu]);
 
   // Tổng hợp tất cả sản phẩm phẳng để dễ tìm kiếm và lọc
   const allProducts = useMemo(() => {
@@ -193,7 +175,7 @@ function MenuPageContent() {
                   Smart POS
                 </p>
                 <h1 className="text-base font-extrabold text-stone-900 leading-tight">
-                  Thực đơn gọi món
+                  {canOrder ? "Thực đơn gọi món" : "Thực đơn của quán"}
                 </h1>
               </div>
             </div>
@@ -204,6 +186,12 @@ function MenuPageContent() {
               </span>
             </div>
           </div>
+
+          {!canOrder && (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-xs font-medium text-amber-900">
+              Chế độ xem thực đơn. Vui lòng quét mã QR trên bàn để chọn món và đặt hàng.
+            </div>
+          )}
 
           {/* Ô tìm kiếm */}
           <div className="relative mt-3">
@@ -321,7 +309,7 @@ function MenuPageContent() {
               <MenuItem
                 key={product.id}
                 item={product}
-                onClick={() => setSelectedItem(product)}
+                onClick={canOrder ? () => setSelectedItem(product) : undefined}
               />
             ))}
           </div>
@@ -329,20 +317,22 @@ function MenuPageContent() {
       </div>
 
       {/* Modal tùy chỉnh Size & Topping khi bấm vào món */}
-      <ModifierModal
-        item={selectedItem}
-        open={Boolean(selectedItem)}
-        onClose={() => setSelectedItem(null)}
-        onAddToCart={handleAddToCart}
-      />
+      {canOrder && (
+        <ModifierModal
+          item={selectedItem}
+          open={Boolean(selectedItem)}
+          onClose={() => setSelectedItem(null)}
+          onAddToCart={handleAddToCart}
+        />
+      )}
 
       {/* Thanh giỏ hàng nổi phía dưới */}
-      <FloatingCart
-        items={cartItems}
-        onViewCart={() =>
-          router.push(tableQuery ? `/cart${tableQuery}` : "/cart")
-        }
-      />
+      {canOrder && (
+        <FloatingCart
+          items={cartItems}
+          onViewCart={() => router.push(`/cart${tableQuery}`)}
+        />
+      )}
     </main>
   );
 }

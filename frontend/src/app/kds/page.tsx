@@ -5,7 +5,6 @@ import {
   Salad,
   Soup,
   Printer,
-  PlusCircle,
   LayoutGrid,
   List,
   RefreshCw,
@@ -136,7 +135,9 @@ export default function KdsPage() {
     setCompletedTaskIds((prev) => new Set(prev).add(taskId));
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
 
-    if (completedItem) {
+    try {
+      await updateOrderStatus(orderId, "READY");
+      setTasks((prev) => prev.filter((task) => !task.id.startsWith(`${orderId}-`)));
       toast.success(
         `Đã hoàn tất: ${completedItem.productName}`,
         `${completedItem.tableName ?? completedItem.orderId} (${completedItem.quantity} phần) đã sẵn sàng phục vụ.`
@@ -301,11 +302,10 @@ export default function KdsPage() {
                     type="button"
                     onClick={() => setViewMode("grid")}
                     title="Hiển thị lưới dọc"
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      viewMode === "grid"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "grid"
                         ? "bg-white text-orange-600 shadow-2xs"
                         : "text-stone-500 hover:text-stone-800"
-                    }`}
+                      }`}
                   >
                     <LayoutGrid className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Lưới dọc</span>
@@ -314,11 +314,10 @@ export default function KdsPage() {
                     type="button"
                     onClick={() => setViewMode("list")}
                     title="Hiển thị danh sách dọc"
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      viewMode === "list"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "list"
                         ? "bg-white text-orange-600 shadow-2xs"
                         : "text-stone-500 hover:text-stone-800"
-                    }`}
+                      }`}
                   >
                     <List className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Hàng dọc</span>

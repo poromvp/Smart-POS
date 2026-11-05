@@ -151,60 +151,60 @@ function GuestCartContent() {
             </div>
           ) : (
             cartItems.map((item) => (
-            <article key={item.id} className="rounded-xl border border-orange-100 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h2 className="truncate text-base font-bold text-slate-900">{item.name}</h2>
-                  <p className="mt-1 text-sm font-semibold text-[#b42318]">{formatCurrency(item.basePrice + (item.modifierTotal || 0))}</p>
-                  {item.sizeName && (
-                    <span className="inline-block mt-1 text-[11px] font-semibold text-orange-800 bg-orange-100/70 px-2 py-0.5 rounded">
-                      {item.sizeName}
-                    </span>
-                  )}
-                  {item.toppings && item.toppings.length > 0 && (
-                    <p className="mt-1 text-xs text-stone-500">
-                      Tùy chọn: {item.toppings.join(", ")}
-                    </p>
-                  )}
-                  {item.sweetness && (
-                    <p className="mt-0.5 text-xs text-stone-500">
-                      Độ ngọt: {item.sweetness}
-                    </p>
-                  )}
+              <article key={item.id} className="rounded-xl border border-orange-100 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-base font-bold text-slate-900">{item.name}</h2>
+                    <p className="mt-1 text-sm font-semibold text-[#b42318]">{formatCurrency(item.basePrice + (item.modifierTotal || 0))}</p>
+                    {item.sizeName && (
+                      <span className="inline-block mt-1 text-[11px] font-semibold text-orange-800 bg-orange-100/70 px-2 py-0.5 rounded">
+                        {item.sizeName}
+                      </span>
+                    )}
+                    {item.toppings && item.toppings.length > 0 && (
+                      <p className="mt-1 text-xs text-stone-500">
+                        Tùy chọn: {item.toppings.join(", ")}
+                      </p>
+                    )}
+                    {item.sweetness && (
+                      <p className="mt-0.5 text-xs text-stone-500">
+                        Độ ngọt: {item.sweetness}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center rounded-full border border-slate-200 bg-white shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => changeQuantity(item.id, -1)}
+                      className="flex h-9 w-9 items-center justify-center rounded-l-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                      aria-label={`Giảm số lượng ${item.name}`}
+                    >
+                      <Minus size={16} aria-hidden="true" />
+                    </button>
+                    <span className="w-10 text-center text-sm font-bold text-slate-900">{item.quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => changeQuantity(item.id, 1)}
+                      className="flex h-9 w-9 items-center justify-center rounded-r-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                      aria-label={`Tăng số lượng ${item.name}`}
+                    >
+                      <Plus size={16} aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center rounded-full border border-slate-200 bg-white shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => changeQuantity(item.id, -1)}
-                    className="flex h-9 w-9 items-center justify-center rounded-l-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                    aria-label={`Giảm số lượng ${item.name}`}
-                  >
-                    <Minus size={16} aria-hidden="true" />
-                  </button>
-                  <span className="w-10 text-center text-sm font-bold text-slate-900">{item.quantity}</span>
-                  <button
-                    type="button"
-                    onClick={() => changeQuantity(item.id, 1)}
-                    className="flex h-9 w-9 items-center justify-center rounded-r-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                    aria-label={`Tăng số lượng ${item.name}`}
-                  >
-                    <Plus size={16} aria-hidden="true" />
-                  </button>
+                <div className="mt-4 rounded-lg border border-orange-100 bg-[#fffaf5] px-3 py-3">
+                  <input
+                    type="text"
+                    value={item.note}
+                    onChange={(event) => updateNote(item.id, event.target.value)}
+                    placeholder="Nhập ghi chú cho món này..."
+                    className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    aria-label={`Ghi chú cho ${item.name}`}
+                  />
                 </div>
-              </div>
-
-              <div className="mt-4 rounded-lg border border-orange-100 bg-[#fffaf5] px-3 py-3">
-                <input
-                  type="text"
-                  value={item.note}
-                  onChange={(event) => updateNote(item.id, event.target.value)}
-                  placeholder="Nhập ghi chú cho món này..."
-                  className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                  aria-label={`Ghi chú cho ${item.name}`}
-                />
-              </div>
-            </article>
+              </article>
             ))
           )}
         </div>
@@ -227,8 +227,13 @@ function GuestCartContent() {
             className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#b42318] px-4 text-sm font-bold text-white shadow-lg shadow-red-200 transition active:scale-[0.98] hover:bg-[#8f1d15] disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none"
           >
             {submissionState === "submitting" ? <LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> : <ShoppingBag size={18} aria-hidden="true" />}
-            {submissionState === "submitting" ? "Đang ghi nhận..." : tableLabel ? "Xác nhận gọi món" : "Quét mã QR để xác nhận đơn"}
+            {submissionState === "submitting" ? "Đang gửi đơn..." : tableLabel ? "Xác nhận gọi món" : "Quét mã QR để xác nhận đơn"}
           </button>
+          {submissionState === "error" && (
+            <p role="alert" className="text-sm font-medium text-red-600">
+              {submissionError}
+            </p>
+          )}
         </div>
       </footer>
     </main>

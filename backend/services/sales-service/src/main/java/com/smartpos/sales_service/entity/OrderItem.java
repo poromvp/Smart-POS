@@ -51,6 +51,9 @@ public class OrderItem {
     @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
 
+    @Column(name = "total_price", nullable = false, precision = 12, scale = 2)
+    private BigDecimal totalPrice;
+
     @Column(name = "modifier_total", precision = 12, scale = 2)
     @Builder.Default
     private BigDecimal modifierTotal = BigDecimal.ZERO;

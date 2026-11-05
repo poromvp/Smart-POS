@@ -56,7 +56,8 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal totalAmount = BigDecimal.ZERO;
 
         for (CreateOrderItemRequest itemReq : request.getItems()) {
-            BigDecimal modifierTotal = itemReq.getModifierTotal() != null ? itemReq.getModifierTotal() : BigDecimal.ZERO;
+            BigDecimal modifierTotal = itemReq.getModifierTotal() != null ? itemReq.getModifierTotal()
+                    : BigDecimal.ZERO;
             BigDecimal itemTotal = itemReq.getBasePrice().add(modifierTotal)
                     .multiply(BigDecimal.valueOf(itemReq.getQuantity()));
             totalAmount = totalAmount.add(itemTotal);
@@ -89,6 +90,7 @@ public class OrderServiceImpl implements OrderService {
                     .name(itemReq.getName())
                     .quantity(itemReq.getQuantity())
                     .unitPrice(itemReq.getBasePrice())
+                    .totalPrice(itemTotal)
                     .modifierTotal(modifierTotal)
                     .toppings(toppingsStr)
                     .sweetness(itemReq.getSweetness())
@@ -210,8 +212,7 @@ public class OrderServiceImpl implements OrderService {
                         ? new HashSet<>(item.getModifierOptionIds())
                         : new HashSet<>())
                 .quantity(item.getQuantity())
-                .build()
-        ).collect(Collectors.toList());
+                .build()).collect(Collectors.toList());
 
         DeductInventoryRequest deductRequest = DeductInventoryRequest.builder()
                 .orderCode(order.getOrderCode())
@@ -221,13 +222,15 @@ public class OrderServiceImpl implements OrderService {
         try {
             log.info("Bắt đầu gọi API trừ kho cho đơn hàng {} với {} món ăn", order.getOrderCode(), items.size());
             ApiResponse<DeductInventoryResponse> response = inventoryClient.deductInventory(deductRequest);
-            log.info("Trừ kho tự động thành công cho đơn hàng: {}. Phản hồi: {}", order.getOrderCode(), response.getMessage());
+            log.info("Trừ kho tự động thành công cho đơn hàng: {}. Phản hồi: {}", order.getOrderCode(),
+                    response.getMessage());
         } catch (FeignException e) {
             String errorMsg = extractErrorMessage(e);
             log.error("Lỗi tồn kho khi trừ kho cho đơn {}: {}", order.getOrderCode(), errorMsg);
             throw new BusinessException("Không thể hoàn tất đơn hàng: " + errorMsg, e);
         } catch (Exception e) {
-            log.error("Lỗi không mong muốn khi gọi catalog-inventory-service cho đơn {}: {}", order.getOrderCode(), e.getMessage());
+            log.error("Lỗi không mong muốn khi gọi catalog-inventory-service cho đơn {}: {}", order.getOrderCode(),
+                    e.getMessage());
             throw new BusinessException("Lỗi kết nối tới Catalog & Inventory Service: " + e.getMessage(), e);
         }
     }
@@ -249,6 +252,14 @@ public class OrderServiceImpl implements OrderService {
         String datePrefix = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String randomSuffix = UUID.randomUUID().toString().substring(0, 5).toUpperCase();
         return "ORD-" + datePrefix + "-" + randomSuffix;
+    }
+
+    private Long parseProductId(String itemId) {
+        try {
+            return Long.valueOf(itemId);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Mã món ăn không hợp lệ: " + itemId);
+        }
     }
 
     private OrderResponse mapToOrderResponse(Order order) {

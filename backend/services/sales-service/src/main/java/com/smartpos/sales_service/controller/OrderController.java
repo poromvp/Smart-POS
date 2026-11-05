@@ -65,6 +65,13 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật trạng thái đơn hàng thành công"));
     }
 
+    @PostMapping("/{id}/complete")
+    @Operation(summary = "Hoàn tất đơn hàng và tự động trừ kho nguyên liệu")
+    public ResponseEntity<ApiResponse<OrderResponse>> completeOrder(@PathVariable Long id) {
+        OrderResponse completed = orderService.completeOrder(id);
+        return ResponseEntity.ok(ApiResponse.success(completed, "Hoàn tất đơn hàng và trừ kho thành công"));
+    }
+
     @PatchMapping("/{id}/payment")
     @Operation(summary = "Cập nhật thông tin thanh toán cho đơn hàng")
     public ResponseEntity<ApiResponse<OrderResponse>> updatePayment(

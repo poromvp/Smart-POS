@@ -7,8 +7,9 @@ import {
   Printer,
   LayoutGrid,
   List,
+  RefreshCw,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import KitchenTaskCard, { type KitchenTask } from "@/components/kds/KitchenTaskCard";
 import ExpiryPrintModal from "@/components/kds/ExpiryPrintModal";
@@ -16,7 +17,8 @@ import TopHeader from "@/components/layout/TopHeader";
 import WorkspaceSidebar from "@/components/layout/WorkspaceSidebar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
-import { fetchOrders, updateOrderStatus, type OrderResponse } from "@/lib/api";
+import { fetchOrders, createOrder, updateOrderStatus } from "@/lib/api";
+import type { OrderResponse } from "@/lib/types/sales";
 
 type StationId = "hot" | "cold" | "bar";
 
@@ -26,40 +28,32 @@ const STATION_TABS: { id: StationId; label: string; icon: typeof Flame }[] = [
   { id: "bar", label: "Quầy bar", icon: Soup },
 ];
 
-function getStationId(productName: string): StationId {
-  const normalizedName = productName.toLowerCase();
-  if (/(trà|cà phê|cafe|nước|sinh tố|latte|matcha)/.test(normalizedName)) {
+function determineStation(productName: string): StationId {
+  const name = productName.toLowerCase();
+  if (
+    name.includes("trà") ||
+    name.includes("cà phê") ||
+    name.includes("matcha") ||
+    name.includes("pepsi") ||
+    name.includes("sinh tố") ||
+    name.includes("nước")
+  ) {
     return "bar";
   }
-  if (/(salad|gỏi|kim chi|cuốn)/.test(normalizedName)) {
+  if (
+    name.includes("gỏi") ||
+    name.includes("salad") ||
+    name.includes("kim chi") ||
+    name.includes("kem")
+  ) {
     return "cold";
   }
   return "hot";
 }
 
-function mapOrderToTasks(order: OrderResponse): KitchenTask[] {
-  if (!["PENDING", "CONFIRMED", "PREPARING"].includes(order.status)) {
-    return [];
-  }
-
-  return order.items.map((item, index) => ({
-    id: `${order.id}-${index}`,
-    orderId: order.orderCode,
-    tableName: order.tableNumber ? `Bàn ${order.tableNumber}` : "Mang đi",
-    orderType: order.orderType === "TAKEAWAY" ? "Mang đi" : "Tại bàn",
-    productName: item.name,
-    quantity: item.quantity,
-    modifiers: [item.toppings, item.sweetness, item.note]
-      .filter(Boolean)
-      .join(", "),
-    startTime: order.createdAt,
-    targetTime: 10,
-    stationId: getStationId(item.name),
-  }));
-}
-
 export default function KdsPage() {
   const [tasks, setTasks] = useState<KitchenTask[]>([]);
+  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
   const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
   const [activeStation, setActiveStation] = useState<StationId>("hot");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -67,6 +61,7 @@ export default function KdsPage() {
   const [presetPrintItem, setPresetPrintItem] = useState<string | undefined>(
     undefined
   );
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const toast = useToast();
 
@@ -75,37 +70,70 @@ export default function KdsPage() {
     return () => window.clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    let ignore = false;
+  // Tải danh sách đơn hàng thực tế từ Sales Service
+  const loadKitchenTasks = useCallback(async () => {
+    try {
+      const orders = await fetchOrders();
+      if (!orders) return;
 
-    const loadOrders = async () => {
-      try {
-        const orders = await fetchOrders();
-        if (!ignore) {
-          setTasks(orders.flatMap(mapOrderToTasks));
-        }
-      } catch (error) {
-        if (!ignore) {
-          toast.error(
-            "Không thể tải đơn bếp",
-            error instanceof Error ? error.message : "Vui lòng kiểm tra kết nối backend."
-          );
+      // Lấy các đơn đang chờ hoặc đang chế biến
+      const activeOrders = orders.filter(
+        (o) =>
+          o.status === "PENDING" ||
+          o.status === "CONFIRMED" ||
+          o.status === "PREPARING"
+      );
+
+      const kitchenTasks: KitchenTask[] = [];
+
+      for (const order of activeOrders) {
+        for (const item of order.items || []) {
+          const taskId = `task-${order.id}-${item.id}`;
+          // Bỏ qua nếu đã đánh dấu hoàn thành trong phiên này
+          if (completedTaskIds.has(taskId)) continue;
+
+          const modifiers = [item.toppings, item.sweetness, item.note]
+            .filter(Boolean)
+            .join(" • ");
+
+          kitchenTasks.push({
+            id: taskId,
+            orderId: order.orderCode,
+            tableName: order.tableNumber ? `Bàn ${order.tableNumber}` : "Mang đi",
+            orderType: order.orderType === "TAKE_AWAY" ? "Mang đi" : "Tại bàn",
+            productName: item.name,
+            quantity: item.quantity,
+            modifiers: modifiers || undefined,
+            startTime: order.createdAt || new Date().toISOString(),
+            targetTime: 10,
+            stationId: determineStation(item.name),
+          });
         }
       }
-    };
 
-    void loadOrders();
-    const refreshTimer = window.setInterval(() => void loadOrders(), 5000);
-    return () => {
-      ignore = true;
-      window.clearInterval(refreshTimer);
-    };
-  }, [toast]);
+      setTasks(kitchenTasks);
+    } catch (err) {
+      console.warn("Chưa thể đồng bộ đơn hàng với KDS:", err);
+    }
+  }, [completedTaskIds]);
+
+  useEffect(() => {
+    loadKitchenTasks();
+    const interval = setInterval(loadKitchenTasks, 5000);
+    return () => clearInterval(interval);
+  }, [loadKitchenTasks]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await loadKitchenTasks();
+    setIsRefreshing(false);
+    toast.info("Đã đồng bộ KDS", "Danh sách món cần nấu đã được cập nhật mới nhất");
+  };
 
   const handleCompleteTask = async (taskId: string) => {
     const completedItem = tasks.find((t) => t.id === taskId);
-    if (!completedItem) return;
-    const orderId = Number(taskId.split("-")[0]);
+    setCompletedTaskIds((prev) => new Set(prev).add(taskId));
+    setTasks((prev) => prev.filter((task) => task.id !== taskId));
 
     try {
       await updateOrderStatus(orderId, "READY");
@@ -114,10 +142,63 @@ export default function KdsPage() {
         `Đã hoàn tất: ${completedItem.productName}`,
         `${completedItem.tableName ?? completedItem.orderId} (${completedItem.quantity} phần) đã sẵn sàng phục vụ.`
       );
-    } catch (error) {
+    }
+  };
+
+  // Tạo đơn hàng thử nghiệm thực tế vào DB sales-service
+  const handleSimulateNewOrder = async () => {
+    const sampleDishes: Record<
+      StationId,
+      { productId: number; name: string; price: number; note: string }
+    > = {
+      hot: {
+        productId: 1,
+        name: "Mì Cay Bò Mỹ",
+        price: 75000,
+        note: "Cay cấp 3, không hành lá",
+      },
+      cold: {
+        productId: 3,
+        name: "Gà Sốt Cay Hàn Quốc",
+        price: 89000,
+        note: "Thêm kim chi",
+      },
+      bar: {
+        productId: 4,
+        name: "Trà Đào Cam Sả",
+        price: 45000,
+        note: "50% đường, ít đá",
+      },
+    };
+
+    const dish = sampleDishes[activeStation];
+    const tableNumber = String(Math.floor(1 + Math.random() * 20));
+
+    try {
+      const response = await createOrder({
+        tableNumber,
+        orderType: "DINE_IN",
+        items: [
+          {
+            productId: dish.productId,
+            name: dish.name,
+            quantity: 1,
+            basePrice: dish.price,
+            note: dish.note,
+          },
+        ],
+      });
+
+      toast.info(
+        `Đã tạo đơn mới #${response.orderCode}`,
+        `Bàn ${tableNumber} • 1× ${dish.name} vừa được lưu vào cơ sở dữ liệu.`
+      );
+
+      await loadKitchenTasks();
+    } catch (err) {
       toast.error(
-        "Không thể cập nhật đơn",
-        error instanceof Error ? error.message : "Vui lòng thử lại."
+        "Lỗi tạo đơn",
+        err instanceof Error ? err.message : "Không thể gửi đơn xuống Sales Service"
       );
     }
   };
@@ -147,13 +228,26 @@ export default function KdsPage() {
         userName="Bếp trưởng"
         rightContent={
           <div className="flex items-center gap-3 text-sm">
+            <button
+              type="button"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition"
+              title="Đồng bộ lại danh sách món"
+            >
+              <RefreshCw
+                size={14}
+                className={isRefreshing ? "animate-spin text-orange-500" : ""}
+              />
+              <span>Đồng bộ</span>
+            </button>
             <span className="text-stone-500">
               Đang chờ:{" "}
               <strong className="text-orange-600 font-bold">
                 {tasks.length} món
               </strong>
             </span>
-            <StatusBadge label="Đã kết nối" variant="success" />
+            <StatusBadge label="Hệ thống trực tuyến" variant="success" />
           </div>
         }
       />
@@ -208,11 +302,10 @@ export default function KdsPage() {
                     type="button"
                     onClick={() => setViewMode("grid")}
                     title="Hiển thị lưới dọc"
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      viewMode === "grid"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "grid"
                         ? "bg-white text-orange-600 shadow-2xs"
                         : "text-stone-500 hover:text-stone-800"
-                    }`}
+                      }`}
                   >
                     <LayoutGrid className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Lưới dọc</span>
@@ -221,16 +314,24 @@ export default function KdsPage() {
                     type="button"
                     onClick={() => setViewMode("list")}
                     title="Hiển thị danh sách dọc"
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      viewMode === "list"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "list"
                         ? "bg-white text-orange-600 shadow-2xs"
                         : "text-stone-500 hover:text-stone-800"
-                    }`}
+                      }`}
                   >
                     <List className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Hàng dọc</span>
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleSimulateNewOrder}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-orange-50 hover:border-orange-300 px-3.5 py-2 text-xs font-bold text-stone-700 hover:text-orange-600 transition-colors cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4 text-orange-500" />
+                  <span>Tạo đơn thử nghiệm (DB)</span>
+                </button>
 
                 <button
                   type="button"

@@ -18,6 +18,8 @@ public interface OrderService {
 
     OrderResponse updateOrderStatus(Long id, OrderStatus status);
 
+    OrderResponse completeOrder(Long id);
+
     OrderResponse updatePayment(Long id, UpdatePaymentRequest request);
 
     void cancelOrder(Long id);

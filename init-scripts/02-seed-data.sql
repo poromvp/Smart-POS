@@ -1,24 +1,68 @@
 -- ============================================================================
--- DỮ LIỆU MẪU CHO DỊCH VỤ CATALOG & INVENTORY SERVICE (pos_catalog_inventory_db)
+-- DỮ LIỆU MẪU TOÀN DIỆN CHO CẢ 3 DỊCH VỤ MICROSERVICES (SMART-POS)
+-- ============================================================================
+
+-- ============================================================================
+-- DỊCH VỤ 1: IDENTITY SERVICE (pos_identity_db)
+-- ============================================================================
+\c pos_identity_db;
+
+INSERT INTO "roles" ("id", "name", "description") VALUES 
+(1, 'ADMIN', 'Quản trị viên toàn quyền'),
+(2, 'CASHIER', 'Nhân viên thu ngân'),
+(3, 'KITCHEN', 'Nhân viên bếp')
+ON CONFLICT (id) DO NOTHING;
+SELECT setval('roles_id_seq', (SELECT COALESCE(MAX(id), 1) FROM roles));
+
+INSERT INTO "users" ("id", "username", "password_hash", "full_name", "phone") VALUES 
+(1, 'admin', '$2a$10$w3Yv72D5jN773JzW26hBLeR2/9Wn4U3bQZ/xsmXm240HwQxX7B9ye', 'Kiệt Lê (Admin)', '0901234567'),
+(2, 'thungan1', '$2a$10$w3Yv72D5jN773JzW26hBLeR2/9Wn4U3bQZ/xsmXm240HwQxX7B9ye', 'Nguyễn Thị Thu Ngân', '0911222333')
+ON CONFLICT (id) DO NOTHING;
+SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users));
+
+INSERT INTO "user_roles" ("user_id", "role_id") VALUES 
+(1, 1),
+(2, 2)
+ON CONFLICT DO NOTHING;
+
+-- ============================================================================
+-- DỊCH VỤ 2: CATALOG & INVENTORY SERVICE (pos_catalog_inventory_db)
 -- ============================================================================
 \c pos_catalog_inventory_db;
 
--- 1. DANH MỤC
+-- 1. KHU VỰC & BÀN ĂN
+INSERT INTO "areas" ("id", "name", "description") VALUES 
+(1, 'Tầng 1', 'Khu vực máy lạnh'), 
+(2, 'Sân thượng', 'Khu vực ngoài trời thoáng mát')
+ON CONFLICT (id) DO NOTHING;
+SELECT setval('areas_id_seq', (SELECT COALESCE(MAX(id), 1) FROM areas));
+
+INSERT INTO "dining_tables" ("id", "area_id", "table_number", "capacity", "status") VALUES 
+(1, 1, 'T1-01', 4, 'EMPTY'), 
+(2, 1, 'T1-02', 4, 'EMPTY'),
+(3, 2, 'ST-01', 6, 'EMPTY'),
+(4, 2, 'ST-02', 4, 'EMPTY')
+ON CONFLICT (id) DO NOTHING;
+SELECT setval('dining_tables_id_seq', (SELECT COALESCE(MAX(id), 1) FROM dining_tables));
+
+-- 2. DANH MỤC THỰC ĐƠN
 INSERT INTO categories (id, name, display_order, is_active) VALUES
 (1, 'Mì Cay', 1, true),
 (2, 'Món Ăn Kèm', 2, true),
 (3, 'Trà & Thức Uống', 3, true)
 ON CONFLICT (id) DO NOTHING;
+SELECT setval('categories_id_seq', (SELECT COALESCE(MAX(id), 1) FROM categories));
 
--- 2. NHÓM TÙY CHỌN (MODIFIER GROUPS)
+-- 3. NHÓM TÙY CHỌN (MODIFIER GROUPS)
 INSERT INTO modifier_groups (id, name, is_multiple, is_required) VALUES
 (1, 'Topping Mì Cay', true, false),
 (2, 'Lượng Đường', false, false),
 (3, 'Topping Thức Uống', true, false),
 (4, 'Lượng Đá', false, false)
 ON CONFLICT (id) DO NOTHING;
+SELECT setval('modifier_groups_id_seq', (SELECT COALESCE(MAX(id), 1) FROM modifier_groups));
 
--- 3. CÁC TÙY CHỌN CON (MODIFIER OPTIONS)
+-- 4. CÁC TÙY CHỌN CON (MODIFIER OPTIONS)
 INSERT INTO modifier_options (id, group_id, name, price) VALUES
 (1, 1, 'Thịt bò thêm', 25000),
 (2, 1, 'Trứng gà chần', 10000),
@@ -36,8 +80,9 @@ INSERT INTO modifier_options (id, group_id, name, price) VALUES
 (14, 4, '50% đá', 0),
 (15, 4, 'Không đá', 0)
 ON CONFLICT (id) DO NOTHING;
+SELECT setval('modifier_options_id_seq', (SELECT COALESCE(MAX(id), 1) FROM modifier_options));
 
--- 4. MÓN ĂN (PRODUCTS)
+-- 5. MÓN ĂN (PRODUCTS)
 INSERT INTO products (id, category_id, name, code, base_price, image_url, description, is_active, created_at) VALUES
 (1, 1, 'Mì Cay Bò Mỹ', 'MC-BO', 75000, '/menu/beef-noodles.jpg', 'Mì sợi dai Hàn Quốc, thịt bò Mỹ cao cấp kết hợp nước dùng chua cay đậm đà chuẩn vị.', true, NOW()),
 (2, 1, 'Mì Cay Hải Sản', 'MC-HS', 85000, '/menu/beef-noodles.jpg', 'Tôm sú tươi giòn ngọt, mực tươi kèm nấm kim châm và rau củ tươi ngon.', true, NOW()),
@@ -46,8 +91,9 @@ INSERT INTO products (id, category_id, name, code, base_price, image_url, descri
 (5, 3, 'Matcha Latte', 'NU-MATCHA', 55000, '/menu/matcha-latte.jpg', 'Bột trà xanh Nhật Bản nguyên chất hòa quyện cùng sữa tươi béo ngậy.', true, NOW()),
 (6, 3, 'Cà Phê Sữa Đá', 'NU-CF-SUA', 35000, '/menu/iced-coffee.jpg', 'Cà phê pha phin truyền thống đậm đà sánh quyện sữa đặc thơm béo.', true, NOW())
 ON CONFLICT (id) DO NOTHING;
+SELECT setval('products_id_seq', (SELECT COALESCE(MAX(id), 1) FROM products));
 
--- 5. BIẾN THỂ SIZE (PRODUCT VARIANTS)
+-- 6. BIẾN THỂ SIZE (PRODUCT VARIANTS)
 INSERT INTO product_variants (id, product_id, size_name, price_adjustment, sku) VALUES
 (1, 1, 'Cấp 1 (Cay nhẹ)', 0, 'MC-BO-C1'),
 (2, 1, 'Cấp 3 (Cay vừa)', 0, 'MC-BO-C3'),
@@ -62,8 +108,9 @@ INSERT INTO product_variants (id, product_id, size_name, price_adjustment, sku) 
 (11, 5, 'Size M', 0, 'NU-MATCHA-M'),
 (12, 5, 'Size L', 10000, 'NU-MATCHA-L')
 ON CONFLICT (id) DO NOTHING;
+SELECT setval('product_variants_id_seq', (SELECT COALESCE(MAX(id), 1) FROM product_variants));
 
--- 6. LIÊN KẾT MÓN ĂN VÀ NHÓM TÙY CHỌN (PRODUCT_MODIFIER_GROUPS)
+-- 7. LIÊN KẾT MÓN ĂN VÀ NHÓM TÙY CHỌN (PRODUCT_MODIFIER_GROUPS)
 INSERT INTO product_modifier_groups (product_id, modifier_group_id) VALUES
 (1, 1),
 (2, 1),
@@ -77,9 +124,48 @@ INSERT INTO product_modifier_groups (product_id, modifier_group_id) VALUES
 (6, 4)
 ON CONFLICT DO NOTHING;
 
--- CẬP NHẬT LẠI SEQUENCE ĐỂ TRÁNH TRÙNG LẶP ID KHI THÊM MỚI BẰNG API
-SELECT setval('categories_id_seq', (SELECT COALESCE(MAX(id), 1) FROM categories));
-SELECT setval('modifier_groups_id_seq', (SELECT COALESCE(MAX(id), 1) FROM modifier_groups));
-SELECT setval('modifier_options_id_seq', (SELECT COALESCE(MAX(id), 1) FROM modifier_options));
-SELECT setval('products_id_seq', (SELECT COALESCE(MAX(id), 1) FROM products));
-SELECT setval('product_variants_id_seq', (SELECT COALESCE(MAX(id), 1) FROM product_variants));
+-- 8. KHO HÀNG NGUYÊN LIỆU (INGREDIENTS)
+INSERT INTO "ingredients" ("id", "name", "code", "unit", "current_stock", "min_threshold", "cost_per_unit", "is_active") VALUES 
+(1, 'Thịt Bò Mỹ', 'NL-BO', 'kg', 25.000, 5.000, 250000, true),
+(2, 'Mì Tròn Hàn Quốc', 'NL-MI', 'gói', 150.000, 20.000, 15000, true),
+(3, 'Tôm Sú Tươi', 'NL-TOM', 'kg', 20.000, 3.000, 280000, true),
+(4, 'Đào Hộp Kronos', 'NL-DAO', 'hộp', 50.000, 5.000, 45000, true),
+(5, 'Trà Đen Phúc Long', 'NL-TRA-DEN', 'kg', 15.000, 2.000, 120000, true),
+(6, 'Rau Củ Tươi', 'NL-RAU', 'kg', 30.000, 5.000, 20000, true),
+(7, 'Sữa Đặc Ngôi Sao', 'NL-MILK', 'hộp', 60.000, 10.000, 22000, true),
+(8, 'Cà Phê Robusta', 'NL-CF', 'kg', 15.000, 3.000, 180000, true)
+ON CONFLICT (id) DO NOTHING;
+SELECT setval('ingredients_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ingredients));
+
+-- 9. ĐỊNH LƯỢNG CÔNG THỨC (RECIPES)
+INSERT INTO "recipes" ("product_id", "ingredient_id", "quantity_needed") VALUES 
+(1, 1, 0.150), -- Mì Cay Bò Mỹ: 150g thịt bò
+(1, 2, 1.000), -- Mì Cay Bò Mỹ: 1 gói mì
+(1, 6, 0.100), -- Mì Cay Bò Mỹ: 100g rau củ
+(2, 3, 0.150), -- Mì Cay Hải Sản: 150g tôm sú
+(2, 2, 1.000), -- Mì Cay Hải Sản: 1 gói mì
+(2, 6, 0.100), -- Mì Cay Hải Sản: 100g rau củ
+(4, 4, 0.100), -- Trà Đào Cam Sả: 0.1 hộp đào
+(4, 5, 0.030), -- Trà Đào Cam Sả: 30g trà đen
+(6, 8, 0.025), -- Cà Phê Sữa Đá: 25g cà phê
+(6, 7, 0.030)  -- Cà Phê Sữa Đá: 30ml sữa đặc
+ON CONFLICT DO NOTHING;
+
+-- ============================================================================
+-- DỊCH VỤ 3: SALES SERVICE (pos_sales_db)
+-- ============================================================================
+\c pos_sales_db;
+
+-- 1. KHÁCH HÀNG THÂN THIẾT
+INSERT INTO "customers" ("id", "phone", "full_name", "current_points", "total_spent") VALUES 
+(1, '0988777666', 'Trần Văn Bình (VIP)', 250, 2500000),
+(2, '0909090909', 'Lê Khách Mới', 0, 0)
+ON CONFLICT (id) DO NOTHING;
+SELECT setval('customers_id_seq', (SELECT COALESCE(MAX(id), 1) FROM customers));
+
+-- 2. KHUYẾN MÃI
+INSERT INTO "promotions" ("id", "code", "name", "discount_percent", "start_date", "end_date", "is_active") VALUES 
+(1, 'OPENING', 'Khai trương giảm 10%', 10.00, '2026-10-01 00:00:00', '2026-12-31 23:59:59', true),
+(2, 'VIP5', 'Khách VIP giảm 5%', 5.00, '2026-10-01 00:00:00', '2026-12-31 23:59:59', true)
+ON CONFLICT (id) DO NOTHING;
+SELECT setval('promotions_id_seq', (SELECT COALESCE(MAX(id), 1) FROM promotions));

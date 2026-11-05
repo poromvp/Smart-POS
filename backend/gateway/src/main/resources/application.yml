@@ -1,0 +1,40 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+      routes:
+        # Route 1: Điều hướng các API bán hàng và đơn hàng sang sales-service (8083)
+        - id: sales-service-route
+          uri: ${SALES_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/orders/**, /api/sales/**
+
+        # Route 2: Điều hướng các API thực đơn, nguyên liệu, kho, NCC sang catalog-inventory-service (8082)
+        - id: catalog-inventory-service-route
+          uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/products/**, /api/categories/**, /api/modifier-groups/**, /api/ingredients/**, /api/recipes/**, /api/inventory/**, /api/suppliers/**, /api/purchase-orders/**, /api/files/**, /uploads/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, gateway
+

@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   List,
   RefreshCw,
+  PlusCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -132,15 +133,26 @@ export default function KdsPage() {
 
   const handleCompleteTask = async (taskId: string) => {
     const completedItem = tasks.find((t) => t.id === taskId);
+    if (!completedItem) return;
+
+    const parts = taskId.split("-");
+    const orderId = Number(parts[0] === "task" ? parts[1] : parts[0]);
+
     setCompletedTaskIds((prev) => new Set(prev).add(taskId));
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
 
     try {
-      await updateOrderStatus(orderId, "READY");
-      setTasks((prev) => prev.filter((task) => !task.id.startsWith(`${orderId}-`)));
+      if (!isNaN(orderId)) {
+        await updateOrderStatus(orderId, "READY");
+      }
       toast.success(
         `Đã hoàn tất: ${completedItem.productName}`,
         `${completedItem.tableName ?? completedItem.orderId} (${completedItem.quantity} phần) đã sẵn sàng phục vụ.`
+      );
+    } catch (error) {
+      toast.error(
+        "Không thể cập nhật đơn",
+        error instanceof Error ? error.message : "Vui lòng thử lại."
       );
     }
   };

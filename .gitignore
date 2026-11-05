@@ -1,7 +1,7 @@
 # ==========================================
 # 1. BẢO MẬT & BIẾN MÔI TRƯỜNG (BẮT BUỘC)
 # ==========================================
-.env
+backend/services/catalog-inventory-service/src/.env
 .env.*
 .env.local
 .env.development.local

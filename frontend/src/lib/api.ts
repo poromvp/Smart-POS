@@ -45,97 +45,19 @@ import {
   CreateOrderItemRequest,
   UpdateOrderStatusRequest,
   UpdatePaymentRequest,
+  CustomerResponse,
+  CustomerCreateRequest,
+  PointTransactionResponse,
+  PromotionResponse,
+  PromotionCreateRequest,
+  ApplyPromotionRequest,
+  ApplyPromotionResponse,
 } from "./types/sales";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "/api/catalog";
 export const SALES_API_BASE_URL =
   process.env.NEXT_PUBLIC_SALES_API_URL || "/api/sales";
-
-export type OrderStatus =
-  | "PENDING"
-  | "CONFIRMED"
-  | "PREPARING"
-  | "READY"
-  | "SERVED"
-  | "COMPLETED"
-  | "CANCELLED";
-
-export interface OrderItemRequest {
-  itemId: string;
-  name: string;
-  quantity: number;
-  basePrice: number;
-  modifierTotal: number;
-  toppings: string[];
-  sweetness?: string;
-  note?: string;
-}
-
-export interface CreateOrderRequest {
-  tableNumber: string;
-  orderType: "DINE_IN" | "TAKEAWAY";
-  items: OrderItemRequest[];
-}
-
-export interface OrderItemResponse {
-  id: number;
-  itemId: string;
-  name: string;
-  quantity: number;
-  unitPrice: number;
-  modifierTotal: number;
-  toppings?: string;
-  sweetness?: string;
-  note?: string;
-}
-
-export interface OrderResponse {
-  id: number;
-  orderCode: string;
-  tableNumber?: string;
-  orderType: "DINE_IN" | "TAKEAWAY";
-  status: OrderStatus;
-  totalAmount: number;
-  items: OrderItemResponse[];
-  createdAt: string;
-}
-
-export async function createOrder(
-  data: CreateOrderRequest
-): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return handleResponse<OrderResponse>(res);
-}
-
-export async function fetchOrders(): Promise<OrderResponse[]> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders`, {
-    cache: "no-store",
-  });
-  return handleResponse<OrderResponse[]>(res);
-}
-
-export async function updateOrderStatus(
-  orderId: number,
-  status: OrderStatus
-): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/${orderId}/status`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-  });
-  return handleResponse<OrderResponse>(res);
-}
-
-export const SALES_API_BASE_URL =
-  process.env.NEXT_PUBLIC_SALES_API_URL ||
-  (process.env.NEXT_PUBLIC_API_URL
-    ? `${process.env.NEXT_PUBLIC_API_URL}`
-    : "http://localhost:8083/api");
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -720,4 +642,80 @@ export async function cancelOrder(id: number): Promise<void> {
     method: "DELETE",
   });
   return handleResponse<void>(res);
+}
+
+
+// ==================== KHÁCH HÀNG & TÍCH ĐIỂM (LOYALTY) ====================
+
+export async function searchCustomerByPhone(phone: string): Promise<CustomerResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/customers/search?phone=${encodeURIComponent(phone)}`, {
+    cache: "no-store",
+  });
+  return handleResponse<CustomerResponse>(res);
+}
+
+export async function createCustomer(data: CustomerCreateRequest): Promise<CustomerResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/customers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<CustomerResponse>(res);
+}
+
+export async function fetchCustomers(search?: string): Promise<CustomerResponse[]> {
+  const query = search ? `?search=${encodeURIComponent(search)}` : "";
+  const res = await fetch(`${SALES_API_BASE_URL}/customers${query}`, {
+    cache: "no-store",
+  });
+  return handleResponse<CustomerResponse[]>(res);
+}
+
+export async function fetchCustomerTransactions(customerId: number): Promise<PointTransactionResponse[]> {
+  const res = await fetch(`${SALES_API_BASE_URL}/customers/${customerId}/transactions`, {
+    cache: "no-store",
+  });
+  return handleResponse<PointTransactionResponse[]>(res);
+}
+
+// ==================== KHUYẾN MÃI (PROMOTIONS) ====================
+
+export async function fetchPromotions(activeOnly?: boolean): Promise<PromotionResponse[]> {
+  const query = activeOnly !== undefined ? `?activeOnly=${activeOnly}` : "";
+  const res = await fetch(`${SALES_API_BASE_URL}/promotions${query}`, {
+    cache: "no-store",
+  });
+  return handleResponse<PromotionResponse[]>(res);
+}
+
+export async function createPromotion(data: PromotionCreateRequest): Promise<PromotionResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/promotions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<PromotionResponse>(res);
+}
+
+export async function togglePromotionStatus(id: number, active: boolean): Promise<PromotionResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/promotions/${id}/status?active=${active}`, {
+    method: "PUT",
+  });
+  return handleResponse<PromotionResponse>(res);
+}
+
+export async function deletePromotion(id: number): Promise<void> {
+  const res = await fetch(`${SALES_API_BASE_URL}/promotions/${id}`, {
+    method: "DELETE",
+  });
+  return handleResponse<void>(res);
+}
+
+export async function applyPromotion(data: ApplyPromotionRequest): Promise<ApplyPromotionResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/promotions/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ApplyPromotionResponse>(res);
 }

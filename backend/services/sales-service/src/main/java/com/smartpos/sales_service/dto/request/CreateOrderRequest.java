@@ -23,6 +23,11 @@ public class CreateOrderRequest {
 
     private String note;
 
+    private Long customerId;
+    private String customerPhone;
+    private String promotionCode;
+    private Integer pointsToRedeem;
+
     @NotEmpty(message = "Danh sách món ăn không được để trống")
     @Valid
     private List<CreateOrderItemRequest> items;

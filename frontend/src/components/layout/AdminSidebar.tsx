@@ -5,10 +5,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
+  ReceiptText,
   UtensilsCrossed,
   Layers,
   Package,
   Truck,
+  Tag,
+  UserCheck,
   Users,
   LogOut,
   ChevronRight,
@@ -28,6 +31,11 @@ const adminNavItems: AdminNavItem[] = [
     href: "/admin",
     icon: LayoutDashboard,
     exact: true,
+  },
+  {
+    label: "Lịch sử hóa đơn",
+    href: "/admin/orders",
+    icon: ReceiptText,
   },
   {
     label: "Món ăn & Thực đơn",
@@ -50,7 +58,17 @@ const adminNavItems: AdminNavItem[] = [
     icon: Truck,
   },
   {
-    label: "Nhân sự & chi nhánh",
+    label: "Mã khuyến mãi",
+    href: "/admin/promotions",
+    icon: Tag,
+  },
+  {
+    label: "Khách hàng",
+    href: "/admin/customers",
+    icon: UserCheck,
+  },
+  {
+    label: "Nhân sự & Bàn/QR",
     href: "/admin/staff",
     icon: Users,
   },

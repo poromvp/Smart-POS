@@ -27,6 +27,14 @@ public class Order {
     @Column(name = "table_number", length = 32)
     private String tableNumber;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "promotion_id")
+    private Promotion promotion;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false, length = 32)
     @Builder.Default
@@ -45,6 +53,18 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", length = 32)
     private PaymentMethod paymentMethod;
+
+    @Column(name = "subtotal", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal subtotal = BigDecimal.ZERO;
+
+    @Column(name = "discount_amount", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Column(name = "points_discount_amount", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal pointsDiscountAmount = BigDecimal.ZERO;
 
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     @Builder.Default
@@ -67,6 +87,18 @@ public class Order {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        if (this.subtotal == null) {
+            this.subtotal = BigDecimal.ZERO;
+        }
+        if (this.discountAmount == null) {
+            this.discountAmount = BigDecimal.ZERO;
+        }
+        if (this.pointsDiscountAmount == null) {
+            this.pointsDiscountAmount = BigDecimal.ZERO;
+        }
+        if (this.totalAmount == null) {
+            this.totalAmount = BigDecimal.ZERO;
+        }
     }
 
     @PreUpdate

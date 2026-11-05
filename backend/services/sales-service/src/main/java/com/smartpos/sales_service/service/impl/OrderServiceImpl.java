@@ -12,12 +12,13 @@ import com.smartpos.sales_service.dto.request.UpdatePaymentRequest;
 import com.smartpos.sales_service.dto.response.ApiResponse;
 import com.smartpos.sales_service.dto.response.OrderItemResponse;
 import com.smartpos.sales_service.dto.response.OrderResponse;
-import com.smartpos.sales_service.entity.Order;
-import com.smartpos.sales_service.entity.OrderItem;
-import com.smartpos.sales_service.entity.OrderStatus;
+import com.smartpos.sales_service.entity.*;
 import com.smartpos.sales_service.exception.BusinessException;
 import com.smartpos.sales_service.exception.ResourceNotFoundException;
+import com.smartpos.sales_service.repository.CustomerRepository;
 import com.smartpos.sales_service.repository.OrderRepository;
+import com.smartpos.sales_service.repository.PointTransactionRepository;
+import com.smartpos.sales_service.repository.PromotionRepository;
 import com.smartpos.sales_service.service.OrderService;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -37,6 +39,9 @@ import java.util.stream.Collectors;
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
+    private final CustomerRepository customerRepository;
+    private final PromotionRepository promotionRepository;
+    private final PointTransactionRepository pointTransactionRepository;
     private final InventoryClient inventoryClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -48,19 +53,19 @@ public class OrderServiceImpl implements OrderService {
         Order order = Order.builder()
                 .orderCode(orderCode)
                 .tableNumber(request.getTableNumber())
-                .orderType(request.getOrderType())
+                .orderType(request.getOrderType() != null ? request.getOrderType() : OrderType.DINE_IN)
                 .note(request.getNote())
                 .status(OrderStatus.PENDING)
                 .build();
 
-        BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal subtotal = BigDecimal.ZERO;
 
         for (CreateOrderItemRequest itemReq : request.getItems()) {
             BigDecimal modifierTotal = itemReq.getModifierTotal() != null ? itemReq.getModifierTotal()
                     : BigDecimal.ZERO;
             BigDecimal itemTotal = itemReq.getBasePrice().add(modifierTotal)
                     .multiply(BigDecimal.valueOf(itemReq.getQuantity()));
-            totalAmount = totalAmount.add(itemTotal);
+            subtotal = subtotal.add(itemTotal);
 
             String toppingsStr = itemReq.getToppings() != null && !itemReq.getToppings().isEmpty()
                     ? String.join(", ", itemReq.getToppings())
@@ -100,7 +105,73 @@ public class OrderServiceImpl implements OrderService {
             order.addItem(orderItem);
         }
 
+        order.setSubtotal(subtotal);
+
+        // 1. Áp dụng Khuyến mãi (Voucher)
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        if (request.getPromotionCode() != null && !request.getPromotionCode().isBlank()) {
+            String code = request.getPromotionCode().trim();
+            Promotion promotion = promotionRepository.findByCodeIgnoreCase(code).orElse(null);
+            if (promotion != null && Boolean.TRUE.equals(promotion.getIsActive())) {
+                LocalDateTime now = LocalDateTime.now();
+                boolean withinDate = !now.isBefore(promotion.getStartDate()) && !now.isAfter(promotion.getEndDate());
+                boolean withinLimit = promotion.getUsageLimit() == null || promotion.getUsedCount() < promotion.getUsageLimit();
+                boolean meetMinOrder = promotion.getMinOrderAmount() == null || subtotal.compareTo(promotion.getMinOrderAmount()) >= 0;
+
+                if (withinDate && withinLimit && meetMinOrder) {
+                    BigDecimal calculated = subtotal.multiply(promotion.getDiscountPercent())
+                            .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+                    if (promotion.getMaxDiscountAmount() != null && calculated.compareTo(promotion.getMaxDiscountAmount()) > 0) {
+                        calculated = promotion.getMaxDiscountAmount();
+                    }
+                    discountAmount = calculated;
+                    order.setPromotion(promotion);
+                } else {
+                    log.warn("Mã khuyến mãi {} không thỏa điều kiện áp dụng cho đơn hàng {}", code, orderCode);
+                }
+            }
+        }
+        order.setDiscountAmount(discountAmount);
+
+        // 2. Áp dụng Khách hàng thân thiết & Điểm tích lũy (Loyalty)
+        BigDecimal pointsDiscountAmount = BigDecimal.ZERO;
+        Customer customer = null;
+        if (request.getCustomerId() != null) {
+            customer = customerRepository.findById(request.getCustomerId()).orElse(null);
+        } else if (request.getCustomerPhone() != null && !request.getCustomerPhone().isBlank()) {
+            customer = customerRepository.findByPhone(request.getCustomerPhone().trim()).orElse(null);
+        }
+
+        if (customer != null) {
+            order.setCustomer(customer);
+
+            if (request.getPointsToRedeem() != null && request.getPointsToRedeem() > 0) {
+                int availablePoints = customer.getCurrentPoints() != null ? customer.getCurrentPoints() : 0;
+                int pointsToUse = Math.min(request.getPointsToRedeem(), availablePoints);
+
+                // Quy đổi: 1 điểm = 1.000 VNĐ
+                BigDecimal potentialPointsDiscount = BigDecimal.valueOf(pointsToUse).multiply(BigDecimal.valueOf(1000));
+                BigDecimal maxAllowedDiscount = subtotal.subtract(discountAmount);
+                if (maxAllowedDiscount.compareTo(BigDecimal.ZERO) < 0) {
+                    maxAllowedDiscount = BigDecimal.ZERO;
+                }
+
+                if (potentialPointsDiscount.compareTo(maxAllowedDiscount) > 0) {
+                    potentialPointsDiscount = maxAllowedDiscount;
+                }
+
+                pointsDiscountAmount = potentialPointsDiscount;
+            }
+        }
+        order.setPointsDiscountAmount(pointsDiscountAmount);
+
+        // 3. Tính tổng thanh toán: subtotal - discountAmount - pointsDiscountAmount
+        BigDecimal totalAmount = subtotal.subtract(discountAmount).subtract(pointsDiscountAmount);
+        if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            totalAmount = BigDecimal.ZERO;
+        }
         order.setTotalAmount(totalAmount);
+
         Order savedOrder = orderRepository.save(order);
         return mapToOrderResponse(savedOrder);
     }
@@ -125,7 +196,11 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public List<OrderResponse> getOrders(OrderStatus status, String tableNumber) {
         List<Order> orders;
-        if (status != null) {
+        if (status != null && tableNumber != null && !tableNumber.isBlank()) {
+            orders = orderRepository.findByStatus(status).stream()
+                    .filter(o -> tableNumber.equalsIgnoreCase(o.getTableNumber()))
+                    .collect(Collectors.toList());
+        } else if (status != null) {
             orders = orderRepository.findByStatus(status);
         } else if (tableNumber != null && !tableNumber.isBlank()) {
             orders = orderRepository.findByTableNumber(tableNumber);
@@ -134,6 +209,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return orders.stream()
+                .sorted(Comparator.comparing(Order::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(this::mapToOrderResponse)
                 .collect(Collectors.toList());
     }
@@ -147,9 +223,10 @@ public class OrderServiceImpl implements OrderService {
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(status);
 
-        // Tự động kích hoạt trừ kho khi đơn hàng chuyển sang trạng thái COMPLETED
+        // Tự động kích hoạt trừ kho và xử lý tích điểm/voucher khi đơn hàng chuyển sang trạng thái COMPLETED
         if (status == OrderStatus.COMPLETED && oldStatus != OrderStatus.COMPLETED) {
             deductInventoryForOrder(order);
+            processLoyaltyAndPromotion(order);
         }
 
         Order updated = orderRepository.save(order);
@@ -165,9 +242,10 @@ public class OrderServiceImpl implements OrderService {
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(OrderStatus.COMPLETED);
 
-        // Kích hoạt trừ kho tự động nếu chưa hoàn tất trước đó
+        // Kích hoạt trừ kho tự động & tích điểm nếu chưa hoàn tất trước đó
         if (oldStatus != OrderStatus.COMPLETED) {
             deductInventoryForOrder(order);
+            processLoyaltyAndPromotion(order);
         }
 
         Order updated = orderRepository.save(order);
@@ -194,6 +272,59 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + id));
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
+    }
+
+    /**
+     * Xử lý tích điểm và tăng số lượt dùng mã khuyến mãi khi đơn hoàn tất
+     */
+    private void processLoyaltyAndPromotion(Order order) {
+        // 1. Cập nhật lượt dùng khuyến mãi
+        if (order.getPromotion() != null) {
+            Promotion promo = order.getPromotion();
+            promo.setUsedCount((promo.getUsedCount() != null ? promo.getUsedCount() : 0) + 1);
+            promotionRepository.save(promo);
+        }
+
+        // 2. Cập nhật tích / trừ điểm khách hàng
+        if (order.getCustomer() != null) {
+            Customer customer = order.getCustomer();
+
+            // Nếu đơn có trừ điểm thưởng
+            if (order.getPointsDiscountAmount() != null && order.getPointsDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
+                int pointsRedeemed = order.getPointsDiscountAmount()
+                        .divide(BigDecimal.valueOf(1000), 0, RoundingMode.FLOOR).intValue();
+                if (pointsRedeemed > 0) {
+                    customer.setCurrentPoints(Math.max(0, customer.getCurrentPoints() - pointsRedeemed));
+                    pointTransactionRepository.save(PointTransaction.builder()
+                            .customer(customer)
+                            .order(order)
+                            .pointsChange(-pointsRedeemed)
+                            .type("REDEEM")
+                            .build());
+                }
+            }
+
+            // Tích điểm thưởng cho đơn hoàn tất: 1% giá trị thanh toán thực tế (1 điểm = 1.000đ -> 100.000đ = 1 điểm)
+            if (order.getTotalAmount() != null && order.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
+                int earnedPoints = order.getTotalAmount()
+                        .divide(BigDecimal.valueOf(100000), 0, RoundingMode.FLOOR).intValue();
+                if (earnedPoints > 0) {
+                    customer.setCurrentPoints((customer.getCurrentPoints() != null ? customer.getCurrentPoints() : 0) + earnedPoints);
+                    pointTransactionRepository.save(PointTransaction.builder()
+                            .customer(customer)
+                            .order(order)
+                            .pointsChange(earnedPoints)
+                            .type("EARN")
+                            .build());
+                }
+
+                // Cập nhật tổng chi tiêu
+                BigDecimal currentSpent = customer.getTotalSpent() != null ? customer.getTotalSpent() : BigDecimal.ZERO;
+                customer.setTotalSpent(currentSpent.add(order.getTotalAmount()));
+            }
+
+            customerRepository.save(customer);
+        }
     }
 
     /**
@@ -254,14 +385,6 @@ public class OrderServiceImpl implements OrderService {
         return "ORD-" + datePrefix + "-" + randomSuffix;
     }
 
-    private Long parseProductId(String itemId) {
-        try {
-            return Long.valueOf(itemId);
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException("Mã món ăn không hợp lệ: " + itemId);
-        }
-    }
-
     private OrderResponse mapToOrderResponse(Order order) {
         List<OrderItemResponse> itemResponses = order.getItems().stream()
                 .map(item -> {
@@ -294,6 +417,15 @@ public class OrderServiceImpl implements OrderService {
                 .status(order.getStatus())
                 .paymentStatus(order.getPaymentStatus())
                 .paymentMethod(order.getPaymentMethod())
+                .customerId(order.getCustomer() != null ? order.getCustomer().getId() : null)
+                .customerName(order.getCustomer() != null ? order.getCustomer().getFullName() : null)
+                .customerPhone(order.getCustomer() != null ? order.getCustomer().getPhone() : null)
+                .promotionId(order.getPromotion() != null ? order.getPromotion().getId() : null)
+                .promotionCode(order.getPromotion() != null ? order.getPromotion().getCode() : null)
+                .promotionName(order.getPromotion() != null ? order.getPromotion().getName() : null)
+                .subtotal(order.getSubtotal() != null ? order.getSubtotal() : order.getTotalAmount())
+                .discountAmount(order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO)
+                .pointsDiscountAmount(order.getPointsDiscountAmount() != null ? order.getPointsDiscountAmount() : BigDecimal.ZERO)
                 .totalAmount(order.getTotalAmount())
                 .note(order.getNote())
                 .items(itemResponses)

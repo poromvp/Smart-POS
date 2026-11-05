@@ -55,7 +55,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     roleKey: "waiter",
     email: "waiter@smartpos.vn",
     password: "123456",
-    redirectUrl: "/order-taking",
+    redirectUrl: "/pos",
     icon: Utensils,
   },
 ];

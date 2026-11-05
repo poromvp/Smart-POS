@@ -14,7 +14,7 @@ import {
   Printer,
 } from "lucide-react";
 
-type StaffTab = "staff" | "branches" | "qr";
+type StaffTab = "staff" | "qr";
 
 interface Employee {
   id: string;
@@ -60,7 +60,7 @@ export default function StaffBranchesQrPage() {
   );
 
   const [selectedArea, setSelectedArea] = useState("Tầng 1");
-  const [selectedTable, setSelectedTable] = useState("Bàn T1-02");
+  const [selectedTable, setSelectedTable] = useState("Bàn 1");
   const [publicAppUrl, setPublicAppUrl] = useState(
     process.env.NEXT_PUBLIC_PUBLIC_APP_URL ||
       (typeof window !== "undefined" ? window.location.origin : "")
@@ -354,10 +354,14 @@ export default function StaffBranchesQrPage() {
                   onChange={(e) => setSelectedTable(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-gray-800 text-sm font-medium focus:ring-2 focus:ring-orange-500 outline-none bg-white"
                 >
-                  <option value="Bàn T1-01">Bàn T1-01</option>
-                  <option value="Bàn T1-02">Bàn T1-02</option>
-                  <option value="Bàn T1-03">Bàn T1-03</option>
-                  <option value="Bàn VIP-01">Bàn VIP-01</option>
+                  {Array.from({ length: 20 }, (_, i) => {
+                    const num = i + 1;
+                    return (
+                      <option key={num} value={`Bàn ${num}`}>
+                        Bàn {num}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

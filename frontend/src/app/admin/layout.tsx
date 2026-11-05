@@ -9,12 +9,15 @@ import RoleGate from "@/components/auth/RoleGate";
 const ADMIN_ALLOWED_ROLES = ["manager"] as const;
 
 const HEADER_TITLES: Record<string, string> = {
-  "/admin": "Báo cáo doanh thu & vận hành đa chi nhánh",
+  "/admin": "Báo cáo doanh thu & tổng quan vận hành",
+  "/admin/orders": "Lịch sử & tra cứu hóa đơn bán hàng",
   "/admin/products": "Quản lý món ăn & danh mục thực đơn",
   "/admin/menu-bom": "Thiết lập thực đơn & định lượng nguyên vật liệu",
   "/admin/inventory": "Quản lý kho hàng",
   "/admin/purchasing": "Quản lý nhập kho & nhà cung cấp",
-  "/admin/staff": "Nhân sự, chi nhánh & mã QR",
+  "/admin/promotions": "Quản lý chương trình khuyến mãi & mã giảm giá",
+  "/admin/customers": "Quản lý khách hàng thân thiết & tích điểm",
+  "/admin/staff": "Quản lý nhân sự, bàn ăn & mã QR",
 };
 
 export default function AdminLayout({
@@ -24,14 +27,14 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const currentTitle =
-    HEADER_TITLES[pathname] ?? "Báo cáo doanh thu & vận hành đa chi nhánh";
+    HEADER_TITLES[pathname] ?? "Quản trị hệ thống Smart POS";
 
   return (
     <RoleGate allowedRoles={ADMIN_ALLOWED_ROLES}>
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <TopHeader
           title={currentTitle}
-          branchName="Chi nhánh 01"
+          branchName="Chi nhánh chính"
           actionLabel="Tài khoản"
           showPortalLink={true}
         />

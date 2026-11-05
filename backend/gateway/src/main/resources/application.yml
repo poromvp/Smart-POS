@@ -24,7 +24,7 @@ spring:
         - id: sales-service-route
           uri: ${SALES_SERVICE_URL:http://localhost:8083}
           predicates:
-            - Path=/api/orders/**, /api/sales/**
+            - Path=/api/orders/**, /api/sales/**, /api/customers/**, /api/promotions/**
 
         # Route 2: Điều hướng các API thực đơn, nguyên liệu, kho, NCC sang catalog-inventory-service (8082)
         - id: catalog-inventory-service-route

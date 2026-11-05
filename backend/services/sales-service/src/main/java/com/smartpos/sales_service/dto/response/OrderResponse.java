@@ -25,7 +25,20 @@ public class OrderResponse {
     private OrderStatus status;
     private PaymentStatus paymentStatus;
     private PaymentMethod paymentMethod;
+
+    private Long customerId;
+    private String customerName;
+    private String customerPhone;
+
+    private Long promotionId;
+    private String promotionCode;
+    private String promotionName;
+
+    private BigDecimal subtotal;
+    private BigDecimal discountAmount;
+    private BigDecimal pointsDiscountAmount;
     private BigDecimal totalAmount;
+
     private String note;
     private List<OrderItemResponse> items;
     private LocalDateTime createdAt;

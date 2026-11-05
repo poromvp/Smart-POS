@@ -23,6 +23,7 @@ export interface OrderItem {
   toppings?: string[];
   note?: string;
   spicyLevel?: string;
+  sweetness?: string;
 }
 
 export interface InvoicePanelProps {

@@ -1,10 +1,12 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, LoaderCircle, MapPin, MessageCircleMore, Minus, Plus, ShoppingBag } from "lucide-react";
+import { ArrowLeft, CheckCircle2, LoaderCircle, MapPin, MessageCircleMore, Minus, Plus, ShoppingBag, AlertCircle } from "lucide-react";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGuestCart } from "@/components/customer/guestCartStore";
 import { getGuestTableId, getGuestTableLabel, getGuestTableQuery } from "@/components/customer/guestTable";
+import { createOrder } from "@/lib/api";
+import type { OrderResponse } from "@/lib/types/sales";
 
 const formatCurrency = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`;
 
@@ -24,17 +26,45 @@ function GuestCartContent() {
   const tableQuery = getGuestTableQuery(tableId);
   const { cartItems, totalPrice, updateNote, updateQuantity: changeQuantity, clearCart } = useGuestCart(tableId ?? "unassigned");
   const [submissionState, setSubmissionState] = useState<"idle" | "submitting" | "success">("idle");
+  const [createdOrder, setCreatedOrder] = useState<OrderResponse | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmitOrder = () => {
+  const handleSubmitOrder = async () => {
     if (!tableId || cartItems.length === 0 || submissionState !== "idle") return;
 
     setSubmissionState("submitting");
+    setErrorMessage(null);
 
-    // Local demo only: no order API or kitchen integration exists yet.
-    window.setTimeout(() => {
+    try {
+      const items = cartItems.map((item) => {
+        const numericProductId = parseInt(item.itemId, 10);
+        return {
+          productId: !isNaN(numericProductId) ? numericProductId : 1,
+          variantId: item.variantId,
+          modifierOptionIds: item.modifierOptionIds || [],
+          name: item.name,
+          quantity: item.quantity,
+          basePrice: item.basePrice,
+          modifierTotal: item.modifierTotal || 0,
+          toppings: item.toppings,
+          sweetness: item.sweetness,
+          note: item.note,
+        };
+      });
+
+      const response = await createOrder({
+        tableNumber: tableId,
+        orderType: "DINE_IN",
+        items,
+      });
+
+      setCreatedOrder(response);
       clearCart();
       setSubmissionState("success");
-    }, 650);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Không thể gửi đơn hàng. Vui lòng thử lại!");
+      setSubmissionState("idle");
+    }
   };
 
   const handleBackToMenu = () => {
@@ -46,16 +76,18 @@ function GuestCartContent() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#fffaf5] px-4 text-stone-900">
         <section className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-7 text-center shadow-xl shadow-orange-100/60">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-red-50 text-[#b42318]">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
             <CheckCircle2 size={36} aria-hidden="true" />
           </div>
           <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-[#b42318]">{tableLabel ?? "Chưa xác định bàn"}</p>
-          <h1 className="mt-2 text-2xl font-extrabold">Đã ghi nhận yêu cầu gọi món</h1>
+          <h1 className="mt-2 text-2xl font-extrabold text-slate-900">Đã gửi đơn hàng thành công!</h1>
+          {createdOrder && (
+            <div className="mt-3 inline-block rounded-lg bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">
+              Mã đơn: {createdOrder.orderCode}
+            </div>
+          )}
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Yêu cầu gọi món đã được ghi nhận trong phiên bản demo cho {tableLabel ?? "bàn chưa xác định"} trên thiết bị này.
-          </p>
-          <p className="mt-2 text-xs leading-5 text-slate-400">
-            Hệ thống hiện chưa kết nối gửi đơn trực tiếp đến bếp.
+            Đơn gọi món của quý khách đã được chuyển thẳng tới quầy Thu ngân và Bếp để chế biến.
           </p>
           <button
             type="button"
@@ -104,6 +136,13 @@ function GuestCartContent() {
             {tableLabel ? "Ghi chú được lưu riêng cho từng món." : "Quét mã QR tại bàn để đơn được gắn đúng bàn."}
           </div>
         </div>
+
+        {errorMessage && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle size={18} className="shrink-0 text-red-600" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
         <div className="space-y-3">
           {cartItems.length === 0 ? (

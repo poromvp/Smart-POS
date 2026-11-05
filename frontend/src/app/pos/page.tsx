@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { LayoutGrid, ReceiptText, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { LayoutGrid, ReceiptText, RefreshCw, X } from "lucide-react";
 import InvoicePanel, {
   type MenuItem,
   type OrderItem,
@@ -14,101 +14,70 @@ import TopHeader from "@/components/layout/TopHeader";
 import WorkspaceSidebar from "@/components/layout/WorkspaceSidebar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
-import { fetchMenu } from "@/lib/api";
+import {
+  fetchMenu,
+  fetchOrders,
+  createOrder,
+  completeOrder,
+  updateOrderPayment,
+} from "@/lib/api";
+import type { OrderResponse, OrderItemResponse, PaymentMethod } from "@/lib/types/sales";
 
+const TOTAL_TABLES_COUNT = 20;
 
-const SPICY_LEVELS = Array.from({ length: 8 }, (_, index) => `Cấp ${index}`);
+const DEFAULT_TABLES: RestaurantTable[] = Array.from(
+  { length: TOTAL_TABLES_COUNT },
+  (_, index) => {
+    const tableNumber = index + 1;
+    return {
+      id: `table-${tableNumber}`,
+      name: `Bàn ${tableNumber}`,
+      status: "empty",
+    };
+  }
+);
 
-const MENU_ITEMS: MenuItem[] = [
-  { id: "spicy-beef-noodles", name: "Mì cay bò", price: 75000, spicyLevels: SPICY_LEVELS },
-  { id: "spicy-seafood-noodles", name: "Mì cay hải sản", price: 85000, spicyLevels: SPICY_LEVELS },
-  { id: "peach-lemongrass-tea", name: "Trà đào cam sả", price: 25000 },
-  { id: "pepsi", name: "Pepsi", price: 15000 },
-];
+function normalizeTableId(tableStr: string | null | undefined): string | null {
+  if (!tableStr) return null;
+  const num = tableStr.replace(/[^0-9]/g, "");
+  return num ? `table-${num}` : tableStr.trim().toLowerCase();
+}
 
-const INITIAL_TABLES: RestaurantTable[] = Array.from({ length: 20 }, (_, index) => {
-  const tableNumber = index + 1;
-  const occupiedTableNumbers = [1, 3, 6, 9, 14, 18];
+function getTableNumberOnly(tableId: string): string {
+  return tableId.replace(/[^0-9]/g, "") || tableId;
+}
 
+function mapBackendItemToPosItem(backendItem: OrderItemResponse): OrderItem {
   return {
-    id: `table-${tableNumber}`,
-    name: `Bàn ${tableNumber}`,
-    status: occupiedTableNumbers.includes(tableNumber) ? "occupied" : "empty",
+    id: `item-${backendItem.id}`,
+    menuItemId: String(backendItem.productId || backendItem.itemId || ""),
+    name: backendItem.name,
+    price: backendItem.unitPrice + (backendItem.modifierTotal || 0),
+    quantity: backendItem.quantity,
+    toppings: backendItem.toppings
+      ? backendItem.toppings.split(", ").filter(Boolean)
+      : undefined,
+    sweetness: backendItem.sweetness || undefined,
+    note: backendItem.note || undefined,
   };
-});
-
-const INITIAL_ORDERS: Record<string, OrderItem[]> = {
-  "table-1": [
-    {
-      id: "spicy-beef-noodles-cap-3",
-      menuItemId: "spicy-beef-noodles",
-      name: "Mì cay bò",
-      price: 75000,
-      quantity: 2,
-      spicyLevel: "Cấp 3",
-    },
-    {
-      id: "peach-lemongrass-tea",
-      menuItemId: "peach-lemongrass-tea",
-      name: "Trà đào cam sả",
-      price: 25000,
-      quantity: 2,
-    },
-  ],
-  "table-3": [
-    {
-      id: "spicy-seafood-noodles-cap-1",
-      menuItemId: "spicy-seafood-noodles",
-      name: "Mì cay hải sản",
-      price: 85000,
-      quantity: 1,
-      spicyLevel: "Cấp 1",
-    },
-  ],
-  "table-6": [
-    { id: "pepsi", menuItemId: "pepsi", name: "Pepsi", price: 15000, quantity: 3 },
-  ],
-  "table-9": [
-    {
-      id: "spicy-beef-noodles-cap-5",
-      menuItemId: "spicy-beef-noodles",
-      name: "Mì cay bò",
-      price: 75000,
-      quantity: 1,
-      spicyLevel: "Cấp 5",
-    },
-  ],
-  "table-14": [
-    {
-      id: "spicy-seafood-noodles-cap-2",
-      menuItemId: "spicy-seafood-noodles",
-      name: "Mì cay hải sản",
-      price: 85000,
-      quantity: 2,
-      spicyLevel: "Cấp 2",
-    },
-  ],
-  "table-18": [
-    {
-      id: "peach-lemongrass-tea",
-      menuItemId: "peach-lemongrass-tea",
-      name: "Trà đào cam sả",
-      price: 25000,
-      quantity: 4,
-    },
-  ],
-};
+}
 
 export default function PosPage() {
-  const [tables, setTables] = useState<RestaurantTable[]>(INITIAL_TABLES);
-  const [ordersByTable, setOrdersByTable] = useState<Record<string, OrderItem[]>>(INITIAL_ORDERS);
+  const [tables, setTables] = useState<RestaurantTable[]>(DEFAULT_TABLES);
+  const [ordersByTable, setOrdersByTable] = useState<Record<string, OrderItem[]>>({});
+  const [backendOrdersByTable, setBackendOrdersByTable] = useState<
+    Record<string, OrderResponse>
+  >({});
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [isPosItemModalOpen, setIsPosItemModalOpen] = useState(false);
-  const [selectedModalProduct, setSelectedModalProduct] = useState<ProductDetailResponse | null>(null);
+  const [selectedModalProduct, setSelectedModalProduct] =
+    useState<ProductDetailResponse | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const toast = useToast();
 
+  // 1. Tải thực đơn từ Catalog Service
   useEffect(() => {
     let active = true;
     fetchMenu()
@@ -133,13 +102,77 @@ export default function PosPage() {
           }
         }
       })
-      .catch(() => {
-        // Fallback to static mock menu when backend is unreachable
+      .catch((err) => {
+        console.error("Lỗi khi tải thực đơn:", err);
       });
     return () => {
       active = false;
     };
   }, []);
+
+  // 2. Tải danh sách đơn hàng thực tế từ Sales Service
+  const loadActiveOrders = useCallback(async () => {
+    try {
+      const allOrders = await fetchOrders();
+      if (!allOrders) return;
+
+      // Lọc các đơn chưa hoàn tất hoặc hủy
+      const active = allOrders.filter(
+        (o) => o.status !== "COMPLETED" && o.status !== "CANCELLED"
+      );
+
+      const newOrdersByTable: Record<string, OrderItem[]> = {};
+      const newBackendOrdersByTable: Record<string, OrderResponse> = {};
+      const occupiedTableIds = new Set<string>();
+
+      for (const order of active) {
+        const tableId = normalizeTableId(order.tableNumber);
+        if (tableId) {
+          occupiedTableIds.add(tableId);
+          newBackendOrdersByTable[tableId] = order;
+          newOrdersByTable[tableId] = (order.items || []).map(mapBackendItemToPosItem);
+        }
+      }
+
+      setBackendOrdersByTable(newBackendOrdersByTable);
+
+      // Cập nhật trạng thái từng bàn
+      setTables((currentTables) =>
+        currentTables.map((t) => ({
+          ...t,
+          status:
+            occupiedTableIds.has(t.id) ||
+            (newOrdersByTable[t.id] && newOrdersByTable[t.id].length > 0)
+              ? "occupied"
+              : "empty",
+        }))
+      );
+
+      // Đồng bộ items
+      setOrdersByTable((prev) => {
+        const updated = { ...prev };
+        for (const [tableId, items] of Object.entries(newOrdersByTable)) {
+          updated[tableId] = items;
+        }
+        return updated;
+      });
+    } catch (err) {
+      console.warn("Chưa thể kết nối tới Sales Service hoặc danh sách đơn trống:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadActiveOrders();
+    const interval = setInterval(loadActiveOrders, 6000);
+    return () => clearInterval(interval);
+  }, [loadActiveOrders]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await loadActiveOrders();
+    setIsRefreshing(false);
+    toast.info("Đã đồng bộ", "Dữ liệu đơn hàng và bàn ăn đã được cập nhật mới nhất");
+  };
 
   const selectedTable = useMemo(
     () => tables.find((table) => table.id === selectedTableId) ?? null,
@@ -270,13 +303,16 @@ export default function PosPage() {
     if (!selectedTableId || !Number.isSafeInteger(quantity) || quantity < 0) return;
 
     const remainingItems = selectedOrder
-      .map((item) => item.id === orderItemId ? { ...item, quantity } : item)
+      .map((item) => (item.id === orderItemId ? { ...item, quantity } : item))
       .filter((item) => item.quantity > 0);
-    setTables((currentTables) => currentTables.map((table) =>
-      table.id === selectedTableId
-        ? { ...table, status: remainingItems.length ? "occupied" : "empty" }
-        : table
-    ));
+
+    setTables((currentTables) =>
+      currentTables.map((table) =>
+        table.id === selectedTableId
+          ? { ...table, status: remainingItems.length ? "occupied" : "empty" }
+          : table
+      )
+    );
 
     setOrdersByTable((currentOrders) => {
       const nextTableOrder = (currentOrders[selectedTableId] ?? [])
@@ -287,25 +323,93 @@ export default function PosPage() {
     });
   };
 
-  const handlePaymentSuccess = () => {
+  // Thanh toán thực tế: Gọi API Sales Service & Trừ kho tự động
+  const handlePaymentSuccess = async (method: "CASH" | "VIETQR") => {
     if (!selectedTableId) return;
 
     const paidTableId = selectedTableId;
     const paidTableName = selectedTable?.name ?? "Bàn";
+    const paymentMethod: PaymentMethod = method === "VIETQR" ? "VIETQR" : "CASH";
 
-    setOrdersByTable((currentOrders) => ({ ...currentOrders, [paidTableId]: [] }));
-    setTables((currentTables) =>
-      currentTables.map((table) =>
-        table.id === paidTableId ? { ...table, status: "empty" } : table
-      )
-    );
-    setIsPaymentModalOpen(false);
-    setSelectedTableId(null);
+    try {
+      const existingBackendOrder = backendOrdersByTable[paidTableId];
 
-    toast.success(
-      `Đã hoàn tất demo ${paidTableName}`,
-      `Hóa đơn mẫu: ${selectedTotal.toLocaleString("vi-VN")}đ. Bàn đã chuyển về trạng thái trống.`
-    );
+      let orderCode = "";
+      if (existingBackendOrder) {
+        // Cập nhật trạng thái thanh toán
+        await updateOrderPayment(existingBackendOrder.id, {
+          paymentStatus: "PAID",
+          paymentMethod,
+        });
+
+        // Hoàn tất đơn hàng và tự động trừ kho
+        await completeOrder(existingBackendOrder.id);
+        orderCode = existingBackendOrder.orderCode;
+      } else {
+        // Đơn tạo trực tiếp tại POS (chưa lưu vào DB)
+        const tableNumber = getTableNumberOnly(paidTableId);
+        const currentItems = ordersByTable[paidTableId] || [];
+
+        if (currentItems.length > 0) {
+          const createItems = currentItems.map((item) => {
+            const numericId = parseInt(item.menuItemId, 10);
+            return {
+              productId: !isNaN(numericId) ? numericId : 1,
+              name: item.name,
+              quantity: item.quantity,
+              basePrice: item.price,
+              toppings: item.toppings,
+              note: item.note,
+            };
+          });
+
+          const created = await createOrder({
+            tableNumber,
+            orderType: "DINE_IN",
+            items: createItems,
+          });
+
+          await updateOrderPayment(created.id, {
+            paymentStatus: "PAID",
+            paymentMethod,
+          });
+
+          await completeOrder(created.id);
+          orderCode = created.orderCode;
+        }
+      }
+
+      // Xóa đơn local & chuyển bàn về trống
+      setOrdersByTable((currentOrders) => ({ ...currentOrders, [paidTableId]: [] }));
+      setBackendOrdersByTable((prev) => {
+        const next = { ...prev };
+        delete next[paidTableId];
+        return next;
+      });
+
+      setTables((currentTables) =>
+        currentTables.map((table) =>
+          table.id === paidTableId ? { ...table, status: "empty" } : table
+        )
+      );
+
+      setIsPaymentModalOpen(false);
+      setSelectedTableId(null);
+
+      toast.success(
+        `Thanh toán thành công ${paidTableName}!`,
+        `Đơn hàng ${orderCode ? `#${orderCode} ` : ""}đã hoàn tất (${selectedTotal.toLocaleString("vi-VN")}đ) và tự động trừ kho nguyên liệu.`
+      );
+
+      // Đồng bộ lại danh sách
+      await loadActiveOrders();
+    } catch (err) {
+      console.error("Lỗi khi xử lý thanh toán:", err);
+      toast.error(
+        "Lỗi thanh toán",
+        err instanceof Error ? err.message : "Không thể hoàn tất thanh toán và trừ kho"
+      );
+    }
   };
 
   return (
@@ -313,14 +417,30 @@ export default function PosPage() {
       <TopHeader
         title="Màn hình thu ngân (POS)"
         branchName="Chi nhánh 01"
-        rightContent={<StatusBadge label="Phiên demo" variant="serving" />}
+        rightContent={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+              title="Đồng bộ đơn hàng từ máy khách & bếp"
+            >
+              <RefreshCw
+                size={14}
+                className={isRefreshing ? "animate-spin text-orange-500" : ""}
+              />
+              <span>Đồng bộ</span>
+            </button>
+            <StatusBadge label="Hệ thống trực tuyến" variant="success" />
+          </div>
+        }
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <WorkspaceSidebar defaultCollapsed={true} />
 
         <main className="mx-auto flex w-full max-w-[1800px] flex-1 min-h-0 flex-col p-3.5 lg:p-5">
-          <p className="mb-3 shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Hóa đơn demo · Thao tác chỉ áp dụng trong phiên này, tải lại trang sẽ đặt lại hóa đơn.</p>
           <div
             className={`grid flex-1 min-h-0 gap-4 ${
               selectedTable
@@ -328,20 +448,30 @@ export default function PosPage() {
                 : "grid-cols-1"
             }`}
           >
-            <section className={`${selectedTable ? "hidden lg:flex" : "flex"} min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs`}>
+            <section
+              className={`${
+                selectedTable ? "hidden lg:flex" : "flex"
+              } min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs`}
+            >
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 text-sm font-semibold text-slate-600">
                 <div className="flex items-center gap-2">
                   <LayoutGrid size={18} className="text-orange-500" aria-hidden="true" />
                   <span>Khu vực phục vụ</span>
                 </div>
                 <span className="text-xs font-bold text-orange-600">
-                  Đang dùng: {tables.filter((t) => t.status === "occupied").length}/{tables.length} bàn
+                  Đang dùng: {tables.filter((t) => t.status === "occupied").length}/
+                  {tables.length} bàn
                 </span>
               </div>
 
               <TableMap
                 tables={tables}
-                totals={Object.fromEntries(Object.entries(ordersByTable).map(([id, items]) => [id, items.reduce((sum, item) => sum + item.price * item.quantity, 0)]))}
+                totals={Object.fromEntries(
+                  Object.entries(ordersByTable).map(([id, items]) => [
+                    id,
+                    items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+                  ])
+                )}
                 selectedTableId={selectedTableId}
                 onSelectTable={handleSelectTable}
               />
@@ -351,9 +481,18 @@ export default function PosPage() {
               <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-lg shadow-orange-500/5">
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 text-sm font-semibold text-slate-700 bg-orange-50/40">
                   <div className="flex items-center gap-2">
-                    <ReceiptText size={18} className="text-orange-600" aria-hidden="true" />
+                    <ReceiptText
+                      size={18}
+                      className="text-orange-600"
+                      aria-hidden="true"
+                    />
                     <span className="font-bold text-slate-800">
                       Chi tiết của {selectedTable.name}
+                      {backendOrdersByTable[selectedTable.id] && (
+                        <span className="ml-2 text-xs font-semibold text-orange-600">
+                          (Đơn #{backendOrdersByTable[selectedTable.id].orderCode})
+                        </span>
+                      )}
                     </span>
                   </div>
                   <button

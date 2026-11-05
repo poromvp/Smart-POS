@@ -114,7 +114,7 @@ public class UserService {
     @Transactional
     public void resetPassword(
             Long userId,
-            ResetPasswordRequest request
+            AdminResetPasswordRequest request
     ) {
         User user = getByUserId(userId);
 

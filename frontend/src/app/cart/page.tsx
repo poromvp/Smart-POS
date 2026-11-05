@@ -229,9 +229,9 @@ function GuestCartContent() {
             {submissionState === "submitting" ? <LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> : <ShoppingBag size={18} aria-hidden="true" />}
             {submissionState === "submitting" ? "Đang gửi đơn..." : tableLabel ? "Xác nhận gọi món" : "Quét mã QR để xác nhận đơn"}
           </button>
-          {submissionState === "error" && (
+          {errorMessage && (
             <p role="alert" className="text-sm font-medium text-red-600">
-              {submissionError}
+              {errorMessage}
             </p>
           )}
         </div>

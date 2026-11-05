@@ -52,90 +52,18 @@ export const API_BASE_URL =
 export const SALES_API_BASE_URL =
   process.env.NEXT_PUBLIC_SALES_API_URL || "/api/sales";
 
-export type OrderStatus =
-  | "PENDING"
-  | "CONFIRMED"
-  | "PREPARING"
-  | "READY"
-  | "SERVED"
-  | "COMPLETED"
-  | "CANCELLED";
-
-export interface OrderItemRequest {
-  itemId: string;
-  name: string;
-  quantity: number;
-  basePrice: number;
-  modifierTotal: number;
-  toppings: string[];
-  sweetness?: string;
-  note?: string;
-}
-
-export interface CreateOrderRequest {
-  tableNumber: string;
-  orderType: "DINE_IN" | "TAKEAWAY";
-  items: OrderItemRequest[];
-}
-
-export interface OrderItemResponse {
-  id: number;
-  itemId: string;
-  name: string;
-  quantity: number;
-  unitPrice: number;
-  modifierTotal: number;
-  toppings?: string;
-  sweetness?: string;
-  note?: string;
-}
-
-export interface OrderResponse {
-  id: number;
-  orderCode: string;
-  tableNumber?: string;
-  orderType: "DINE_IN" | "TAKEAWAY";
-  status: OrderStatus;
-  totalAmount: number;
-  items: OrderItemResponse[];
-  createdAt: string;
-}
-
-export async function createOrder(
-  data: CreateOrderRequest
-): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return handleResponse<OrderResponse>(res);
-}
-
-export async function fetchOrders(): Promise<OrderResponse[]> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders`, {
-    cache: "no-store",
-  });
-  return handleResponse<OrderResponse[]>(res);
-}
-
-export async function updateOrderStatus(
-  orderId: number,
-  status: OrderStatus
-): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/${orderId}/status`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-  });
-  return handleResponse<OrderResponse>(res);
-}
-
-export const SALES_API_BASE_URL =
-  process.env.NEXT_PUBLIC_SALES_API_URL ||
-  (process.env.NEXT_PUBLIC_API_URL
-    ? `${process.env.NEXT_PUBLIC_API_URL}`
-    : "http://localhost:8083/api");
+export type {
+  OrderStatus,
+  OrderType,
+  PaymentStatus,
+  PaymentMethod,
+  OrderItemResponse,
+  OrderResponse,
+  CreateOrderRequest,
+  CreateOrderItemRequest,
+  UpdateOrderStatusRequest,
+  UpdatePaymentRequest,
+};
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {

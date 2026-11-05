@@ -5,6 +5,7 @@ import {
   Salad,
   Soup,
   Printer,
+  PlusCircle,
   LayoutGrid,
   List,
   RefreshCw,
@@ -135,13 +136,21 @@ export default function KdsPage() {
     setCompletedTaskIds((prev) => new Set(prev).add(taskId));
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
 
-    try {
-      await updateOrderStatus(orderId, "READY");
-      setTasks((prev) => prev.filter((task) => !task.id.startsWith(`${orderId}-`)));
+    if (completedItem) {
       toast.success(
         `Đã hoàn tất: ${completedItem.productName}`,
         `${completedItem.tableName ?? completedItem.orderId} (${completedItem.quantity} phần) đã sẵn sàng phục vụ.`
       );
+    }
+
+    try {
+      const parts = taskId.split("-");
+      const orderIdNum = parts.length >= 2 ? parseInt(parts[1], 10) : NaN;
+      if (!isNaN(orderIdNum)) {
+        await updateOrderStatus(orderIdNum, "READY");
+      }
+    } catch (err) {
+      console.warn("Không thể cập nhật trạng thái đơn hàng lên server:", err);
     }
   };
 

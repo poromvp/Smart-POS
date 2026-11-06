@@ -10,12 +10,15 @@
     "test": "node --experimental-strip-types --test tests/kds-timer.test.ts tests/priceCalculation.test.ts tests/tableUtils.test.ts"
   },
   "dependencies": {
+    "axios": "^1.21.0",
+    "jwt-decode": "^4.0.0",
     "lucide-react": "^1.47.0",
     "next": "^16.3.5",
     "postcss": "^8.5.28",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -26,5 +29,6 @@
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
-  }
+  },
+  "packageManager": "pnpm@12.3.4+sha512.961aa41fb077da3a04a441d9f8e15ebc0c96da8ef710b2eb67bf9ee7cb0610eabd48f1fd85f51cffe73846785fa0f87c56a3a872a1d893f8446741b5cce45457"
 }

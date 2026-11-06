@@ -63,7 +63,12 @@ public class DataInitializer implements CommandLineRunner {
 
         assignPermissions(roles, permissions);
 
-        seedAdminUser(roles.get("ADMIN"));
+        Role adminRole = roleRepository.findByName("ADMIN").orElseThrow();
+        Role managerRole = roleRepository.findByName("MANAGER").orElseThrow();
+        Role chefRole = roleRepository.findByName("CHEF").orElseThrow();
+        Role cashierRole = roleRepository.findByName("CASHIER").orElseThrow();
+
+        seedDefaultUsers(adminRole, managerRole, chefRole, cashierRole);
 
         System.out.println("Smart-POS seed data initialized successfully.");
     }
@@ -188,8 +193,13 @@ public class DataInitializer implements CommandLineRunner {
                         true
                 ),
                 new Role(
-                        "STAFF",
-                        "Restaurant staff",
+                        "CHEF",
+                        "Restaurant chef",
+                        true
+                ),
+                new Role(
+                        "CASHIER",
+                        "Restaurant cashier",
                         true
                 )
         );
@@ -261,8 +271,24 @@ public class DataInitializer implements CommandLineRunner {
                         "INVENTORY_EXPORT",
                         "REPORT_VIEW"
                 ),
+                "CHEF", Set.of(
+                        "USER_READ",
+                        "MENU_CREATE",
+                        "MENU_READ",
+                        "MENU_UPDATE",
+                        "MENU_DELETE",
+                        "ORDER_CREATE",
+                        "ORDER_READ",
+                        "ORDER_UPDATE",
+                        "ORDER_CANCEL",
+                        "INVENTORY_VIEW",
+                        "INVENTORY_IMPORT",
+                        "INVENTORY_EXPORT",
+                        "REPORT_VIEW"
+                ),
 
-                "STAFF", Set.of(
+
+                "CASHIER", Set.of(
                         "MENU_READ",
                         "ORDER_CREATE",
                         "ORDER_READ",
@@ -293,33 +319,75 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 4. Creates the default administrator account
+     * 4. Creates the default administrator and staff accounts
      */
-    private void seedAdminUser(Role adminRole) {
-        if (adminUsername.isBlank() || adminPassword.isBlank()) {
-            System.out.println(
-                    "Admin account skipped: configure app.seed.admin-username "
-                            + "and app.seed.admin-password to create it."
+    private void seedDefaultUsers(Role adminRole, Role managerRole, Role chefRole, Role cashierRole) {
+        // ==========================================
+        // 1. SEED ADMIN (Từ file cấu hình properties)
+        // ==========================================
+        if (!adminUsername.isBlank() && !adminPassword.isBlank()) {
+            if (userRepository.findByUsername(adminUsername).isEmpty()) {
+                User admin = new User(
+                        adminUsername,
+                        passwordEncoder.encode(adminPassword),
+                        adminFullName,
+                        adminPhone.isBlank() ? null : adminPhone
+                );
+                admin.setRole(adminRole);
+                admin.setActive(true);
+                userRepository.save(admin);
+                System.out.println("Default admin account created.");
+            }
+        } else {
+            System.out.println("Admin account skipped: configure app.seed.admin-username and app.seed.admin-password.");
+        }
+
+        // ==========================================
+        // 2. SEED MANAGER (Hardcoded)
+        // ==========================================
+        if (userRepository.findByUsername("manager").isEmpty()) {
+            User manager = new User(
+                    "manager",
+                    passwordEncoder.encode("12345678"),
+                    "Quản lý cửa hàng",
+                    "0901234567" // Có thể để null nếu constructor cho phép
             );
-            return;
+            manager.setRole(managerRole);
+            manager.setActive(true);
+            userRepository.save(manager);
+            System.out.println("Default manager account created.");
         }
 
-        if (userRepository.findByUsername(adminUsername).isPresent()) {
-            return;
+        // ==========================================
+        // 3. SEED CHEF (Hardcoded)
+        // ==========================================
+        if (userRepository.findByUsername("chef").isEmpty()) {
+            User chef = new User(
+                    "chef",
+                    passwordEncoder.encode("12345678"),
+                    "Bếp trưởng",
+                    "0902345678"
+            );
+            chef.setRole(chefRole);
+            chef.setActive(true);
+            userRepository.save(chef);
+            System.out.println("Default chef account created.");
         }
 
-        User admin = new User(
-                adminUsername,
-                passwordEncoder.encode(adminPassword),
-                adminFullName,
-                adminPhone.isBlank() ? null : adminPhone
-        );
-
-        admin.setRole(adminRole);
-        admin.setActive(true);
-
-        userRepository.save(admin);
-
-        System.out.println("Default admin account created.");
+        // ==========================================
+        // 4. SEED CASHIER (Hardcoded)
+        // ==========================================
+        if (userRepository.findByUsername("cashier").isEmpty()) {
+            User cashier = new User(
+                    "cashier",
+                    passwordEncoder.encode("12345678"),
+                    "Nhân viên thu ngân",
+                    "0903456789"
+            );
+            cashier.setRole(cashierRole);
+            cashier.setActive(true);
+            userRepository.save(cashier);
+            System.out.println("Default cashier account created.");
+        }
     }
 }

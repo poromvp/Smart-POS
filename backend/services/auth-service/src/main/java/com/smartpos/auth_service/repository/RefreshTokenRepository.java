@@ -20,7 +20,7 @@ public interface RefreshTokenRepository
     @Modifying
     @Query("""
             UPDATE RefreshToken rt
-            SET rt.revokedAt = CURRENT_TIMESTAMP
+            SET rt.revokedAt = CURRENT_INSTANT
             WHERE rt.user.id = :userId
               AND rt.revokedAt IS NULL
             """)

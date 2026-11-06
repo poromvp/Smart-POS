@@ -5,11 +5,12 @@ import {
   Salad,
   Soup,
   Printer,
-  PlusCircle,
   LayoutGrid,
   List,
+  RefreshCw,
+  PlusCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import KitchenTaskCard, { type KitchenTask } from "@/components/kds/KitchenTaskCard";
 import ExpiryPrintModal from "@/components/kds/ExpiryPrintModal";
@@ -17,141 +18,8 @@ import TopHeader from "@/components/layout/TopHeader";
 import WorkspaceSidebar from "@/components/layout/WorkspaceSidebar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
-
-const INITIAL_TASKS: KitchenTask[] = [
-  {
-    id: "task-009",
-    orderId: "ORD-009",
-    tableName: "Bàn VIP-01",
-    orderType: "Tại bàn",
-    productName: "Mì cay hải sản Cấp 3",
-    quantity: 3,
-    modifiers: "1 tô không hành, thêm phô mai viên",
-    startTime: new Date(Date.now() - 11 * 60 * 1000 - 15 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "hot",
-  },
-  {
-    id: "task-007",
-    orderId: "ORD-007",
-    tableName: "Bàn 06",
-    orderType: "Mang đi",
-    productName: "Bún chả giò",
-    quantity: 1,
-    modifiers: "Không ngọt, thêm chả giò, nước mắm để riêng",
-    startTime: new Date(Date.now() - 9 * 60 * 1000 - 32 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "hot",
-  },
-  {
-    id: "task-002",
-    orderId: "ORD-002",
-    tableName: "Bàn 03",
-    orderType: "Tại bàn",
-    productName: "Gà sốt cay Hàn Quốc",
-    quantity: 1,
-    modifiers: "Làm cay vừa, thêm kim chi",
-    startTime: new Date(Date.now() - 6 * 60 * 1000 - 37 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "hot",
-  },
-  {
-    id: "task-001",
-    orderId: "ORD-001",
-    tableName: "Bàn 01",
-    orderType: "Tại bàn",
-    productName: "Mì xào bò",
-    quantity: 2,
-    modifiers: "Ít hành, thêm bò, không cay",
-    startTime: new Date(Date.now() - 2 * 60 * 1000 - 54 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "hot",
-  },
-  {
-    id: "task-010",
-    orderId: "ORD-010",
-    tableName: "Bàn 14",
-    orderType: "Tại bàn",
-    productName: "Phở bò đặc biệt",
-    quantity: 2,
-    modifiers: "Nước béo, hành trần",
-    startTime: new Date(Date.now() - 35 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "hot",
-  },
-  {
-    id: "task-004",
-    orderId: "ORD-004",
-    tableName: "Bàn 09",
-    orderType: "Mang đi",
-    productName: "Gỏi cuốn tôm thịt",
-    quantity: 4,
-    modifiers: "Tương đen thêm đậu phộng, kèm ớt xay",
-    startTime: new Date(Date.now() - 10 * 60 * 1000 - 40 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "cold",
-  },
-  {
-    id: "task-003",
-    orderId: "ORD-003",
-    tableName: "Bàn 02",
-    orderType: "Tại bàn",
-    productName: "Salad cá ngừ",
-    quantity: 1,
-    modifiers: "Không hành tây, sốt mè rang để riêng",
-    startTime: new Date(Date.now() - 7 * 60 * 1000 - 12 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "cold",
-  },
-  {
-    id: "task-011",
-    orderId: "ORD-011",
-    tableName: "Bàn 05",
-    orderType: "Tại bàn",
-    productName: "Kim chi cải thảo đĩa lớn",
-    quantity: 2,
-    modifiers: "Cắt nhỏ vừa ăn",
-    startTime: new Date(Date.now() - 1 * 60 * 1000 - 20 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "cold",
-  },
-  {
-    id: "task-006",
-    orderId: "ORD-006",
-    tableName: "Bàn 08",
-    orderType: "Mang đi",
-    productName: "Matcha Latte Kem Cheese",
-    quantity: 2,
-    modifiers: "70% đường, thêm trân châu đường đen",
-    startTime: new Date(Date.now() - 6 * 60 * 1000 - 40 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "bar",
-  },
-  {
-    id: "task-008",
-    orderId: "ORD-008",
-    tableName: "Bàn 12",
-    orderType: "Tại bàn",
-    productName: "Sinh tố xoài nhiệt đới",
-    quantity: 2,
-    modifiers: "Ít đường, đá xay nhuyễn",
-    startTime: new Date(Date.now() - 4 * 60 * 1000 - 20 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "bar",
-  },
-  {
-    id: "task-005",
-    orderId: "ORD-005",
-    tableName: "Bàn 01",
-    orderType: "Tại bàn",
-    productName: "Trà đào cam sả",
-    quantity: 3,
-    modifiers: "50% đường, ít đá",
-    startTime: new Date(Date.now() - 3 * 60 * 1000 - 45 * 1000).toISOString(),
-    targetTime: 10,
-    stationId: "bar",
-  },
-];
+import { fetchOrders, createOrder, updateOrderStatus } from "@/lib/api";
+import type { OrderResponse } from "@/lib/types/sales";
 
 type StationId = "hot" | "cold" | "bar";
 
@@ -161,8 +29,32 @@ const STATION_TABS: { id: StationId; label: string; icon: typeof Flame }[] = [
   { id: "bar", label: "Quầy bar", icon: Soup },
 ];
 
+function determineStation(productName: string): StationId {
+  const name = productName.toLowerCase();
+  if (
+    name.includes("trà") ||
+    name.includes("cà phê") ||
+    name.includes("matcha") ||
+    name.includes("pepsi") ||
+    name.includes("sinh tố") ||
+    name.includes("nước")
+  ) {
+    return "bar";
+  }
+  if (
+    name.includes("gỏi") ||
+    name.includes("salad") ||
+    name.includes("kim chi") ||
+    name.includes("kem")
+  ) {
+    return "cold";
+  }
+  return "hot";
+}
+
 export default function KdsPage() {
-  const [tasks, setTasks] = useState<KitchenTask[]>(INITIAL_TASKS);
+  const [tasks, setTasks] = useState<KitchenTask[]>([]);
+  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
   const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
   const [activeStation, setActiveStation] = useState<StationId>("hot");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -170,6 +62,7 @@ export default function KdsPage() {
   const [presetPrintItem, setPresetPrintItem] = useState<string | undefined>(
     undefined
   );
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const toast = useToast();
 
@@ -178,61 +71,148 @@ export default function KdsPage() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const handleCompleteTask = (taskId: string) => {
+  // Tải danh sách đơn hàng thực tế từ Sales Service
+  const loadKitchenTasks = useCallback(async () => {
+    try {
+      const orders = await fetchOrders();
+      if (!orders) return;
+
+      // Lấy các đơn đang chờ hoặc đang chế biến
+      const activeOrders = orders.filter(
+        (o) =>
+          o.status === "PENDING" ||
+          o.status === "CONFIRMED" ||
+          o.status === "PREPARING"
+      );
+
+      const kitchenTasks: KitchenTask[] = [];
+
+      for (const order of activeOrders) {
+        for (const item of order.items || []) {
+          const taskId = `task-${order.id}-${item.id}`;
+          // Bỏ qua nếu đã đánh dấu hoàn thành trong phiên này
+          if (completedTaskIds.has(taskId)) continue;
+
+          const modifiers = [item.toppings, item.sweetness, item.note]
+            .filter(Boolean)
+            .join(" • ");
+
+          kitchenTasks.push({
+            id: taskId,
+            orderId: order.orderCode,
+            tableName: order.tableNumber ? `Bàn ${order.tableNumber}` : "Mang đi",
+            orderType: order.orderType === "TAKE_AWAY" ? "Mang đi" : "Tại bàn",
+            productName: item.name,
+            quantity: item.quantity,
+            modifiers: modifiers || undefined,
+            startTime: order.createdAt || new Date().toISOString(),
+            targetTime: 10,
+            stationId: determineStation(item.name),
+          });
+        }
+      }
+
+      setTasks(kitchenTasks);
+    } catch (err) {
+      console.warn("Chưa thể đồng bộ đơn hàng với KDS:", err);
+    }
+  }, [completedTaskIds]);
+
+  useEffect(() => {
+    loadKitchenTasks();
+    const interval = setInterval(loadKitchenTasks, 5000);
+    return () => clearInterval(interval);
+  }, [loadKitchenTasks]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await loadKitchenTasks();
+    setIsRefreshing(false);
+    toast.info("Đã đồng bộ KDS", "Danh sách món cần nấu đã được cập nhật mới nhất");
+  };
+
+  const handleCompleteTask = async (taskId: string) => {
     const completedItem = tasks.find((t) => t.id === taskId);
+    if (!completedItem) return;
+
+    const parts = taskId.split("-");
+    const orderId = Number(parts[0] === "task" ? parts[1] : parts[0]);
+
+    setCompletedTaskIds((prev) => new Set(prev).add(taskId));
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
 
-    if (completedItem) {
+    try {
+      if (!isNaN(orderId)) {
+        await updateOrderStatus(orderId, "READY");
+      }
       toast.success(
         `Đã hoàn tất: ${completedItem.productName}`,
         `${completedItem.tableName ?? completedItem.orderId} (${completedItem.quantity} phần) đã sẵn sàng phục vụ.`
       );
+    } catch (error) {
+      toast.error(
+        "Không thể cập nhật đơn",
+        error instanceof Error ? error.message : "Vui lòng thử lại."
+      );
     }
   };
 
-  const handleSimulateNewOrder = () => {
+  // Tạo đơn hàng thử nghiệm thực tế vào DB sales-service
+  const handleSimulateNewOrder = async () => {
     const sampleDishes: Record<
       StationId,
-      { name: string; modifiers: string; table: string }
+      { productId: number; name: string; price: number; note: string }
     > = {
       hot: {
-        name: "Mì cay bò Mỹ Cấp 2",
-        modifiers: "Thêm bò viên, không hành lá",
-        table: `Bàn ${Math.floor(1 + Math.random() * 20)}`,
+        productId: 1,
+        name: "Mì Cay Bò Mỹ",
+        price: 75000,
+        note: "Cay cấp 3, không hành lá",
       },
       cold: {
-        name: "Salad ức gà áp chảo",
-        modifiers: "Sốt chanh dây để riêng",
-        table: `Bàn ${Math.floor(1 + Math.random() * 20)}`,
+        productId: 3,
+        name: "Gà Sốt Cay Hàn Quốc",
+        price: 89000,
+        note: "Thêm kim chi",
       },
       bar: {
-        name: "Trà vải hoa hồng",
-        modifiers: "Ít đá, 50% đường",
-        table: `Bàn ${Math.floor(1 + Math.random() * 20)}`,
+        productId: 4,
+        name: "Trà Đào Cam Sả",
+        price: 45000,
+        note: "50% đường, ít đá",
       },
     };
 
     const dish = sampleDishes[activeStation];
-    const orderNum = Math.floor(100 + Math.random() * 900);
+    const tableNumber = String(Math.floor(1 + Math.random() * 20));
 
-    const newTask: KitchenTask = {
-      id: `task-${Date.now()}`,
-      orderId: `ORD-${orderNum}`,
-      tableName: dish.table,
-      orderType: Math.random() > 0.3 ? "Tại bàn" : "Mang đi",
-      productName: dish.name,
-      quantity: Math.floor(1 + Math.random() * 3),
-      modifiers: dish.modifiers,
-      startTime: new Date().toISOString(),
-      targetTime: 10,
-      stationId: activeStation,
-    };
+    try {
+      const response = await createOrder({
+        tableNumber,
+        orderType: "DINE_IN",
+        items: [
+          {
+            productId: dish.productId,
+            name: dish.name,
+            quantity: 1,
+            basePrice: dish.price,
+            note: dish.note,
+          },
+        ],
+      });
 
-    setTasks((prev) => [...prev, newTask]);
-    toast.info(
-      `Đơn mới tại ${dish.table}`,
-      `${newTask.quantity}× ${newTask.productName} vừa chuyển xuống trạm.`
-    );
+      toast.info(
+        `Đã tạo đơn mới #${response.orderCode}`,
+        `Bàn ${tableNumber} • 1× ${dish.name} vừa được lưu vào cơ sở dữ liệu.`
+      );
+
+      await loadKitchenTasks();
+    } catch (err) {
+      toast.error(
+        "Lỗi tạo đơn",
+        err instanceof Error ? err.message : "Không thể gửi đơn xuống Sales Service"
+      );
+    }
   };
 
   const handleOpenExpiryModal = (itemName?: string) => {
@@ -260,13 +240,26 @@ export default function KdsPage() {
         userName="Bếp trưởng"
         rightContent={
           <div className="flex items-center gap-3 text-sm">
+            <button
+              type="button"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition"
+              title="Đồng bộ lại danh sách món"
+            >
+              <RefreshCw
+                size={14}
+                className={isRefreshing ? "animate-spin text-orange-500" : ""}
+              />
+              <span>Đồng bộ</span>
+            </button>
             <span className="text-stone-500">
               Đang chờ:{" "}
               <strong className="text-orange-600 font-bold">
                 {tasks.length} món
               </strong>
             </span>
-            <StatusBadge label="Đã kết nối" variant="success" />
+            <StatusBadge label="Hệ thống trực tuyến" variant="success" />
           </div>
         }
       />
@@ -321,11 +314,10 @@ export default function KdsPage() {
                     type="button"
                     onClick={() => setViewMode("grid")}
                     title="Hiển thị lưới dọc"
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      viewMode === "grid"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "grid"
                         ? "bg-white text-orange-600 shadow-2xs"
                         : "text-stone-500 hover:text-stone-800"
-                    }`}
+                      }`}
                   >
                     <LayoutGrid className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Lưới dọc</span>
@@ -334,11 +326,10 @@ export default function KdsPage() {
                     type="button"
                     onClick={() => setViewMode("list")}
                     title="Hiển thị danh sách dọc"
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      viewMode === "list"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "list"
                         ? "bg-white text-orange-600 shadow-2xs"
                         : "text-stone-500 hover:text-stone-800"
-                    }`}
+                      }`}
                   >
                     <List className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Hàng dọc</span>
@@ -351,7 +342,7 @@ export default function KdsPage() {
                   className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-orange-50 hover:border-orange-300 px-3.5 py-2 text-xs font-bold text-stone-700 hover:text-orange-600 transition-colors cursor-pointer"
                 >
                   <PlusCircle className="w-4 h-4 text-orange-500" />
-                  <span>Giả lập đơn mới</span>
+                  <span>Tạo đơn thử nghiệm (DB)</span>
                 </button>
 
                 <button

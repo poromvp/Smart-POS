@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
@@ -9,12 +10,11 @@ import {
   ShieldCheck,
   Plus,
   Save,
-  QrCode,
   RefreshCw,
   Printer,
 } from "lucide-react";
 
-type StaffTab = "staff" | "branches" | "qr";
+type StaffTab = "staff" | "qr";
 
 interface Employee {
   id: string;
@@ -60,8 +60,69 @@ export default function StaffBranchesQrPage() {
   );
 
   const [selectedArea, setSelectedArea] = useState("Tầng 1");
-  const [selectedTable, setSelectedTable] = useState("Bàn T1-02");
-  const [qrVersion, setQrVersion] = useState(1);
+  const [selectedTable, setSelectedTable] = useState("Bàn 1");
+  const [publicAppUrl, setPublicAppUrl] = useState(
+    process.env.NEXT_PUBLIC_PUBLIC_APP_URL ||
+      (typeof window !== "undefined" ? window.location.origin : "")
+  );
+
+  const guestMenuUrl = useMemo(() => {
+    const appUrl = (
+      publicAppUrl ||
+      (typeof window !== "undefined" ? window.location.origin : "")
+    ).replace(/\/$/, "");
+    const tableId = selectedTable.replace(/^bàn\s+/i, "").trim();
+
+    return appUrl
+      ? `${appUrl}/menu?table=${encodeURIComponent(tableId)}`
+      : "";
+  }, [publicAppUrl, selectedTable]);
+
+  const handlePrintQr = () => {
+    if (!guestMenuUrl) {
+      toast.error(
+        "Thiếu địa chỉ frontend",
+        "Nhập URL dạng http://192.168.x.x:3000 trước khi in mã QR."
+      );
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=600,height=720");
+    if (!printWindow) {
+      toast.error("Không thể mở cửa sổ in", "Vui lòng cho phép popup rồi thử lại.");
+      return;
+    }
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="vi">
+        <head>
+          <title>Mã QR ${selectedTable}</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 32px; }
+            svg { width: 280px; height: 280px; }
+            h1 { margin-bottom: 8px; }
+            p { color: #555; word-break: break-all; }
+          </style>
+        </head>
+        <body>
+          <h1>Smart POS</h1>
+          <h2>${selectedTable}</h2>
+          <div id="qr"></div>
+          <p>${guestMenuUrl}</p>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+
+    const qrElement = document.querySelector("[data-qr-preview]");
+    const printQrContainer = printWindow.document.getElementById("qr");
+    if (qrElement && printQrContainer) {
+      printQrContainer.innerHTML = qrElement.innerHTML;
+    }
+    printWindow.focus();
+    printWindow.print();
+  };
 
   const filteredStaff = INITIAL_STAFF.filter((emp) => {
     const matchesName = emp.name
@@ -256,6 +317,21 @@ export default function StaffBranchesQrPage() {
             <div className="sm:col-span-7 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+                  Địa chỉ frontend cho điện thoại
+                </label>
+                <input
+                  type="url"
+                  value={publicAppUrl}
+                  onChange={(event) => setPublicAppUrl(event.target.value)}
+                  placeholder="http://192.168.1.10:3000"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-gray-800 text-sm font-medium focus:ring-2 focus:ring-orange-500 outline-none"
+                />
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Không dùng localhost khi quét bằng điện thoại. Hai thiết bị phải cùng Wi-Fi.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">
                   Khu vực
                 </label>
                 <select
@@ -278,23 +354,44 @@ export default function StaffBranchesQrPage() {
                   onChange={(e) => setSelectedTable(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-gray-800 text-sm font-medium focus:ring-2 focus:ring-orange-500 outline-none bg-white"
                 >
-                  <option value="Bàn T1-01">Bàn T1-01</option>
-                  <option value="Bàn T1-02">Bàn T1-02</option>
-                  <option value="Bàn T1-03">Bàn T1-03</option>
-                  <option value="Bàn VIP-01">Bàn VIP-01</option>
+                  {Array.from({ length: 20 }, (_, i) => {
+                    const num = i + 1;
+                    return (
+                      <option key={num} value={`Bàn ${num}`}>
+                        Bàn {num}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
               <p className="text-xs font-semibold text-emerald-600 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Mã QR đang hoạt động (v{qrVersion})
+                Mã QR hoạt động - quét để gọi món
               </p>
             </div>
 
             <div className="sm:col-span-5 flex flex-col items-center justify-center p-4 rounded-2xl bg-orange-50/50 border-2 border-dashed border-orange-200 aspect-square max-w-[160px] mx-auto w-full">
-              <QrCode className="w-20 h-20 text-orange-600 mb-1.5" />
+              {guestMenuUrl ? (
+                <div data-qr-preview className="rounded-lg bg-white p-2">
+                  <QRCodeSVG
+                    value={guestMenuUrl}
+                    size={128}
+                    level="M"
+                    includeMargin
+                    title={`Mã QR gọi món ${selectedTable}`}
+                  />
+                </div>
+              ) : (
+                <div className="flex h-[144px] w-[144px] items-center justify-center rounded-lg bg-amber-50 p-3 text-center text-xs font-semibold text-amber-700">
+                  Nhập địa chỉ frontend để tạo QR
+                </div>
+              )}
               <span className="text-xs font-bold text-gray-700">
                 {selectedTable}
+              </span>
+              <span className="mt-1 max-w-full truncate text-[10px] text-gray-500">
+                {guestMenuUrl}
               </span>
             </div>
           </div>
@@ -303,30 +400,28 @@ export default function StaffBranchesQrPage() {
             <button
               type="button"
               onClick={() => {
-                setQrVersion((v) => v + 1);
-                toast.warning(
-                  "Đã tạo lại mã QR mới",
-                  `Mã QR cũ của ${selectedTable} đã bị vô hiệu hóa.`
-                );
+                toast.info("Mã QR đã sẵn sàng", "Mã này mở đúng menu của bàn đã chọn.");
               }}
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-gray-300 bg-white hover:bg-orange-50 text-gray-700 hover:text-orange-600 text-sm font-semibold transition-colors cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
-              Tạo lại QR
+              Làm mới QR
             </button>
 
             <button
               type="button"
-              onClick={() =>
-                toast.success(
-                  `Đang in mã QR ${selectedTable}`,
-                  `Khu vực: ${selectedArea} (${configBranch})`
-                )
-              }
+              onClick={handlePrintQr}
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold shadow-xs transition-colors cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               In mã QR
+            </button>
+            <button
+              type="button"
+              onClick={() => window.open(guestMenuUrl, "_blank", "noopener,noreferrer")}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 text-sm font-semibold transition-colors hover:bg-orange-100"
+            >
+              Mở trang gọi món
             </button>
           </div>
         </div>

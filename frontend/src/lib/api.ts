@@ -34,9 +34,30 @@ import {
   PurchaseOrderCreateRequest,
   PurchaseOrderUpdateRequest,
 } from "./types/purchasing";
+import {
+  OrderStatus,
+  OrderType,
+  PaymentStatus,
+  PaymentMethod,
+  OrderItemResponse,
+  OrderResponse,
+  CreateOrderRequest,
+  CreateOrderItemRequest,
+  UpdateOrderStatusRequest,
+  UpdatePaymentRequest,
+  CustomerResponse,
+  CustomerCreateRequest,
+  PointTransactionResponse,
+  PromotionResponse,
+  PromotionCreateRequest,
+  ApplyPromotionRequest,
+  ApplyPromotionResponse,
+} from "./types/sales";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082/api";
+  process.env.NEXT_PUBLIC_API_URL || "/api/catalog";
+export const SALES_API_BASE_URL =
+  process.env.NEXT_PUBLIC_SALES_API_URL || "/api/sales";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -77,11 +98,19 @@ async function handleResponse<T>(res: Response): Promise<T> {
  * Lấy toàn bộ thực đơn theo danh mục (Menu POS / QR Order)
  */
 export async function fetchMenu(): Promise<CategoryMenuResponse[]> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 10_000);
+
+  try {
   const res = await fetch(`${API_BASE_URL}/products/menu`, {
     cache: "no-store",
     headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
   });
   return handleResponse<CategoryMenuResponse[]>(res);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 // ==================== GIAI ĐOẠN 2.1: NGUYÊN LIỆU (INGREDIENT) ====================
@@ -533,4 +562,160 @@ export async function adjustInventory(
     body: JSON.stringify(data),
   });
   return handleResponse<InventoryAdjustmentResponse>(res);
+}
+
+// ==================== BÁN HÀNG & ĐƠN HÀNG (SALES SERVICE) ====================
+
+export async function fetchOrders(params?: {
+  status?: OrderStatus;
+  tableNumber?: string;
+}): Promise<OrderResponse[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.status) queryParams.append("status", params.status);
+  if (params?.tableNumber) queryParams.append("tableNumber", params.tableNumber);
+  const query = queryParams.toString() ? `?${queryParams.toString()}` : "";
+
+  const res = await fetch(`${SALES_API_BASE_URL}/orders${query}`, {
+    cache: "no-store",
+  });
+  return handleResponse<OrderResponse[]>(res);
+}
+
+export async function fetchOrderDetail(id: number): Promise<OrderResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}`, {
+    cache: "no-store",
+  });
+  return handleResponse<OrderResponse>(res);
+}
+
+export async function fetchOrderByCode(orderCode: string): Promise<OrderResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/code/${orderCode}`, {
+    cache: "no-store",
+  });
+  return handleResponse<OrderResponse>(res);
+}
+
+export async function createOrder(
+  data: CreateOrderRequest
+): Promise<OrderResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<OrderResponse>(res);
+}
+
+export async function updateOrderStatus(
+  id: number,
+  status: OrderStatus
+): Promise<OrderResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  return handleResponse<OrderResponse>(res);
+}
+
+export async function completeOrder(id: number): Promise<OrderResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}/complete`, {
+    method: "POST",
+  });
+  return handleResponse<OrderResponse>(res);
+}
+
+export async function updateOrderPayment(
+  id: number,
+  data: UpdatePaymentRequest
+): Promise<OrderResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}/payment`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<OrderResponse>(res);
+}
+
+export async function cancelOrder(id: number): Promise<void> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}`, {
+    method: "DELETE",
+  });
+  return handleResponse<void>(res);
+}
+
+
+// ==================== KHÁCH HÀNG & TÍCH ĐIỂM (LOYALTY) ====================
+
+export async function searchCustomerByPhone(phone: string): Promise<CustomerResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/customers/search?phone=${encodeURIComponent(phone)}`, {
+    cache: "no-store",
+  });
+  return handleResponse<CustomerResponse>(res);
+}
+
+export async function createCustomer(data: CustomerCreateRequest): Promise<CustomerResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/customers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<CustomerResponse>(res);
+}
+
+export async function fetchCustomers(search?: string): Promise<CustomerResponse[]> {
+  const query = search ? `?search=${encodeURIComponent(search)}` : "";
+  const res = await fetch(`${SALES_API_BASE_URL}/customers${query}`, {
+    cache: "no-store",
+  });
+  return handleResponse<CustomerResponse[]>(res);
+}
+
+export async function fetchCustomerTransactions(customerId: number): Promise<PointTransactionResponse[]> {
+  const res = await fetch(`${SALES_API_BASE_URL}/customers/${customerId}/transactions`, {
+    cache: "no-store",
+  });
+  return handleResponse<PointTransactionResponse[]>(res);
+}
+
+// ==================== KHUYẾN MÃI (PROMOTIONS) ====================
+
+export async function fetchPromotions(activeOnly?: boolean): Promise<PromotionResponse[]> {
+  const query = activeOnly !== undefined ? `?activeOnly=${activeOnly}` : "";
+  const res = await fetch(`${SALES_API_BASE_URL}/promotions${query}`, {
+    cache: "no-store",
+  });
+  return handleResponse<PromotionResponse[]>(res);
+}
+
+export async function createPromotion(data: PromotionCreateRequest): Promise<PromotionResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/promotions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<PromotionResponse>(res);
+}
+
+export async function togglePromotionStatus(id: number, active: boolean): Promise<PromotionResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/promotions/${id}/status?active=${active}`, {
+    method: "PUT",
+  });
+  return handleResponse<PromotionResponse>(res);
+}
+
+export async function deletePromotion(id: number): Promise<void> {
+  const res = await fetch(`${SALES_API_BASE_URL}/promotions/${id}`, {
+    method: "DELETE",
+  });
+  return handleResponse<void>(res);
+}
+
+export async function applyPromotion(data: ApplyPromotionRequest): Promise<ApplyPromotionResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/promotions/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ApplyPromotionResponse>(res);
 }

@@ -386,11 +386,11 @@ public OrderResponse completeOrder(Long orderId) {
 
 | STT | Hạng mục công việc | Mô tả chi tiết | Trạng thái |
 | :---: | :--- | :--- | :---: |
-| 1 | **Cập nhật Schema DB `pos_sales_db`** | Thêm cột `product_id`, `variant_id`, `modifier_option_ids` vào bảng `order_items`. | ⏳ Chờ Sales |
-| 2 | **Cập nhật Entity & DTO `sales-service`** | Bổ sung các trường tương ứng vào `OrderItem.java`, `CreateOrderItemRequest.java`. | ⏳ Chờ Sales |
-| 3 | **Cập nhật API Tạo Đơn (`POST /api/orders`)** | Lưu đúng `productId`, `variantId` và danh sách `modifierOptionIds` khi khách/thu ngân gửi lên. | ⏳ Chờ Sales |
-| 4 | **Tích hợp FeignClient gọi trừ kho** | Thêm `InventoryClient` gọi sang `http://catalog-inventory-service:8082/api/inventory/deduct`. | ⏳ Chờ Sales |
-| 5 | **Kiểm thử liên dịch vụ (E2E Test)** | Tạo 1 đơn hàng mì cay + trà đào $\rightarrow$ Kiểm tra thẻ kho `inventory_transactions` bên Catalog xem có trừ đúng thịt bò, mì, đào hộp không. | ⏳ Chờ Sales |
+| 1 | **Cập nhật Schema DB `pos_sales_db`** | Thêm cột `product_id`, `variant_id`, `modifier_option_ids` vào bảng `order_items`. | ✅ Đã hoàn thành |
+| 2 | **Cập nhật Entity & DTO `sales-service`** | Bổ sung các trường tương ứng vào `OrderItem.java`, `CreateOrderItemRequest.java`, `OrderItemResponse.java`. | ✅ Đã hoàn thành |
+| 3 | **Cập nhật API Tạo Đơn (`POST /api/orders`)** | Lưu đúng `productId`, `variantId` và danh sách `modifierOptionIds` khi khách/thu ngân gửi lên. | ✅ Đã hoàn thành |
+| 4 | **Tích hợp FeignClient gọi trừ kho** | Thêm `InventoryClient` gọi sang `http://catalog-inventory-service:8082/api/inventory/deduct`. | ✅ Đã hoàn thành |
+| 5 | **Kiểm thử liên dịch vụ (E2E Test)** | Tạo 1 đơn hàng mì cay + trà đào $\rightarrow$ Kiểm tra thẻ kho `inventory_transactions` bên Catalog xem có trừ đúng thịt bò, mì, đào hộp không. | ⏳ Sẵn sàng kiểm thử |
 
 ---
 

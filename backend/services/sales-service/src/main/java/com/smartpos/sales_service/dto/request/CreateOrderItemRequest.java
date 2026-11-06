@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -17,7 +18,18 @@ import java.util.List;
 @AllArgsConstructor
 public class CreateOrderItemRequest {
 
-    @NotBlank(message = "Mã món ăn không được để trống")
+    // 1. Mã số món ăn (tham chiếu sang catalog-inventory-service)
+    @NotNull(message = "ID món ăn (productId) không được để trống")
+    private Long productId;
+
+    // 2. Mã biến thể Size (nếu có)
+    private Long variantId;
+
+    // 3. Danh sách ID tùy chọn topping, đường, đá
+    @Builder.Default
+    private List<Long> modifierOptionIds = new ArrayList<>();
+
+    // Cột itemId chuỗi cũ (hỗ trợ tương thích ngược)
     private String itemId;
 
     @NotBlank(message = "Tên món ăn không được để trống")

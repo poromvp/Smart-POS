@@ -1,10 +1,15 @@
 package com.smartpos.sales_service.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.smartpos.sales_service.converter.LongListJsonConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "order_items")
@@ -24,9 +29,19 @@ public class OrderItem {
     @JsonIgnore
     private Order order;
 
-    @Column(name = "item_id", nullable = false, length = 64)
+    // 1. Mã số món ăn (tham chiếu sang catalog-inventory-service)
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
+    // 2. Mã biến thể Size (ví dụ: Size L, Size M) - null nếu món không phân size
+    @Column(name = "variant_id")
+    private Long variantId;
+
+    // Cột item_id cũ hỗ trợ tương thích ngược
+    @Column(name = "item_id", length = 64)
     private String itemId;
 
+    // 3. Tên món hiển thị trên hóa đơn / KDS
     @Column(name = "name", nullable = false, length = 255)
     private String name;
 
@@ -36,10 +51,21 @@ public class OrderItem {
     @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
 
+    @Column(name = "total_price", nullable = false, precision = 12, scale = 2)
+    private BigDecimal totalPrice;
+
     @Column(name = "modifier_total", precision = 12, scale = 2)
     @Builder.Default
     private BigDecimal modifierTotal = BigDecimal.ZERO;
 
+    // 4. Danh sách các ID tùy chọn topping, đường, đá đã chọn
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = LongListJsonConverter.class)
+    @Column(name = "modifier_option_ids", columnDefinition = "jsonb")
+    @Builder.Default
+    private List<Long> modifierOptionIds = new ArrayList<>();
+
+    // Các trường ghi chú text phục vụ in hóa đơn và KDS bếp
     @Column(name = "toppings", length = 500)
     private String toppings;
 

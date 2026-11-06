@@ -45,7 +45,7 @@ export const ROLE_REDIRECTS: Record<UserRole, string> = {
   chef: "/kds",
   cashier: "/pos",
   manager: "/admin",
-  waiter: "/order-taking",
+  waiter: "/pos",
 };
 
 export async function mockLogin({

@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { Armchair, Search } from "lucide-react";
+import type { OrderStatus } from "@/lib/types/sales";
 
 export interface RestaurantTable {
   id: string;
@@ -13,24 +14,57 @@ interface TableMapProps {
   tables: RestaurantTable[];
   selectedTableId: string | null;
   totals?: Record<string, number>;
+  kitchenStatuses?: Record<string, OrderStatus>;
   onSelectTable: (table: RestaurantTable) => void;
 }
 
-export default function TableMap({ tables, selectedTableId, totals = {}, onSelectTable }: TableMapProps) {
+export default function TableMap({
+  tables,
+  selectedTableId,
+  totals = {},
+  kitchenStatuses = {},
+  onSelectTable,
+}: TableMapProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const occupied = tables.filter((table) => table.status === "occupied").length;
-  const visible = tables.filter((table) => (filter === "all" || table.status === filter) && table.name.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi")));
+  const visible = tables.filter(
+    (table) =>
+      (filter === "all" || table.status === filter) &&
+      table.name.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"))
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col p-4">
       <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 text-slate-500 focus-within:ring-2 focus-within:ring-orange-300">
         <Search size={18} aria-hidden="true" />
-        <input aria-label="Tìm bàn" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm tên hoặc số bàn…" className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none" />
+        <input
+          aria-label="Tìm bàn"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Tìm tên hoặc số bàn…"
+          className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"
+        />
       </label>
       <div className="my-3 flex flex-wrap gap-2">
-        {[["all", `Tất cả (${tables.length})`], ["occupied", `Đang dùng (${occupied})`], ["empty", `Trống (${tables.length - occupied})`]].map(([value, label]) => (
-          <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className={`min-h-11 rounded-lg px-3 text-xs font-semibold ${filter === value ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{label}</button>
+        {[
+          ["all", `Tất cả (${tables.length})`],
+          ["occupied", `Đang dùng (${occupied})`],
+          ["empty", `Trống (${tables.length - occupied})`],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={filter === value}
+            onClick={() => setFilter(value)}
+            className={`min-h-11 rounded-lg px-3 text-xs font-semibold ${
+              filter === value
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            {label}
+          </button>
         ))}
       </div>
       <p className="mb-3 text-xs text-slate-500">Chọn bàn để xem và kiểm tra hóa đơn.</p>
@@ -38,16 +72,65 @@ export default function TableMap({ tables, selectedTableId, totals = {}, onSelec
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
           {visible.map((table) => {
             const selected = selectedTableId === table.id;
+            const kStatus = kitchenStatuses[table.id];
+
             return (
-              <button key={table.id} type="button" aria-pressed={selected} onClick={() => onSelectTable(table)} className={`flex min-h-24 flex-col items-start justify-center rounded-xl border p-3 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${selected ? "border-orange-600 bg-orange-500 text-white shadow-sm" : table.status === "occupied" ? "border-orange-200 bg-orange-50 text-orange-950 hover:bg-orange-100" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
-                <span className="flex w-full items-center justify-between gap-2 font-bold"><span>{table.name}</span><Armchair size={18} aria-hidden="true" /></span>
-                <span className={`mt-1 text-xs ${selected ? "text-orange-50" : "text-slate-500"}`}>{table.status === "occupied" ? "Đang dùng" : "Trống"}</span>
-                {table.status === "occupied" && <span className="mt-1 text-sm font-semibold tabular-nums">{(totals[table.id] ?? 0).toLocaleString("vi-VN")}đ</span>}
+              <button
+                key={table.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => onSelectTable(table)}
+                className={`flex min-h-24 flex-col items-start justify-center rounded-xl border p-3 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${
+                  selected
+                    ? "border-orange-600 bg-orange-500 text-white shadow-sm"
+                    : table.status === "occupied"
+                    ? "border-orange-200 bg-orange-50 text-orange-950 hover:bg-orange-100"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <span className="flex w-full items-center justify-between gap-2 font-bold">
+                  <span>{table.name}</span>
+                  <Armchair size={18} aria-hidden="true" />
+                </span>
+
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className={`text-xs ${selected ? "text-orange-50" : "text-slate-500"}`}>
+                    {table.status === "occupied" ? "Đang dùng" : "Trống"}
+                  </span>
+
+                  {table.status === "occupied" && kStatus && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                        kStatus === "READY"
+                          ? "bg-emerald-600 text-white"
+                          : kStatus === "PREPARING"
+                          ? "bg-amber-500 text-white animate-pulse"
+                          : "bg-yellow-400 text-slate-900"
+                      }`}
+                    >
+                      {kStatus === "READY"
+                        ? "Bếp đã xong"
+                        : kStatus === "PREPARING"
+                        ? "Bếp đang nấu"
+                        : "Chờ bếp"}
+                    </span>
+                  )}
+                </div>
+
+                {table.status === "occupied" && (
+                  <span className="mt-1 text-sm font-semibold tabular-nums">
+                    {(totals[table.id] ?? 0).toLocaleString("vi-VN")}đ
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
-        {visible.length === 0 && <p className="py-10 text-center text-sm text-slate-500">Không tìm thấy bàn phù hợp.</p>}
+        {visible.length === 0 && (
+          <p className="py-10 text-center text-sm text-slate-500">
+            Không tìm thấy bàn phù hợp.
+          </p>
+        )}
       </div>
     </div>
   );

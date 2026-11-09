@@ -18,7 +18,7 @@ import StatCard from "@/components/ui/StatCard";
 import StatusBadge, { type StatusVariant } from "@/components/ui/StatusBadge";
 import OrderDetailModal, { formatCurrency } from "@/components/pos/OrderDetailModal";
 import { useToast } from "@/components/ui/ToastProvider";
-import { fetchOrders } from "@/lib/api";
+import { fetchPagedOrders } from "@/lib/api";
 import type { OrderResponse, OrderStatus, PaymentMethod } from "@/lib/types/sales";
 
 export default function AdminOrdersPage() {
@@ -32,16 +32,50 @@ export default function AdminOrdersPage() {
   const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("ALL");
 
+  // Phân trang
+  const [page, setPage] = useState(0);
+  const [pageSize] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+
   // Modal chi tiết
   const [selectedOrder, setSelectedOrder] = useState<OrderResponse | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const toast = useToast();
 
-  const loadData = async () => {
+  const loadData = React.useCallback(async () => {
+    setIsLoading(true);
     try {
-      const data = await fetchOrders();
-      setOrders(data || []);
+      const now = new Date();
+      let startDate: string | undefined;
+      let endDate: string | undefined;
+
+      if (periodFilter === "today") {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      } else if (periodFilter === "yesterday") {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString();
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      } else if (periodFilter === "week") {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).toISOString();
+      } else if (periodFilter === "month") {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      }
+
+      const paged = await fetchPagedOrders({
+        status: statusFilter !== "ALL" ? statusFilter : undefined,
+        search: searchQuery.trim() || undefined,
+        startDate,
+        endDate,
+        page,
+        size: pageSize,
+      });
+
+      if (paged && paged.content) {
+        setOrders(paged.content);
+        setTotalPages(paged.totalPages);
+        setTotalElements(paged.totalElements);
+      }
     } catch (err) {
       console.error("Lỗi khi tải danh sách đơn hàng:", err);
       toast.error(
@@ -52,11 +86,11 @@ export default function AdminOrdersPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [periodFilter, statusFilter, searchQuery, page, pageSize, toast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -428,6 +462,31 @@ export default function AdminOrdersPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Thanh điều hướng Phân trang (Pagination Bar) */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/50 px-6 py-4">
+          <div className="text-xs font-medium text-gray-500">
+            Hiển thị trang <span className="font-bold text-gray-800">{page + 1}</span> / <span className="font-bold text-gray-800">{totalPages || 1}</span> (Tổng số {totalElements} đơn hàng)
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 0 || isLoading}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Trang trước
+            </button>
+            <button
+              type="button"
+              disabled={page >= totalPages - 1 || isLoading}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Trang sau
+            </button>
+          </div>
         </div>
       </div>
 

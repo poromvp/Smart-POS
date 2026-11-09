@@ -36,6 +36,7 @@ import {
 } from "./types/purchasing";
 import {
   OrderStatus,
+  ItemKdsStatus,
   OrderType,
   PaymentStatus,
   PaymentMethod,
@@ -43,8 +44,11 @@ import {
   OrderResponse,
   CreateOrderRequest,
   CreateOrderItemRequest,
+  CheckoutOrderRequest,
   UpdateOrderStatusRequest,
   UpdatePaymentRequest,
+  PageResponse,
+  SalesStatisticsResponse,
   CustomerResponse,
   CustomerCreateRequest,
   PointTransactionResponse,
@@ -637,11 +641,86 @@ export async function updateOrderPayment(
   return handleResponse<OrderResponse>(res);
 }
 
-export async function cancelOrder(id: number): Promise<void> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}`, {
+export async function checkoutOrder(
+  id: number,
+  data: CheckoutOrderRequest
+): Promise<OrderResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}/checkout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<OrderResponse>(res);
+}
+
+export async function addItemsToOrder(
+  id: number,
+  items: CreateOrderItemRequest[]
+): Promise<OrderResponse> {
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}/items`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(items),
+  });
+  return handleResponse<OrderResponse>(res);
+}
+
+export async function updateOrderItemKdsStatus(
+  orderId: number,
+  itemId: number,
+  status: ItemKdsStatus
+): Promise<OrderResponse> {
+  const res = await fetch(
+    `${SALES_API_BASE_URL}/orders/${orderId}/items/${itemId}/kds-status?status=${status}`,
+    {
+      method: "PATCH",
+    }
+  );
+  return handleResponse<OrderResponse>(res);
+}
+
+export async function cancelOrder(id: number, reason?: string): Promise<void> {
+  const query = reason ? `?reason=${encodeURIComponent(reason)}` : "";
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}${query}`, {
     method: "DELETE",
   });
   return handleResponse<void>(res);
+}
+
+export async function fetchPagedOrders(params?: {
+  status?: OrderStatus | string;
+  tableNumber?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+  page?: number;
+  size?: number;
+  sort?: string;
+}): Promise<PageResponse<OrderResponse>> {
+  const queryParams = new URLSearchParams();
+  if (params?.status && params.status !== "ALL") queryParams.append("status", params.status);
+  if (params?.tableNumber) queryParams.append("tableNumber", params.tableNumber);
+  if (params?.startDate) queryParams.append("startDate", params.startDate);
+  if (params?.endDate) queryParams.append("endDate", params.endDate);
+  if (params?.search) queryParams.append("search", params.search);
+  queryParams.append("page", String(params?.page ?? 0));
+  queryParams.append("size", String(params?.size ?? 20));
+  if (params?.sort) queryParams.append("sort", params.sort);
+
+  const res = await fetch(`${SALES_API_BASE_URL}/orders?${queryParams.toString()}`, {
+    cache: "no-store",
+  });
+  return handleResponse<PageResponse<OrderResponse>>(res);
+}
+
+export async function fetchSalesStatistics(
+  period?: string
+): Promise<SalesStatisticsResponse> {
+  const query = period ? `?period=${encodeURIComponent(period)}` : "";
+  const res = await fetch(`${SALES_API_BASE_URL}/orders/statistics${query}`, {
+    cache: "no-store",
+  });
+  return handleResponse<SalesStatisticsResponse>(res);
 }
 
 

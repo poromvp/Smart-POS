@@ -3,11 +3,14 @@ package com.smartpos.sales_service.service;
 import com.smartpos.sales_service.client.InventoryClient;
 import com.smartpos.sales_service.client.dto.DeductInventoryRequest;
 import com.smartpos.sales_service.client.dto.DeductInventoryResponse;
+import com.smartpos.sales_service.dto.request.CheckoutOrderRequest;
 import com.smartpos.sales_service.dto.request.CreateOrderItemRequest;
 import com.smartpos.sales_service.dto.request.CreateOrderRequest;
 import com.smartpos.sales_service.dto.request.UpdatePaymentRequest;
 import com.smartpos.sales_service.dto.response.ApiResponse;
 import com.smartpos.sales_service.dto.response.OrderResponse;
+import com.smartpos.sales_service.dto.response.PageResponse;
+import com.smartpos.sales_service.dto.response.SalesStatisticsResponse;
 import com.smartpos.sales_service.entity.*;
 import com.smartpos.sales_service.exception.BusinessException;
 import com.smartpos.sales_service.exception.ResourceNotFoundException;
@@ -15,10 +18,13 @@ import com.smartpos.sales_service.repository.CustomerRepository;
 import com.smartpos.sales_service.repository.OrderRepository;
 import com.smartpos.sales_service.repository.PointTransactionRepository;
 import com.smartpos.sales_service.repository.PromotionRepository;
+import com.smartpos.sales_service.security.UserContext;
+import com.smartpos.sales_service.security.UserContextHolder;
 import com.smartpos.sales_service.service.impl.OrderServiceImpl;
 import feign.FeignException;
 import feign.Request;
 import feign.Response;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +33,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -55,10 +66,18 @@ class OrderServiceImplTest {
     @Mock
     private InventoryClient inventoryClient;
 
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+
     @InjectMocks
     private OrderServiceImpl orderService;
 
     private Order sampleOrder;
+
+    @AfterEach
+    void tearDown() {
+        UserContextHolder.clear();
+    }
 
     @BeforeEach
     void setUp() {
@@ -326,5 +345,208 @@ class OrderServiceImplTest {
 
         assertThatThrownBy(() -> orderService.getOrderById(999L))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("Thanh toán đơn hàng (checkoutOrder) thành công với voucher và điểm tích lũy")
+    void testCheckoutOrder_Success_AppliesVoucherAndPoints() {
+        Customer customer = Customer.builder()
+                .id(5L)
+                .phone("0901234567")
+                .currentPoints(10)
+                .totalSpent(BigDecimal.ZERO)
+                .build();
+
+        Promotion promo = Promotion.builder()
+                .id(2L)
+                .code("SALE10")
+                .name("Giảm 10%")
+                .discountPercent(new BigDecimal("10"))
+                .maxDiscountAmount(new BigDecimal("20000"))
+                .minOrderAmount(new BigDecimal("50000"))
+                .isActive(true)
+                .startDate(java.time.LocalDateTime.now().minusDays(1))
+                .endDate(java.time.LocalDateTime.now().plusDays(5))
+                .usedCount(0)
+                .build();
+
+        sampleOrder.setStatus(OrderStatus.PREPARING);
+        sampleOrder.setSubtotal(new BigDecimal("90000"));
+
+        CheckoutOrderRequest req = CheckoutOrderRequest.builder()
+                .customerId(5L)
+                .promotionCode("SALE10")
+                .pointsToRedeem(5)
+                .paymentMethod(PaymentMethod.CASH)
+                .staffId(100L)
+                .build();
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(customerRepository.findById(5L)).thenReturn(Optional.of(customer));
+        when(promotionRepository.findByCodeIgnoreCase("SALE10")).thenReturn(Optional.of(promo));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        ApiResponse<DeductInventoryResponse> deductResponse = ApiResponse.success(
+                DeductInventoryResponse.builder().orderCode("ORD-20261102-TEST1").build(),
+                "Trừ kho thành công"
+        );
+        when(inventoryClient.deductInventory(any(DeductInventoryRequest.class))).thenReturn(deductResponse);
+
+        OrderResponse res = orderService.checkoutOrder(1L, req);
+
+        assertThat(res.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+        assertThat(res.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(res.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+        assertThat(res.getStaffId()).isEqualTo(100L);
+        assertThat(res.getDiscountAmount()).isEqualByComparingTo("9000"); // 10% của 90k
+        assertThat(res.getPointsDiscountAmount()).isEqualByComparingTo("5000"); // 5 điểm = 5000đ
+        assertThat(res.getTotalAmount()).isEqualByComparingTo("76000"); // 90k - 9k - 5k = 76k
+        assertThat(sampleOrder.getItems().get(0).getKdsStatus()).isEqualTo(ItemKdsStatus.SERVED);
+
+        verify(inventoryClient).deductInventory(any(DeductInventoryRequest.class));
+        verify(customerRepository).save(customer);
+        verify(promotionRepository).save(promo);
+    }
+
+    @Test
+    @DisplayName("Thanh toán thất bại khi đơn hàng đã hoàn tất trước đó")
+    void testCheckoutOrder_AlreadyCompleted_ThrowsException() {
+        sampleOrder.setStatus(OrderStatus.COMPLETED);
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+
+        CheckoutOrderRequest req = CheckoutOrderRequest.builder()
+                .paymentMethod(PaymentMethod.CASH)
+                .build();
+
+        assertThatThrownBy(() -> orderService.checkoutOrder(1L, req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Đơn hàng đã được thanh toán và hoàn tất trước đó");
+    }
+
+    @Test
+    @DisplayName("Thêm món vào đơn hàng thành công, tính lại tổng tiền và chuyển trạng thái từ READY về PREPARING")
+    void testAddItemsToOrder_Success_RecalculatesSubtotal() {
+        sampleOrder.setStatus(OrderStatus.READY);
+        sampleOrder.setSubtotal(new BigDecimal("90000"));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        CreateOrderItemRequest newItem = CreateOrderItemRequest.builder()
+                .productId(102L)
+                .name("Trà Sữa Oolong")
+                .quantity(1)
+                .basePrice(new BigDecimal("30000"))
+                .modifierTotal(BigDecimal.ZERO)
+                .build();
+
+        OrderResponse res = orderService.addItemsToOrder(1L, List.of(newItem));
+
+        assertThat(res.getItems()).hasSize(2);
+        assertThat(res.getStatus()).isEqualTo(OrderStatus.PREPARING);
+        assertThat(res.getSubtotal()).isEqualByComparingTo("120000"); // 90k + 30k
+        assertThat(res.getTotalAmount()).isEqualByComparingTo("120000");
+    }
+
+    @Test
+    @DisplayName("Thêm món vào đơn hàng đã hoàn tất ném ra BusinessException")
+    void testAddItemsToOrder_CompletedOrder_ThrowsException() {
+        sampleOrder.setStatus(OrderStatus.COMPLETED);
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+
+        CreateOrderItemRequest newItem = CreateOrderItemRequest.builder()
+                .productId(102L)
+                .name("Bánh mì")
+                .quantity(1)
+                .basePrice(new BigDecimal("20000"))
+                .build();
+
+        assertThatThrownBy(() -> orderService.addItemsToOrder(1L, List.of(newItem)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Không thể thêm món vào đơn hàng đã hoàn tất");
+    }
+
+    @Test
+    @DisplayName("Cập nhật trạng thái món ăn KDS sang COOKING chuyển trạng thái đơn hàng sang PREPARING")
+    void testUpdateOrderItemKdsStatus_Cooking_SetsOrderPreparing() {
+        sampleOrder.setStatus(OrderStatus.PENDING);
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        OrderResponse res = orderService.updateOrderItemKdsStatus(1L, 1L, ItemKdsStatus.COOKING);
+
+        assertThat(res.getStatus()).isEqualTo(OrderStatus.PREPARING);
+        assertThat(res.getItems().get(0).getKdsStatus()).isEqualTo(ItemKdsStatus.COOKING);
+    }
+
+    @Test
+    @DisplayName("Cập nhật trạng thái món ăn KDS sang READY khi tất cả món hoàn thành thì đơn hàng READY")
+    void testUpdateOrderItemKdsStatus_AllReady_SetsOrderReady() {
+        sampleOrder.setStatus(OrderStatus.PREPARING);
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        OrderResponse res = orderService.updateOrderItemKdsStatus(1L, 1L, ItemKdsStatus.READY);
+
+        assertThat(res.getStatus()).isEqualTo(OrderStatus.READY);
+        assertThat(res.getItems().get(0).getKdsStatus()).isEqualTo(ItemKdsStatus.READY);
+    }
+
+    @Test
+    @DisplayName("Hủy đơn hàng có lý do và ghi nhận người hủy từ UserContext")
+    void testCancelOrder_WithReason_SavesCancelledByAndReason() {
+        sampleOrder.setStatus(OrderStatus.PENDING);
+        UserContextHolder.setContext(UserContext.builder().userId("U-123").username("manager_an").role("ADMIN").build());
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        orderService.cancelOrder(1L, "Khách đổi bàn sang tầng 2");
+
+        assertThat(sampleOrder.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(sampleOrder.getCancelReason()).isEqualTo("Khách đổi bàn sang tầng 2");
+        assertThat(sampleOrder.getCancelledBy()).isEqualTo("manager_an");
+    }
+
+    @Test
+    @DisplayName("Hủy đơn hàng đã hoàn tất ném ra BusinessException")
+    void testCancelOrder_CompletedOrder_ThrowsException() {
+        sampleOrder.setStatus(OrderStatus.COMPLETED);
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(1L, "Lý do hủy"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Không thể hủy đơn hàng đã hoàn tất");
+    }
+
+    @Test
+    @DisplayName("Lấy thống kê doanh thu (getSalesStatistics) thành công")
+    void testGetSalesStatistics_Success() {
+        sampleOrder.setStatus(OrderStatus.COMPLETED);
+        sampleOrder.setCreatedAt(java.time.LocalDateTime.now());
+        when(orderRepository.findCompletedOrdersBetween(eq(OrderStatus.COMPLETED), any(), any()))
+                .thenReturn(List.of(sampleOrder));
+
+        SalesStatisticsResponse stats = orderService.getSalesStatistics("today");
+
+        assertThat(stats).isNotNull();
+        assertThat(stats.getTotalOrders()).isEqualTo(1);
+        assertThat(stats.getTotalRevenue()).isEqualByComparingTo("90000");
+        assertThat(stats.getTopSellingItems()).hasSize(1);
+        assertThat(stats.getTopSellingItems().get(0).getName()).isEqualTo("Trà Đào Cam Sả");
+    }
+
+    @Test
+    @DisplayName("Lấy danh sách đơn hàng phân trang (getPagedOrders) thành công")
+    void testGetPagedOrders_Success() {
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(sampleOrder), PageRequest.of(0, 10), 1));
+
+        PageResponse<OrderResponse> page = orderService.getPagedOrders(OrderStatus.PENDING, null, null, null, null, 0, 10, "createdAt,desc");
+
+        assertThat(page).isNotNull();
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        assertThat(page.getPageNumber()).isEqualTo(0);
+        assertThat(page.getPageSize()).isEqualTo(10);
     }
 }

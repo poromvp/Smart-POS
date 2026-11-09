@@ -16,7 +16,9 @@ import java.util.List;
 @AllArgsConstructor
 public class CreateOrderRequest {
 
+    private Long tableId;
     private String tableNumber;
+    private Long staffId;
 
     @Builder.Default
     private OrderType orderType = OrderType.DINE_IN;

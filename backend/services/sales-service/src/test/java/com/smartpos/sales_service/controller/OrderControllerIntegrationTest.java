@@ -1,11 +1,18 @@
 package com.smartpos.sales_service.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartpos.sales_service.dto.request.CancelOrderRequest;
+import com.smartpos.sales_service.dto.request.CheckoutOrderRequest;
 import com.smartpos.sales_service.dto.request.CreateOrderItemRequest;
 import com.smartpos.sales_service.dto.request.CreateOrderRequest;
 import com.smartpos.sales_service.dto.response.OrderResponse;
+import com.smartpos.sales_service.dto.response.PageResponse;
+import com.smartpos.sales_service.dto.response.SalesStatisticsResponse;
+import com.smartpos.sales_service.entity.ItemKdsStatus;
 import com.smartpos.sales_service.entity.OrderStatus;
 import com.smartpos.sales_service.entity.OrderType;
+import com.smartpos.sales_service.entity.PaymentMethod;
+import com.smartpos.sales_service.entity.PaymentStatus;
 import com.smartpos.sales_service.exception.ResourceNotFoundException;
 import com.smartpos.sales_service.service.OrderService;
 import org.junit.jupiter.api.DisplayName;
@@ -21,7 +28,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -127,5 +134,140 @@ class OrderControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Hủy đơn hàng thành công"));
+    }
+
+    @Test
+    @DisplayName("POST /api/orders/{id}/checkout thanh toán đơn hàng thành công")
+    void testCheckoutOrder_Success() throws Exception {
+        CheckoutOrderRequest request = CheckoutOrderRequest.builder()
+                .paymentMethod(PaymentMethod.CASH)
+                .staffId(10L)
+                .build();
+
+        OrderResponse response = OrderResponse.builder()
+                .id(1L)
+                .orderCode("ORD-20261105-001")
+                .status(OrderStatus.COMPLETED)
+                .paymentStatus(PaymentStatus.PAID)
+                .paymentMethod(PaymentMethod.CASH)
+                .totalAmount(new BigDecimal("50000"))
+                .build();
+
+        when(orderService.checkoutOrder(eq(1L), any(CheckoutOrderRequest.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/orders/1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.paymentStatus").value("PAID"));
+    }
+
+    @Test
+    @DisplayName("POST /api/orders/{id}/items thêm món vào đơn hàng thành công")
+    void testAddItemsToOrder_Success() throws Exception {
+        CreateOrderItemRequest itemReq = CreateOrderItemRequest.builder()
+                .productId(102L)
+                .name("Trà Sữa Oolong")
+                .quantity(1)
+                .basePrice(new BigDecimal("30000"))
+                .build();
+
+        OrderResponse response = OrderResponse.builder()
+                .id(1L)
+                .orderCode("ORD-20261105-001")
+                .status(OrderStatus.PREPARING)
+                .totalAmount(new BigDecimal("80000"))
+                .build();
+
+        when(orderService.addItemsToOrder(eq(1L), anyList())).thenReturn(response);
+
+        mockMvc.perform(post("/api/orders/1/items")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(itemReq))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("PREPARING"));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/orders/{orderId}/items/{itemId}/kds-status cập nhật trạng thái chế biến món ăn")
+    void testUpdateOrderItemKdsStatus_Success() throws Exception {
+        OrderResponse response = OrderResponse.builder()
+                .id(1L)
+                .status(OrderStatus.READY)
+                .build();
+
+        when(orderService.updateOrderItemKdsStatus(1L, 5L, ItemKdsStatus.READY)).thenReturn(response);
+
+        mockMvc.perform(patch("/api/orders/1/items/5/kds-status")
+                        .param("status", "READY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("READY"));
+    }
+
+    @Test
+    @DisplayName("POST /api/orders/{id}/cancel hủy đơn kèm lý do thành công")
+    void testCancelOrderWithReason_Success() throws Exception {
+        CancelOrderRequest request = new CancelOrderRequest("Khách hủy do chờ lâu");
+        doNothing().when(orderService).cancelOrder(1L, "Khách hủy do chờ lâu");
+
+        mockMvc.perform(post("/api/orders/1/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Hủy đơn hàng thành công"));
+    }
+
+    @Test
+    @DisplayName("GET /api/orders/statistics trả về thống kê doanh thu")
+    void testGetSalesStatistics_Success() throws Exception {
+        SalesStatisticsResponse response = SalesStatisticsResponse.builder()
+                .totalRevenue(new BigDecimal("1500000"))
+                .totalOrders(10)
+                .topSellingItems(Collections.emptyList())
+                .hourlyRevenue(Collections.emptyList())
+                .build();
+
+        when(orderService.getSalesStatistics("today")).thenReturn(response);
+
+        mockMvc.perform(get("/api/orders/statistics")
+                        .param("period", "today"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.totalRevenue").value(1500000))
+                .andExpect(jsonPath("$.data.totalOrders").value(10));
+    }
+
+    @Test
+    @DisplayName("GET /api/orders có tham số page trả về danh sách phân trang PageResponse")
+    void testGetPagedOrders_ReturnsPageResponse() throws Exception {
+        OrderResponse orderRes = OrderResponse.builder()
+                .id(1L)
+                .orderCode("ORD-20261105-001")
+                .build();
+
+        PageResponse<OrderResponse> pageResponse = PageResponse.<OrderResponse>builder()
+                .content(List.of(orderRes))
+                .pageNumber(0)
+                .pageSize(10)
+                .totalElements(1)
+                .totalPages(1)
+                .last(true)
+                .build();
+
+        when(orderService.getPagedOrders(any(), any(), any(), any(), any(), eq(0), eq(10), any()))
+                .thenReturn(pageResponse);
+
+        mockMvc.perform(get("/api/orders")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isArray())
+                .andExpect(jsonPath("$.data.totalElements").value(1));
     }
 }

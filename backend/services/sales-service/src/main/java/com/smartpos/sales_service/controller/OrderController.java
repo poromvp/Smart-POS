@@ -1,20 +1,23 @@
 package com.smartpos.sales_service.controller;
 
-import com.smartpos.sales_service.dto.request.CreateOrderRequest;
-import com.smartpos.sales_service.dto.request.UpdateOrderStatusRequest;
-import com.smartpos.sales_service.dto.request.UpdatePaymentRequest;
+import com.smartpos.sales_service.dto.request.*;
 import com.smartpos.sales_service.dto.response.ApiResponse;
 import com.smartpos.sales_service.dto.response.OrderResponse;
+import com.smartpos.sales_service.dto.response.PageResponse;
+import com.smartpos.sales_service.dto.response.SalesStatisticsResponse;
+import com.smartpos.sales_service.entity.ItemKdsStatus;
 import com.smartpos.sales_service.entity.OrderStatus;
 import com.smartpos.sales_service.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -48,12 +51,59 @@ public class OrderController {
     }
 
     @GetMapping
-    @Operation(summary = "Lấy danh sách đơn hàng (lọc theo trạng thái hoặc số bàn)")
-    public ResponseEntity<ApiResponse<List<OrderResponse>>> getOrders(
+    @Operation(summary = "Lấy danh sách đơn hàng (hỗ trợ phân trang, lọc thời gian hoặc lấy toàn bộ)")
+    public ResponseEntity<ApiResponse<?>> getOrders(
             @RequestParam(required = false) OrderStatus status,
-            @RequestParam(required = false) String tableNumber) {
+            @RequestParam(required = false) String tableNumber,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false, defaultValue = "20") Integer size,
+            @RequestParam(required = false, defaultValue = "createdAt,desc") String sort) {
+        if (page != null) {
+            PageResponse<OrderResponse> paged = orderService.getPagedOrders(
+                    status, tableNumber, startDate, endDate, search, page, size, sort);
+            return ResponseEntity.ok(ApiResponse.success(paged, "Lấy danh sách đơn hàng phân trang thành công"));
+        }
         List<OrderResponse> orders = orderService.getOrders(status, tableNumber);
         return ResponseEntity.ok(ApiResponse.success(orders, "Lấy danh sách đơn hàng thành công"));
+    }
+
+    @GetMapping("/statistics")
+    @Operation(summary = "Thống kê doanh thu và báo cáo bán hàng theo kỳ (today, yesterday, week, month)")
+    public ResponseEntity<ApiResponse<SalesStatisticsResponse>> getSalesStatistics(
+            @RequestParam(required = false, defaultValue = "today") String period) {
+        SalesStatisticsResponse statistics = orderService.getSalesStatistics(period);
+        return ResponseEntity.ok(ApiResponse.success(statistics, "Lấy dữ liệu thống kê thành công"));
+    }
+
+    @PostMapping("/{id}/checkout")
+    @Operation(summary = "Thanh toán đơn hàng (hỗ trợ voucher, tích điểm, trừ kho)")
+    public ResponseEntity<ApiResponse<OrderResponse>> checkoutOrder(
+            @PathVariable Long id,
+            @Valid @RequestBody CheckoutOrderRequest request) {
+        OrderResponse response = orderService.checkoutOrder(id, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Thanh toán đơn hàng thành công"));
+    }
+
+    @PostMapping("/{id}/items")
+    @Operation(summary = "Thêm món vào đơn hàng đang phục vụ")
+    public ResponseEntity<ApiResponse<OrderResponse>> addItemsToOrder(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CreateOrderItemRequest> newItems) {
+        OrderResponse response = orderService.addItemsToOrder(id, newItems);
+        return ResponseEntity.ok(ApiResponse.success(response, "Thêm món vào đơn hàng thành công"));
+    }
+
+    @PatchMapping("/{orderId}/items/{itemId}/kds-status")
+    @Operation(summary = "Cập nhật trạng thái chế biến KDS của món ăn")
+    public ResponseEntity<ApiResponse<OrderResponse>> updateOrderItemKdsStatus(
+            @PathVariable Long orderId,
+            @PathVariable Long itemId,
+            @RequestParam ItemKdsStatus status) {
+        OrderResponse response = orderService.updateOrderItemKdsStatus(orderId, itemId, status);
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật trạng thái món thành công"));
     }
 
     @PatchMapping("/{id}/status")
@@ -83,8 +133,20 @@ public class OrderController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Hủy đơn hàng")
-    public ResponseEntity<ApiResponse<Void>> cancelOrder(@PathVariable Long id) {
-        orderService.cancelOrder(id);
+    public ResponseEntity<ApiResponse<Void>> cancelOrder(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "Hủy theo yêu cầu") String reason) {
+        orderService.cancelOrder(id, reason);
+        return ResponseEntity.ok(ApiResponse.success(null, "Hủy đơn hàng thành công"));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @Operation(summary = "Hủy đơn hàng có kèm lý do")
+    public ResponseEntity<ApiResponse<Void>> cancelOrderWithBody(
+            @PathVariable Long id,
+            @RequestBody(required = false) CancelOrderRequest request) {
+        String reason = (request != null && request.getReason() != null) ? request.getReason() : "Hủy theo yêu cầu";
+        orderService.cancelOrder(id, reason);
         return ResponseEntity.ok(ApiResponse.success(null, "Hủy đơn hàng thành công"));
     }
 }

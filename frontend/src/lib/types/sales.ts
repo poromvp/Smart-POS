@@ -7,6 +7,8 @@ export type OrderStatus =
   | "COMPLETED"
   | "CANCELLED";
 
+export type ItemKdsStatus = "PENDING" | "COOKING" | "READY" | "SERVED";
+
 export type OrderType = "DINE_IN" | "TAKE_AWAY" | "DELIVERY";
 
 export type PaymentStatus = "UNPAID" | "PAID" | "REFUNDED";
@@ -27,12 +29,16 @@ export interface OrderItemResponse {
   sweetness?: string | null;
   note?: string | null;
   subTotal: number;
+  kdsStatus?: ItemKdsStatus;
+  createdAt?: string;
 }
 
 export interface OrderResponse {
   id: number;
   orderCode: string;
+  tableId?: number | null;
   tableNumber: string;
+  staffId?: number | null;
   orderType: OrderType;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
@@ -48,6 +54,9 @@ export interface OrderResponse {
   pointsDiscountAmount?: number;
   totalAmount: number;
   note?: string | null;
+  cancelReason?: string | null;
+  cancelledBy?: string | null;
+  version?: number;
   items: OrderItemResponse[];
   createdAt: string;
   updatedAt: string;
@@ -68,7 +77,9 @@ export interface CreateOrderItemRequest {
 }
 
 export interface CreateOrderRequest {
+  tableId?: number;
   tableNumber?: string;
+  staffId?: number;
   orderType?: OrderType;
   note?: string;
   customerId?: number;
@@ -78,6 +89,15 @@ export interface CreateOrderRequest {
   items: CreateOrderItemRequest[];
 }
 
+export interface CheckoutOrderRequest {
+  paymentMethod: PaymentMethod;
+  customerId?: number;
+  customerPhone?: string;
+  promotionCode?: string;
+  pointsToRedeem?: number;
+  staffId?: number;
+}
+
 export interface UpdateOrderStatusRequest {
   status: OrderStatus;
 }
@@ -85,6 +105,35 @@ export interface UpdateOrderStatusRequest {
 export interface UpdatePaymentRequest {
   paymentStatus: PaymentStatus;
   paymentMethod?: PaymentMethod;
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+}
+
+export interface TopSellingItemDto {
+  name: string;
+  quantity: number;
+  revenue: number;
+}
+
+export interface HourlyRevenueDto {
+  hour: number;
+  revenue: number;
+  orderCount: number;
+}
+
+export interface SalesStatisticsResponse {
+  totalRevenue: number;
+  totalOrders: number;
+  averageOrderValue: number;
+  topSellingItems: TopSellingItemDto[];
+  hourlyRevenue: HourlyRevenueDto[];
 }
 
 // ==================== KHÁCH HÀNG & TÍCH ĐIỂM (LOYALTY) ====================
@@ -109,7 +158,7 @@ export interface PointTransactionResponse {
   orderId?: number | null;
   orderCode?: string | null;
   pointsChange: number;
-  type: string; // 'EARN' | 'REDEEM'
+  type: string;
   createdAt: string;
 }
 
@@ -121,7 +170,7 @@ export interface PromotionResponse {
   name: string;
   discountPercent: number;
   maxDiscountAmount?: number | null;
-  minOrderAmount?: number;
+  minOrderAmount?: number | null;
   startDate: string;
   endDate: string;
   usageLimit?: number | null;
@@ -133,25 +182,26 @@ export interface PromotionCreateRequest {
   code: string;
   name: string;
   discountPercent: number;
-  maxDiscountAmount?: number | null;
+  maxDiscountAmount?: number;
   minOrderAmount?: number;
   startDate: string;
   endDate: string;
-  usageLimit?: number | null;
+  usageLimit?: number;
   isActive?: boolean;
 }
 
 export interface ApplyPromotionRequest {
   code: string;
-  subtotal: number;
+  orderAmount?: number;
+  subtotal?: number;
 }
 
 export interface ApplyPromotionResponse {
-  valid: boolean;
-  code?: string;
-  name?: string;
-  discountPercent?: number;
-  discountAmount?: number;
-  finalSubtotal?: number;
-  message: string;
+  code: string;
+  name: string;
+  discountPercent: number;
+  discountAmount: number;
+  finalAmount: number;
+  valid?: boolean;
+  message?: string;
 }

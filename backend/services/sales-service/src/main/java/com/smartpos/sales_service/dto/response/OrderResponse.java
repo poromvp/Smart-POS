@@ -20,7 +20,9 @@ import java.util.List;
 public class OrderResponse {
     private Long id;
     private String orderCode;
+    private Long tableId;
     private String tableNumber;
+    private Long staffId;
     private OrderType orderType;
     private OrderStatus status;
     private PaymentStatus paymentStatus;
@@ -40,6 +42,10 @@ public class OrderResponse {
     private BigDecimal totalAmount;
 
     private String note;
+    private String cancelReason;
+    private String cancelledBy;
+    private Long version;
+
     private List<OrderItemResponse> items;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

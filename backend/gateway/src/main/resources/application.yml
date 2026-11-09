@@ -26,6 +26,12 @@ spring:
           predicates:
             - Path=/api/orders/**, /api/sales/**, /api/customers/**, /api/promotions/**
 
+        # Route WebSocket sang sales-service (8083)
+        - id: sales-service-websocket
+          uri: ${SALES_WS_URL:ws://localhost:8083}
+          predicates:
+            - Path=/ws-pos/**
+
         # Route 2: Điều hướng các API thực đơn, nguyên liệu, kho, NCC sang catalog-inventory-service (8082)
         - id: catalog-inventory-service-route
           uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
@@ -37,4 +43,3 @@ management:
     web:
       exposure:
         include: health, info, gateway
-

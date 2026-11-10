@@ -1,9 +1,10 @@
 package com.smartpos.sales_service.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.smartpos.sales_service.converter.LongListJsonConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -58,7 +59,7 @@ public class OrderItem {
     private BigDecimal modifierTotal = BigDecimal.ZERO;
 
     // 4. Danh sách các ID tùy chọn topping, đường, đá đã chọn
-    @Convert(converter = LongListJsonConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "modifier_option_ids", columnDefinition = "jsonb")
     @Builder.Default
     private List<Long> modifierOptionIds = new ArrayList<>();
@@ -91,6 +92,9 @@ public class OrderItem {
         }
         if (this.modifierTotal == null) {
             this.modifierTotal = BigDecimal.ZERO;
+        }
+        if (this.modifierOptionIds == null) {
+            this.modifierOptionIds = new ArrayList<>();
         }
     }
 }

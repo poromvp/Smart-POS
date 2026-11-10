@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import RoleGate from "@/components/auth/RoleGate";
-
-const ALLOWED_ROLES = ["cashier"] as const;
+import { WORKSPACE_PERMISSIONS } from "@/lib/auth-routing";
 
 export default function PosLayout({ children }: { children: ReactNode }) {
-  return <RoleGate allowedRoles={ALLOWED_ROLES}>{children}</RoleGate>;
+  return (
+    <RoleGate requiredPermissions={WORKSPACE_PERMISSIONS.pos}>
+      {children}
+    </RoleGate>
+  );
 }

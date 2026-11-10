@@ -1,10 +1,12 @@
 package com.smartpos.auth_service.service;
 
+import com.smartpos.auth_service.dto.request.ChangePasswordRequest;
 import com.smartpos.auth_service.dto.request.LoginRequest;
 import com.smartpos.auth_service.dto.response.AuthResult;
 import com.smartpos.auth_service.entity.RefreshToken;
 import com.smartpos.auth_service.entity.Role;
 import com.smartpos.auth_service.entity.User;
+import com.smartpos.auth_service.exception.BadRequestException;
 import com.smartpos.auth_service.mapper.UserMapper;
 import com.smartpos.auth_service.repository.UserRepository;
 import com.smartpos.auth_service.security.CookieUtil;
@@ -20,6 +22,8 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
@@ -48,6 +52,9 @@ class AuthServiceImplTest {
 
     @Mock
     private UserMapper userMapper;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private AuthService authService;
@@ -165,5 +172,45 @@ class AuthServiceImplTest {
                 .hasMessageContaining("Invalid refresh token");
 
         verify(oldToken).revoke();
+    }
+
+    @Test
+    @DisplayName("Đổi mật khẩu thành công khi đúng mật khẩu cũ")
+    void testChangePassword_Success() {
+        ChangePasswordRequest request = new ChangePasswordRequest("oldPass123", "newPass123");
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("oldPass123", "$2a$10$hashedPassword")).thenReturn(true);
+        when(passwordEncoder.encode("newPass123")).thenReturn("$2a$10$newHashedPassword");
+
+        authService.changePassword("admin", request);
+
+        assertThat(sampleUser.getPasswordHash()).isEqualTo("$2a$10$newHashedPassword");
+        verify(userRepository).save(sampleUser);
+        verify(refreshTokenService).revokeAllByUserId(sampleUser.getId());
+    }
+
+    @Test
+    @DisplayName("Đổi mật khẩu thất bại khi sai mật khẩu cũ")
+    void testChangePassword_WrongOldPassword_ThrowsBadRequestException() {
+        ChangePasswordRequest request = new ChangePasswordRequest("wrongOldPass", "newPass123");
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("wrongOldPass", "$2a$10$hashedPassword")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.changePassword("admin", request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Mật khẩu cũ không chính xác");
+
+        verify(userRepository, never()).save(any());
+        verify(refreshTokenService, never()).revokeAllByUserId(any());
+    }
+
+    @Test
+    @DisplayName("Đổi mật khẩu thất bại khi không tìm thấy user")
+    void testChangePassword_UserNotFound_ThrowsException() {
+        ChangePasswordRequest request = new ChangePasswordRequest("oldPass123", "newPass123");
+        when(userRepository.findByUsername("nonexistent")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.changePassword("nonexistent", request))
+                .isInstanceOf(UsernameNotFoundException.class);
     }
 }

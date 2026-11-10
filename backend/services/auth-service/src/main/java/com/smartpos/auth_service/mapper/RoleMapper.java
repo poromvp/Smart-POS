@@ -18,7 +18,8 @@ public class RoleMapper {
         return new RoleResponse(
                 role.getId(),
                 role.getName(),
-                role.getDescription()
+                role.getDescription(),
+                role.isSystem()
         );
     }
 

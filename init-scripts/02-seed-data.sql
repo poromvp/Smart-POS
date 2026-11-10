@@ -7,23 +7,17 @@
 -- ============================================================================
 \c pos_identity_db;
 
-INSERT INTO "roles" ("id", "name", "description") VALUES 
-(1, 'ADMIN', 'Quản trị viên toàn quyền'),
-(2, 'CASHIER', 'Nhân viên thu ngân'),
-(3, 'KITCHEN', 'Nhân viên bếp')
+INSERT INTO "roles" ("id", "name", "description", "is_system") VALUES 
+(1, 'ADMIN', 'Quản trị viên toàn quyền', true),
+(2, 'CASHIER', 'Nhân viên thu ngân', true),
+(3, 'CHEF', 'Nhân viên bếp', true),
+(4, 'MANAGER', 'Quản lý nhà hàng', true),
+(5, 'WAITER', 'Nhân viên phục vụ', true)
 ON CONFLICT (id) DO NOTHING;
 SELECT setval('roles_id_seq', (SELECT COALESCE(MAX(id), 1) FROM roles));
 
-INSERT INTO "users" ("id", "username", "password_hash", "full_name", "phone") VALUES 
-(1, 'admin', '$2a$10$w3Yv72D5jN773JzW26hBLeR2/9Wn4U3bQZ/xsmXm240HwQxX7B9ye', 'Kiệt Lê (Admin)', '0901234567'),
-(2, 'thungan1', '$2a$10$w3Yv72D5jN773JzW26hBLeR2/9Wn4U3bQZ/xsmXm240HwQxX7B9ye', 'Nguyễn Thị Thu Ngân', '0911222333')
-ON CONFLICT (id) DO NOTHING;
-SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users));
-
-INSERT INTO "user_roles" ("user_id", "role_id") VALUES 
-(1, 1),
-(2, 2)
-ON CONFLICT DO NOTHING;
+-- Users, Permissions & Role-Permissions sẽ được khởi tạo đồng bộ bởi Auth Service (DataInitializer)
+-- với mật khẩu mặc định là 12345678 cho 10 tài khoản kiểm thử (2 tài khoản/vai trò).
 
 -- ============================================================================
 -- DỊCH VỤ 2: CATALOG & INVENTORY SERVICE (pos_catalog_inventory_db)

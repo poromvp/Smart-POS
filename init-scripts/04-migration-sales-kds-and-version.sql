@@ -5,6 +5,7 @@
 
 -- 1. Bổ sung các cột cho bảng orders (Optimistic Locking & Audit)
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "version" BIGINT DEFAULT 0;
+UPDATE "orders" SET "version" = 0 WHERE "version" IS NULL;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "table_id" BIGINT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "staff_id" BIGINT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "cancel_reason" VARCHAR(500);

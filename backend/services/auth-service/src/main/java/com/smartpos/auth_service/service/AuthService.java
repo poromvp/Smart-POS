@@ -1,12 +1,13 @@
 package com.smartpos.auth_service.service;
 
+import com.smartpos.auth_service.dto.request.ChangePasswordRequest;
 import com.smartpos.auth_service.dto.request.LoginRequest;
 import com.smartpos.auth_service.dto.response.AuthResult;
 import com.smartpos.auth_service.dto.response.CurrentUserResponse;
 import com.smartpos.auth_service.dto.response.TokenResponse;
-import com.smartpos.auth_service.dto.response.UserResponse;
 import com.smartpos.auth_service.entity.RefreshToken;
 import com.smartpos.auth_service.entity.User;
+import com.smartpos.auth_service.exception.BadRequestException;
 import com.smartpos.auth_service.mapper.UserMapper;
 import com.smartpos.auth_service.repository.UserRepository;
 import com.smartpos.auth_service.security.CookieUtil;
@@ -17,6 +18,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final CookieUtil cookieUtil;
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public AuthResult login(LoginRequest request) {
@@ -120,5 +123,24 @@ public class AuthService {
         }
 
         return cookieUtil.cleanRefreshTokenCookie();
+    }
+
+    @Transactional
+    public void changePassword(String username, ChangePasswordRequest request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() ->
+                        new UsernameNotFoundException(
+                                "User not found"
+                        )
+                );
+
+        if (!passwordEncoder.matches(request.oldPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Mật khẩu cũ không chính xác");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+
+        refreshTokenService.revokeAllByUserId(user.getId());
     }
 }

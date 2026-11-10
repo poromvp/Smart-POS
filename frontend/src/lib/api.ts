@@ -1,4 +1,5 @@
-import {
+import { getAccessToken, setAccessToken, clearAccessToken } from "./token-manager.ts";
+import type {
   ApiResponse,
   CategoryMenuResponse,
   CategoryResponse,
@@ -11,8 +12,8 @@ import {
   ModifierGroupUpdateRequest,
   ModifierOptionInput,
   ModifierOptionResponse,
-} from "./types/menu";
-import {
+} from "./types/menu.ts";
+import type {
   IngredientResponse,
   IngredientCreateRequest,
   IngredientUpdateRequest,
@@ -25,16 +26,16 @@ import {
   InventoryTransactionResponse,
   InventoryAdjustmentRequest,
   InventoryAdjustmentResponse,
-} from "./types/inventory";
-import {
+} from "./types/inventory.ts";
+import type {
   SupplierResponse,
   SupplierCreateRequest,
   SupplierUpdateRequest,
   PurchaseOrderResponse,
   PurchaseOrderCreateRequest,
   PurchaseOrderUpdateRequest,
-} from "./types/purchasing";
-import {
+} from "./types/purchasing.ts";
+import type {
   OrderStatus,
   ItemKdsStatus,
   OrderType,
@@ -56,12 +57,126 @@ import {
   PromotionCreateRequest,
   ApplyPromotionRequest,
   ApplyPromotionResponse,
-} from "./types/sales";
+} from "./types/sales.ts";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "/api/catalog";
 export const SALES_API_BASE_URL =
   process.env.NEXT_PUBLIC_SALES_API_URL || "/api/sales";
+
+
+let isRefreshing = false;
+let refreshSubscribers: ((token: string | null) => void)[] = [];
+
+function subscribeTokenRefresh(cb: (token: string | null) => void) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token: string | null) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
+export async function customFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  const urlString =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+      ? input.toString()
+      : (input as Request).url;
+  const isAuthEndpoint =
+    urlString.includes("/api/auth/login") ||
+    urlString.includes("/api/auth/refresh");
+
+  const headers = new Headers(init?.headers || {});
+  const token = typeof window !== "undefined" ? getAccessToken() : null;
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(input, {
+    ...init,
+    headers,
+    credentials: init?.credentials ?? "include",
+  });
+
+  if (response.status === 401 && !isAuthEndpoint && typeof window !== "undefined") {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      try {
+        const refreshRes = await fetch("/api/auth/refresh", {
+          method: "POST",
+          credentials: "include",
+        });
+
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          if (data.accessToken) {
+            setAccessToken(data.accessToken);
+            onRefreshed(data.accessToken);
+
+            const retryHeaders = new Headers(init?.headers || {});
+            retryHeaders.set("Authorization", `Bearer ${data.accessToken}`);
+            return fetch(input, {
+              ...init,
+              headers: retryHeaders,
+              credentials: init?.credentials ?? "include",
+            });
+          }
+        }
+        clearAccessToken();
+        onRefreshed(null);
+      } catch {
+        clearAccessToken();
+        onRefreshed(null);
+      } finally {
+        isRefreshing = false;
+      }
+    } else {
+      return new Promise<Response>((resolve, reject) => {
+        subscribeTokenRefresh((newToken) => {
+          if (newToken) {
+            const retryHeaders = new Headers(init?.headers || {});
+            retryHeaders.set("Authorization", `Bearer ${newToken}`);
+            fetch(input, {
+              ...init,
+              headers: retryHeaders,
+              credentials: init?.credentials ?? "include",
+            })
+              .then(resolve)
+              .catch(reject);
+          } else {
+            resolve(response);
+          }
+        });
+      });
+    }
+  }
+
+  return response;
+}
+
+async function handleDirectResponse<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    let errorMsg = `Lỗi HTTP ${res.status}`;
+    try {
+      const errorJson = await res.json();
+      errorMsg =
+        errorJson.message ||
+        errorJson.detail ||
+        errorJson.title ||
+        errorMsg;
+    } catch {
+      // ignore JSON parse error
+    }
+    throw new Error(errorMsg);
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -106,7 +221,7 @@ export async function fetchMenu(): Promise<CategoryMenuResponse[]> {
   const timeoutId = window.setTimeout(() => controller.abort(), 10_000);
 
   try {
-  const res = await fetch(`${API_BASE_URL}/products/menu`, {
+  const res = await customFetch(`${API_BASE_URL}/products/menu`, {
     cache: "no-store",
     headers: { "Content-Type": "application/json" },
       signal: controller.signal,
@@ -127,7 +242,7 @@ export async function fetchIngredients(
   if (search) params.append("search", search);
   if (activeOnly !== undefined) params.append("activeOnly", String(activeOnly));
   const query = params.toString() ? `?${params.toString()}` : "";
-  const res = await fetch(`${API_BASE_URL}/ingredients${query}`, {
+  const res = await customFetch(`${API_BASE_URL}/ingredients${query}`, {
     cache: "no-store",
   });
   return handleResponse<IngredientResponse[]>(res);
@@ -137,7 +252,7 @@ export async function toggleIngredientStatus(
   id: number,
   isActive: boolean
 ): Promise<void> {
-  const res = await fetch(
+  const res = await customFetch(
     `${API_BASE_URL}/ingredients/${id}/status?isActive=${isActive}`,
     {
       method: "PATCH",
@@ -149,7 +264,7 @@ export async function toggleIngredientStatus(
 export async function createIngredient(
   data: IngredientCreateRequest
 ): Promise<IngredientResponse> {
-  const res = await fetch(`${API_BASE_URL}/ingredients`, {
+  const res = await customFetch(`${API_BASE_URL}/ingredients`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -161,7 +276,7 @@ export async function updateIngredient(
   id: number,
   data: IngredientUpdateRequest
 ): Promise<IngredientResponse> {
-  const res = await fetch(`${API_BASE_URL}/ingredients/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/ingredients/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -170,7 +285,7 @@ export async function updateIngredient(
 }
 
 export async function deleteIngredient(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/ingredients/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/ingredients/${id}`, {
     method: "DELETE",
   });
   return handleResponse<void>(res);
@@ -179,14 +294,14 @@ export async function deleteIngredient(id: number): Promise<void> {
 // ==================== GIAI ĐOẠN 2.2: CÔNG THỨC MÓN (RECIPE / BOM) ====================
 
 export async function fetchProducts(): Promise<ProductSummaryResponse[]> {
-  const res = await fetch(`${API_BASE_URL}/products`, {
+  const res = await customFetch(`${API_BASE_URL}/products`, {
     cache: "no-store",
   });
   return handleResponse<ProductSummaryResponse[]>(res);
 }
 
 export async function fetchProductRecipe(productId: number): Promise<RecipeResponse> {
-  const res = await fetch(`${API_BASE_URL}/recipes/product/${productId}`, {
+  const res = await customFetch(`${API_BASE_URL}/recipes/product/${productId}`, {
     cache: "no-store",
   });
   return handleResponse<RecipeResponse>(res);
@@ -196,7 +311,7 @@ export async function saveProductRecipe(
   productId: number,
   data: ProductRecipeRequest
 ): Promise<RecipeResponse> {
-  const res = await fetch(`${API_BASE_URL}/recipes/product/${productId}`, {
+  const res = await customFetch(`${API_BASE_URL}/recipes/product/${productId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -209,7 +324,7 @@ export async function saveProductRecipe(
 export async function deductInventory(
   data: DeductInventoryRequest
 ): Promise<DeductInventoryResponse> {
-  const res = await fetch(`${API_BASE_URL}/inventory/deduct`, {
+  const res = await customFetch(`${API_BASE_URL}/inventory/deduct`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -220,14 +335,14 @@ export async function deductInventory(
 // ==================== QUẢN LÝ THỰC ĐƠN & MÓN ĂN (CATALOG CRUD) ====================
 
 export async function fetchProductDetail(id: number): Promise<ProductDetailResponse> {
-  const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/products/${id}`, {
     cache: "no-store",
   });
   return handleResponse<ProductDetailResponse>(res);
 }
 
 export async function createProduct(data: ProductCreateRequest): Promise<ProductDetailResponse> {
-  const res = await fetch(`${API_BASE_URL}/products`, {
+  const res = await customFetch(`${API_BASE_URL}/products`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -239,7 +354,7 @@ export async function updateProduct(
   id: number,
   data: ProductUpdateRequest
 ): Promise<ProductDetailResponse> {
-  const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/products/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -248,14 +363,14 @@ export async function updateProduct(
 }
 
 export async function toggleProductStatus(id: number, isActive: boolean): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/products/${id}/status?isActive=${isActive}`, {
+  const res = await customFetch(`${API_BASE_URL}/products/${id}/status?isActive=${isActive}`, {
     method: "PATCH",
   });
   return handleResponse<void>(res);
 }
 
 export async function deleteProduct(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/products/${id}`, {
     method: "DELETE",
   });
   return handleResponse<void>(res);
@@ -264,7 +379,7 @@ export async function deleteProduct(id: number): Promise<void> {
 export async function uploadProductImage(file: File): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${API_BASE_URL}/files/upload`, {
+  const res = await customFetch(`${API_BASE_URL}/files/upload`, {
     method: "POST",
     body: formData,
   });
@@ -284,14 +399,14 @@ export async function uploadProductImage(file: File): Promise<string> {
 
 export async function fetchCategories(activeOnly?: boolean): Promise<CategoryResponse[]> {
   const query = activeOnly ? "?activeOnly=true" : "";
-  const res = await fetch(`${API_BASE_URL}/categories${query}`, {
+  const res = await customFetch(`${API_BASE_URL}/categories${query}`, {
     cache: "no-store",
   });
   return handleResponse<CategoryResponse[]>(res);
 }
 
 export async function createCategory(data: CategoryRequest): Promise<CategoryResponse> {
-  const res = await fetch(`${API_BASE_URL}/categories`, {
+  const res = await customFetch(`${API_BASE_URL}/categories`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -300,7 +415,7 @@ export async function createCategory(data: CategoryRequest): Promise<CategoryRes
 }
 
 export async function updateCategory(id: number, data: CategoryRequest): Promise<CategoryResponse> {
-  const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/categories/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -309,14 +424,14 @@ export async function updateCategory(id: number, data: CategoryRequest): Promise
 }
 
 export async function toggleCategoryStatus(id: number, isActive: boolean): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/categories/${id}/status?isActive=${isActive}`, {
+  const res = await customFetch(`${API_BASE_URL}/categories/${id}/status?isActive=${isActive}`, {
     method: "PATCH",
   });
   return handleResponse<void>(res);
 }
 
 export async function deleteCategory(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/categories/${id}`, {
     method: "DELETE",
   });
   return handleResponse<void>(res);
@@ -326,7 +441,7 @@ export async function fetchModifierGroups(
   activeOnly?: boolean
 ): Promise<ModifierGroupResponse[]> {
   const query = activeOnly !== undefined ? `?activeOnly=${activeOnly}` : "";
-  const res = await fetch(`${API_BASE_URL}/modifier-groups${query}`, {
+  const res = await customFetch(`${API_BASE_URL}/modifier-groups${query}`, {
     cache: "no-store",
   });
   return handleResponse<ModifierGroupResponse[]>(res);
@@ -336,7 +451,7 @@ export async function toggleModifierGroupStatus(
   id: number,
   isActive: boolean
 ): Promise<void> {
-  const res = await fetch(
+  const res = await customFetch(
     `${API_BASE_URL}/modifier-groups/${id}/status?isActive=${isActive}`,
     {
       method: "PATCH",
@@ -348,7 +463,7 @@ export async function toggleModifierGroupStatus(
 export async function createModifierGroup(
   data: ModifierGroupCreateRequest
 ): Promise<ModifierGroupResponse> {
-  const res = await fetch(`${API_BASE_URL}/modifier-groups`, {
+  const res = await customFetch(`${API_BASE_URL}/modifier-groups`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -360,7 +475,7 @@ export async function updateModifierGroup(
   id: number,
   data: ModifierGroupUpdateRequest
 ): Promise<ModifierGroupResponse> {
-  const res = await fetch(`${API_BASE_URL}/modifier-groups/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/modifier-groups/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -369,7 +484,7 @@ export async function updateModifierGroup(
 }
 
 export async function deleteModifierGroup(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/modifier-groups/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/modifier-groups/${id}`, {
     method: "DELETE",
   });
   return handleResponse<void>(res);
@@ -379,7 +494,7 @@ export async function addOptionToGroup(
   groupId: number,
   data: ModifierOptionInput
 ): Promise<ModifierOptionResponse> {
-  const res = await fetch(`${API_BASE_URL}/modifier-groups/${groupId}/options`, {
+  const res = await customFetch(`${API_BASE_URL}/modifier-groups/${groupId}/options`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -391,7 +506,7 @@ export async function deleteOptionFromGroup(
   groupId: number,
   optionId: number
 ): Promise<void> {
-  const res = await fetch(
+  const res = await customFetch(
     `${API_BASE_URL}/modifier-groups/${groupId}/options/${optionId}`,
     {
       method: "DELETE",
@@ -411,14 +526,14 @@ export async function fetchSuppliers(
   if (activeOnly) params.append("activeOnly", "true");
   const query = params.toString() ? `?${params.toString()}` : "";
 
-  const res = await fetch(`${API_BASE_URL}/suppliers${query}`, {
+  const res = await customFetch(`${API_BASE_URL}/suppliers${query}`, {
     cache: "no-store",
   });
   return handleResponse<SupplierResponse[]>(res);
 }
 
 export async function fetchSupplierDetail(id: number): Promise<SupplierResponse> {
-  const res = await fetch(`${API_BASE_URL}/suppliers/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/suppliers/${id}`, {
     cache: "no-store",
   });
   return handleResponse<SupplierResponse>(res);
@@ -427,7 +542,7 @@ export async function fetchSupplierDetail(id: number): Promise<SupplierResponse>
 export async function createSupplier(
   data: SupplierCreateRequest
 ): Promise<SupplierResponse> {
-  const res = await fetch(`${API_BASE_URL}/suppliers`, {
+  const res = await customFetch(`${API_BASE_URL}/suppliers`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -439,7 +554,7 @@ export async function updateSupplier(
   id: number,
   data: SupplierUpdateRequest
 ): Promise<SupplierResponse> {
-  const res = await fetch(`${API_BASE_URL}/suppliers/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/suppliers/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -451,14 +566,14 @@ export async function toggleSupplierStatus(
   id: number,
   isActive: boolean
 ): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/suppliers/${id}/status?isActive=${isActive}`, {
+  const res = await customFetch(`${API_BASE_URL}/suppliers/${id}/status?isActive=${isActive}`, {
     method: "PATCH",
   });
   return handleResponse<void>(res);
 }
 
 export async function deleteSupplier(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/suppliers/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/suppliers/${id}`, {
     method: "DELETE",
   });
   return handleResponse<void>(res);
@@ -477,14 +592,14 @@ export async function fetchPurchaseOrders(params?: {
   if (params?.toDate) queryParams.append("toDate", params.toDate);
   const query = queryParams.toString() ? `?${queryParams.toString()}` : "";
 
-  const res = await fetch(`${API_BASE_URL}/purchase-orders${query}`, {
+  const res = await customFetch(`${API_BASE_URL}/purchase-orders${query}`, {
     cache: "no-store",
   });
   return handleResponse<PurchaseOrderResponse[]>(res);
 }
 
 export async function fetchPurchaseOrderDetail(id: number): Promise<PurchaseOrderResponse> {
-  const res = await fetch(`${API_BASE_URL}/purchase-orders/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/purchase-orders/${id}`, {
     cache: "no-store",
   });
   return handleResponse<PurchaseOrderResponse>(res);
@@ -493,7 +608,7 @@ export async function fetchPurchaseOrderDetail(id: number): Promise<PurchaseOrde
 export async function createPurchaseOrder(
   data: PurchaseOrderCreateRequest
 ): Promise<PurchaseOrderResponse> {
-  const res = await fetch(`${API_BASE_URL}/purchase-orders`, {
+  const res = await customFetch(`${API_BASE_URL}/purchase-orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -505,7 +620,7 @@ export async function updatePurchaseOrder(
   id: number,
   data: PurchaseOrderUpdateRequest
 ): Promise<PurchaseOrderResponse> {
-  const res = await fetch(`${API_BASE_URL}/purchase-orders/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/purchase-orders/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -514,14 +629,14 @@ export async function updatePurchaseOrder(
 }
 
 export async function completePurchaseOrder(id: number): Promise<PurchaseOrderResponse> {
-  const res = await fetch(`${API_BASE_URL}/purchase-orders/${id}/complete`, {
+  const res = await customFetch(`${API_BASE_URL}/purchase-orders/${id}/complete`, {
     method: "PATCH",
   });
   return handleResponse<PurchaseOrderResponse>(res);
 }
 
 export async function cancelPurchaseOrder(id: number): Promise<PurchaseOrderResponse> {
-  const res = await fetch(`${API_BASE_URL}/purchase-orders/${id}/cancel`, {
+  const res = await customFetch(`${API_BASE_URL}/purchase-orders/${id}/cancel`, {
     method: "PATCH",
   });
   return handleResponse<PurchaseOrderResponse>(res);
@@ -530,7 +645,7 @@ export async function cancelPurchaseOrder(id: number): Promise<PurchaseOrderResp
 // ==================== GIAI ĐOẠN 4: CẢNH BÁO & SỔ THẺ KHO (AUDIT & ALERTS) ====================
 
 export async function fetchLowStockAlerts(): Promise<LowStockAlertResponse[]> {
-  const res = await fetch(`${API_BASE_URL}/inventory/low-stock`, {
+  const res = await customFetch(`${API_BASE_URL}/inventory/low-stock`, {
     cache: "no-store",
   });
   return handleResponse<LowStockAlertResponse[]>(res);
@@ -551,7 +666,7 @@ export async function fetchInventoryTransactions(params?: {
   if (params?.toDate) queryParams.append("toDate", params.toDate);
   const query = queryParams.toString() ? `?${queryParams.toString()}` : "";
 
-  const res = await fetch(`${API_BASE_URL}/inventory/transactions${query}`, {
+  const res = await customFetch(`${API_BASE_URL}/inventory/transactions${query}`, {
     cache: "no-store",
   });
   return handleResponse<InventoryTransactionResponse[]>(res);
@@ -560,7 +675,7 @@ export async function fetchInventoryTransactions(params?: {
 export async function adjustInventory(
   data: InventoryAdjustmentRequest
 ): Promise<InventoryAdjustmentResponse> {
-  const res = await fetch(`${API_BASE_URL}/inventory/adjust`, {
+  const res = await customFetch(`${API_BASE_URL}/inventory/adjust`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -579,21 +694,21 @@ export async function fetchOrders(params?: {
   if (params?.tableNumber) queryParams.append("tableNumber", params.tableNumber);
   const query = queryParams.toString() ? `?${queryParams.toString()}` : "";
 
-  const res = await fetch(`${SALES_API_BASE_URL}/orders${query}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders${query}`, {
     cache: "no-store",
   });
   return handleResponse<OrderResponse[]>(res);
 }
 
 export async function fetchOrderDetail(id: number): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders/${id}`, {
     cache: "no-store",
   });
   return handleResponse<OrderResponse>(res);
 }
 
 export async function fetchOrderByCode(orderCode: string): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/code/${orderCode}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders/code/${orderCode}`, {
     cache: "no-store",
   });
   return handleResponse<OrderResponse>(res);
@@ -602,7 +717,7 @@ export async function fetchOrderByCode(orderCode: string): Promise<OrderResponse
 export async function createOrder(
   data: CreateOrderRequest
 ): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -614,7 +729,7 @@ export async function updateOrderStatus(
   id: number,
   status: OrderStatus
 ): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}/status`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders/${id}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
@@ -623,7 +738,7 @@ export async function updateOrderStatus(
 }
 
 export async function completeOrder(id: number): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}/complete`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders/${id}/complete`, {
     method: "POST",
   });
   return handleResponse<OrderResponse>(res);
@@ -633,7 +748,7 @@ export async function updateOrderPayment(
   id: number,
   data: UpdatePaymentRequest
 ): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}/payment`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders/${id}/payment`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -645,7 +760,7 @@ export async function checkoutOrder(
   id: number,
   data: CheckoutOrderRequest
 ): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}/checkout`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders/${id}/checkout`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -657,7 +772,7 @@ export async function addItemsToOrder(
   id: number,
   items: CreateOrderItemRequest[]
 ): Promise<OrderResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}/items`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders/${id}/items`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(items),
@@ -670,7 +785,7 @@ export async function updateOrderItemKdsStatus(
   itemId: number,
   status: ItemKdsStatus
 ): Promise<OrderResponse> {
-  const res = await fetch(
+  const res = await customFetch(
     `${SALES_API_BASE_URL}/orders/${orderId}/items/${itemId}/kds-status?status=${status}`,
     {
       method: "PATCH",
@@ -681,7 +796,7 @@ export async function updateOrderItemKdsStatus(
 
 export async function cancelOrder(id: number, reason?: string): Promise<void> {
   const query = reason ? `?reason=${encodeURIComponent(reason)}` : "";
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/${id}${query}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders/${id}${query}`, {
     method: "DELETE",
   });
   return handleResponse<void>(res);
@@ -707,7 +822,7 @@ export async function fetchPagedOrders(params?: {
   queryParams.append("size", String(params?.size ?? 20));
   if (params?.sort) queryParams.append("sort", params.sort);
 
-  const res = await fetch(`${SALES_API_BASE_URL}/orders?${queryParams.toString()}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders?${queryParams.toString()}`, {
     cache: "no-store",
   });
   return handleResponse<PageResponse<OrderResponse>>(res);
@@ -717,7 +832,7 @@ export async function fetchSalesStatistics(
   period?: string
 ): Promise<SalesStatisticsResponse> {
   const query = period ? `?period=${encodeURIComponent(period)}` : "";
-  const res = await fetch(`${SALES_API_BASE_URL}/orders/statistics${query}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/orders/statistics${query}`, {
     cache: "no-store",
   });
   return handleResponse<SalesStatisticsResponse>(res);
@@ -727,14 +842,14 @@ export async function fetchSalesStatistics(
 // ==================== KHÁCH HÀNG & TÍCH ĐIỂM (LOYALTY) ====================
 
 export async function searchCustomerByPhone(phone: string): Promise<CustomerResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/customers/search?phone=${encodeURIComponent(phone)}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/customers/search?phone=${encodeURIComponent(phone)}`, {
     cache: "no-store",
   });
   return handleResponse<CustomerResponse>(res);
 }
 
 export async function createCustomer(data: CustomerCreateRequest): Promise<CustomerResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/customers`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/customers`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -744,14 +859,14 @@ export async function createCustomer(data: CustomerCreateRequest): Promise<Custo
 
 export async function fetchCustomers(search?: string): Promise<CustomerResponse[]> {
   const query = search ? `?search=${encodeURIComponent(search)}` : "";
-  const res = await fetch(`${SALES_API_BASE_URL}/customers${query}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/customers${query}`, {
     cache: "no-store",
   });
   return handleResponse<CustomerResponse[]>(res);
 }
 
 export async function fetchCustomerTransactions(customerId: number): Promise<PointTransactionResponse[]> {
-  const res = await fetch(`${SALES_API_BASE_URL}/customers/${customerId}/transactions`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/customers/${customerId}/transactions`, {
     cache: "no-store",
   });
   return handleResponse<PointTransactionResponse[]>(res);
@@ -761,14 +876,14 @@ export async function fetchCustomerTransactions(customerId: number): Promise<Poi
 
 export async function fetchPromotions(activeOnly?: boolean): Promise<PromotionResponse[]> {
   const query = activeOnly !== undefined ? `?activeOnly=${activeOnly}` : "";
-  const res = await fetch(`${SALES_API_BASE_URL}/promotions${query}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/promotions${query}`, {
     cache: "no-store",
   });
   return handleResponse<PromotionResponse[]>(res);
 }
 
 export async function createPromotion(data: PromotionCreateRequest): Promise<PromotionResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/promotions`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/promotions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -777,24 +892,232 @@ export async function createPromotion(data: PromotionCreateRequest): Promise<Pro
 }
 
 export async function togglePromotionStatus(id: number, active: boolean): Promise<PromotionResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/promotions/${id}/status?active=${active}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/promotions/${id}/status?active=${active}`, {
     method: "PUT",
   });
   return handleResponse<PromotionResponse>(res);
 }
 
 export async function deletePromotion(id: number): Promise<void> {
-  const res = await fetch(`${SALES_API_BASE_URL}/promotions/${id}`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/promotions/${id}`, {
     method: "DELETE",
   });
   return handleResponse<void>(res);
 }
 
 export async function applyPromotion(data: ApplyPromotionRequest): Promise<ApplyPromotionResponse> {
-  const res = await fetch(`${SALES_API_BASE_URL}/promotions/apply`, {
+  const res = await customFetch(`${SALES_API_BASE_URL}/promotions/apply`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   return handleResponse<ApplyPromotionResponse>(res);
+}
+
+
+// ==================== IDENTITY SERVICE (USERS & ROLES) ====================
+
+export interface UserSummary {
+  id: number;
+  username: string;
+  fullName: string;
+  phone: string;
+  active: boolean;
+  roleName: string;
+  createdAt: string;
+}
+
+export interface RoleItem {
+  id: number;
+  name: string;
+  description: string;
+  isSystem: boolean;
+}
+
+export interface PermissionItem {
+  id: number;
+  code: string;
+  name: string;
+  module: string;
+}
+
+export interface RoleDetailItem {
+  id: number;
+  name: string;
+  description: string;
+  permissions: PermissionItem[];
+}
+
+export interface SpringPage<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+}
+
+export async function fetchUsers(
+  page = 0,
+  size = 20
+): Promise<SpringPage<UserSummary>> {
+  const res = await customFetch(`/api/users?page=${page}&size=${size}`, {
+    cache: "no-store",
+  });
+  return handleDirectResponse<SpringPage<UserSummary>>(res);
+}
+
+export async function createUser(data: {
+  username: string;
+  password: string;
+  fullName: string;
+  phone: string;
+  roleId: number;
+}): Promise<UserSummary> {
+  const res = await customFetch("/api/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleDirectResponse<UserSummary>(res);
+}
+
+export async function updateUser(
+  id: number,
+  data: { fullName: string; phone: string }
+): Promise<UserSummary> {
+  const res = await customFetch(`/api/users/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleDirectResponse<UserSummary>(res);
+}
+
+export async function updateUserRole(
+  id: number,
+  roleId: number
+): Promise<UserSummary> {
+  const res = await customFetch(`/api/users/${id}/role`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roleId }),
+  });
+  return handleDirectResponse<UserSummary>(res);
+}
+
+export async function updateUserStatus(
+  id: number,
+  active: boolean
+): Promise<UserSummary> {
+  const res = await customFetch(`/api/users/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ active }),
+  });
+  return handleDirectResponse<UserSummary>(res);
+}
+
+export async function adminResetPassword(
+  id: number,
+  newPassword: string
+): Promise<void> {
+  const res = await customFetch(`/api/users/${id}/password-reset`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ newPassword }),
+  });
+  return handleDirectResponse<void>(res);
+}
+
+export async function fetchRoles(
+  page = 0,
+  size = 100
+): Promise<SpringPage<RoleItem>> {
+  const res = await customFetch(`/api/roles?page=${page}&size=${size}`, {
+    cache: "no-store",
+  });
+  return handleDirectResponse<SpringPage<RoleItem>>(res);
+}
+
+export async function changePassword(
+  oldPassword: string,
+  newPassword: string
+): Promise<void> {
+  const res = await customFetch("/api/auth/change-password", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ oldPassword, newPassword }),
+  });
+  return handleDirectResponse<void>(res);
+}
+
+export async function fetchPermissions(
+  module?: string
+): Promise<PermissionItem[]> {
+  const query = module ? `?module=${encodeURIComponent(module)}` : "";
+  const res = await customFetch(`/api/permissions${query}`, {
+    cache: "no-store",
+  });
+  return handleDirectResponse<PermissionItem[]>(res);
+}
+
+export async function fetchRoleDetail(
+  roleId: number
+): Promise<RoleDetailItem> {
+  const res = await customFetch(`/api/roles/${roleId}`, {
+    cache: "no-store",
+  });
+  return handleDirectResponse<RoleDetailItem>(res);
+}
+
+export async function fetchRolePermissions(
+  roleId: number
+): Promise<PermissionItem[]> {
+  const res = await customFetch(`/api/roles/${roleId}/permissions`, {
+    cache: "no-store",
+  });
+  return handleDirectResponse<PermissionItem[]>(res);
+}
+
+export async function createRole(data: {
+  name: string;
+  description: string;
+}): Promise<RoleItem> {
+  const res = await customFetch("/api/roles", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleDirectResponse<RoleItem>(res);
+}
+
+export async function updateRole(
+  id: number,
+  data: { name: string; description: string }
+): Promise<RoleItem> {
+  const res = await customFetch(`/api/roles/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleDirectResponse<RoleItem>(res);
+}
+
+export async function deleteRole(id: number): Promise<void> {
+  const res = await customFetch(`/api/roles/${id}`, {
+    method: "DELETE",
+  });
+  return handleDirectResponse<void>(res);
+}
+
+export async function replaceRolePermissions(
+  roleId: number,
+  permissionIds: number[]
+): Promise<RoleItem> {
+  const res = await customFetch(`/api/roles/${roleId}/permissions`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ permissionIds }),
+  });
+  return handleDirectResponse<RoleItem>(res);
 }

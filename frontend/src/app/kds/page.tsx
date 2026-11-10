@@ -22,6 +22,7 @@ import TopHeader from "@/components/layout/TopHeader";
 import WorkspaceSidebar, { type WorkspaceNavItem } from "@/components/layout/WorkspaceSidebar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useAuth } from "@/lib/auth-context";
 import { fetchOrders, createOrder, updateOrderStatus, updateOrderItemKdsStatus } from "@/lib/api";
 import { wsManager } from "@/lib/websocket";
 
@@ -69,6 +70,7 @@ export default function KdsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const toast = useToast();
+  const { hasPermission } = useAuth();
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -275,19 +277,23 @@ export default function KdsPage() {
       icon: Printer,
       onClick: () => handleOpenExpiryModal(undefined),
     },
-    {
-      id: "pos",
-      label: "Thu ngân (POS)",
-      icon: MonitorSmartphone,
-      href: "/pos",
-    },
+    ...(hasPermission("POS_ACCESS")
+      ? [
+          {
+            id: "pos",
+            label: "Thu ngân (POS)",
+            icon: MonitorSmartphone,
+            href: "/pos",
+          },
+        ]
+      : []),
   ];
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-gray-50 text-stone-900">
       <TopHeader
         title="Điều phối bếp (KDS)"
-        userName="Bếp trưởng"
+        showPortalLink={true}
         rightContent={
           <div className="flex items-center gap-3 text-sm">
             {/* Chuyển đổi Điều phối món vs Kho nguyên liệu */}

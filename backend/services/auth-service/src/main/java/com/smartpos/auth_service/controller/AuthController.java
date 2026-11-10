@@ -1,10 +1,10 @@
 package com.smartpos.auth_service.controller;
 
+import com.smartpos.auth_service.dto.request.ChangePasswordRequest;
 import com.smartpos.auth_service.dto.request.LoginRequest;
 import com.smartpos.auth_service.dto.response.AuthResult;
 import com.smartpos.auth_service.dto.response.CurrentUserResponse;
 import com.smartpos.auth_service.dto.response.TokenResponse;
-import com.smartpos.auth_service.dto.response.UserResponse;
 import com.smartpos.auth_service.security.CookieUtil;
 import com.smartpos.auth_service.service.AuthService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -79,5 +79,19 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, 
                         cleanCookie.toString())
                 .build();
+    }
+
+    @PutMapping("/change-password")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<Void> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication
+    ) {
+        authService.changePassword(
+                authentication.getName(),
+                request
+        );
+
+        return ResponseEntity.noContent().build();
     }
 }

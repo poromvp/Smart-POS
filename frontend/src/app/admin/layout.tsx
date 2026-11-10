@@ -5,8 +5,7 @@ import { usePathname } from "next/navigation";
 import TopHeader from "@/components/layout/TopHeader";
 import AdminSidebar from "@/components/layout/AdminSidebar";
 import RoleGate from "@/components/auth/RoleGate";
-
-const ADMIN_ALLOWED_ROLES = ["manager"] as const;
+import { WORKSPACE_PERMISSIONS } from "@/lib/auth-routing";
 
 const HEADER_TITLES: Record<string, string> = {
   "/admin": "Báo cáo doanh thu & tổng quan vận hành",
@@ -17,7 +16,7 @@ const HEADER_TITLES: Record<string, string> = {
   "/admin/purchasing": "Quản lý nhập kho & nhà cung cấp",
   "/admin/promotions": "Quản lý chương trình khuyến mãi & mã giảm giá",
   "/admin/customers": "Quản lý khách hàng thân thiết & tích điểm",
-  "/admin/staff": "Quản lý nhân sự, bàn ăn & mã QR",
+  "/admin/staff": "Quản lý nhân sự, phân quyền, bàn ăn & mã QR",
 };
 
 export default function AdminLayout({
@@ -30,12 +29,12 @@ export default function AdminLayout({
     HEADER_TITLES[pathname] ?? "Quản trị hệ thống Smart POS";
 
   return (
-    <RoleGate allowedRoles={ADMIN_ALLOWED_ROLES}>
+    <RoleGate requiredPermissions={WORKSPACE_PERMISSIONS.admin}>
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <TopHeader
           title={currentTitle}
           branchName="Chi nhánh chính"
-          actionLabel="Tài khoản"
+          actionLabel="Đăng xuất"
           showPortalLink={true}
         />
         <div className="flex flex-1 min-h-0">

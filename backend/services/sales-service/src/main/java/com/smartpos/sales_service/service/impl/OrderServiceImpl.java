@@ -886,6 +886,11 @@ public class OrderServiceImpl implements OrderService {
         } catch (FeignException e) {
             String errorMsg = extractErrorMessage(e);
             log.error("Lỗi tồn kho khi trừ kho cho đơn {}: {}", order.getOrderCode(), errorMsg);
+            // Xử lý Idempotency: nếu đơn hàng đã được trừ kho trước đó thì không chặn hoàn tất đơn hàng
+            if (errorMsg != null && errorMsg.contains("đã được trừ kho trước đó")) {
+                log.info("Đơn hàng {} đã được trừ kho trước đó (Idempotent call). Tiếp tục hoàn tất đơn hàng.", order.getOrderCode());
+                return;
+            }
             throw new BusinessException("Không thể hoàn tất đơn hàng: " + errorMsg, e);
         } catch (Exception e) {
             log.error("Lỗi không mong muốn khi gọi catalog-inventory-service cho đơn {}: {}", order.getOrderCode(),
@@ -898,8 +903,15 @@ public class OrderServiceImpl implements OrderService {
         try {
             if (e.contentUTF8() != null && !e.contentUTF8().isBlank()) {
                 JsonNode root = objectMapper.readTree(e.contentUTF8());
+                // Ưu tiên đọc RFC 7807 ProblemDetail 'detail' từ catalog-inventory-service
+                if (root.has("detail") && !root.get("detail").asText().isBlank()) {
+                    return root.get("detail").asText();
+                }
                 if (root.has("message") && !root.get("message").asText().isBlank()) {
                     return root.get("message").asText();
+                }
+                if (root.has("title") && !root.get("title").asText().isBlank()) {
+                    return root.get("title").asText();
                 }
             }
         } catch (Exception ignored) {

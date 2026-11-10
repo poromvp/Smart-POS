@@ -27,6 +27,7 @@ import TopHeader from "@/components/layout/TopHeader";
 import WorkspaceSidebar, { type WorkspaceNavItem } from "@/components/layout/WorkspaceSidebar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useAuth } from "@/lib/auth-context";
 import OrderDetailModal, { formatCurrency } from "@/components/pos/OrderDetailModal";
 import {
   fetchMenu,
@@ -137,6 +138,7 @@ export default function PosPage() {
   } | null>(null);
 
   const toast = useToast();
+  const { hasPermission } = useAuth();
 
   // 1. Tải thực đơn từ Catalog Service
   useEffect(() => {
@@ -673,12 +675,16 @@ export default function PosPage() {
         loadCompletedOrders();
       },
     },
-    {
-      id: "kds",
-      label: "Màn hình bếp (KDS)",
-      icon: ChefHat,
-      href: "/kds",
-    },
+    ...(hasPermission("KDS_VIEW")
+      ? [
+          {
+            id: "kds",
+            label: "Màn hình bếp (KDS)",
+            icon: ChefHat,
+            href: "/kds",
+          },
+        ]
+      : []),
     {
       id: "menu",
       label: "Thực đơn món (QR)",
@@ -692,6 +698,7 @@ export default function PosPage() {
       <TopHeader
         title="Màn hình thu ngân (POS)"
         branchName="Chi nhánh chính"
+        showPortalLink={true}
         rightContent={
           <div className="flex items-center gap-3">
             {/* Chuyển chế độ Sơ đồ bàn vs Lịch sử hóa đơn */}

@@ -1,13 +1,16 @@
 # ==========================================
 # 1. BẢO MẬT & BIẾN MÔI TRƯỜNG (BẮT BUỘC)
 # ==========================================
-backend/services/catalog-inventory-service/src/.env
+.env
+**/.env
 .env.*
+**/.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 !.env.example
+!**/.env.example
 *.pem
 *.key
 *.cert

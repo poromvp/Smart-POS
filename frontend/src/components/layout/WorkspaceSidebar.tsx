@@ -9,10 +9,13 @@ import {
   ChefHat,
   UtensilsCrossed,
   BarChart3,
+  ClipboardList,
   LogOut,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { getAccessibleWorkspaces } from "@/lib/auth-routing";
 
 export interface WorkspaceNavItem {
   id?: string;
@@ -23,14 +26,36 @@ export interface WorkspaceNavItem {
   active?: boolean;
   exact?: boolean;
   badge?: string | number;
+  workspaceKey?: "admin" | "pos" | "kds" | "orderTaking";
 }
 
 const defaultNavItems: WorkspaceNavItem[] = [
   { label: "Cổng phân hệ", href: "/", icon: LayoutGrid, exact: true },
-  { label: "Thu ngân (POS)", href: "/pos", icon: MonitorSmartphone },
-  { label: "Điều phối bếp", href: "/kds", icon: ChefHat },
+  {
+    label: "Thu ngân (POS)",
+    href: "/pos",
+    icon: MonitorSmartphone,
+    workspaceKey: "pos",
+  },
+  {
+    label: "Điều phối bếp",
+    href: "/kds",
+    icon: ChefHat,
+    workspaceKey: "kds",
+  },
+  {
+    label: "Phục vụ bàn",
+    href: "/order-taking",
+    icon: ClipboardList,
+    workspaceKey: "orderTaking",
+  },
   { label: "Thực đơn", href: "/menu", icon: UtensilsCrossed },
-  { label: "Quản trị", href: "/admin", icon: BarChart3 },
+  {
+    label: "Quản trị",
+    href: "/admin",
+    icon: BarChart3,
+    workspaceKey: "admin",
+  },
 ];
 
 export default function WorkspaceSidebar({
@@ -44,9 +69,25 @@ export default function WorkspaceSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { currentUser, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
-  const navItems = items && items.length > 0 ? items : defaultNavItems;
+  const accessible = getAccessibleWorkspaces({
+    roleName: currentUser?.roleName,
+    permissions: currentUser?.permissions,
+  });
+
+  const navItems =
+    items && items.length > 0
+      ? items
+      : defaultNavItems.filter(
+          (item) => !item.workspaceKey || accessible[item.workspaceKey]
+        );
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+  };
 
   return (
     <aside
@@ -62,6 +103,7 @@ export default function WorkspaceSidebar({
             </span>
           )}
           <button
+            type="button"
             onClick={() => setCollapsed(!collapsed)}
             className="p-1.5 rounded-lg text-gray-400 hover:text-orange-600 hover:bg-orange-50 transition-colors mx-auto cursor-pointer"
             title={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
@@ -160,7 +202,8 @@ export default function WorkspaceSidebar({
 
       <div className="pt-3 border-t border-gray-100">
         <button
-          onClick={() => router.push("/login")}
+          type="button"
+          onClick={handleLogout}
           title={collapsed ? "Đăng xuất" : undefined}
           className={`w-full flex items-center ${
             collapsed ? "justify-center px-2" : "px-3.5"

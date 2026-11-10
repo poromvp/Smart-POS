@@ -1,5 +1,5 @@
 server:
-  port: ${PORT:8080}
+  port: ${PORT:8088}
 
 spring:
   application:
@@ -7,36 +7,59 @@ spring:
 
   cloud:
     gateway:
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins: "*"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-      routes:
-        # Route 1: Điều hướng các API bán hàng và đơn hàng sang sales-service (8083)
-        - id: sales-service-route
-          uri: ${SALES_SERVICE_URL:http://localhost:8083}
-          predicates:
-            - Path=/api/orders/**, /api/sales/**, /api/customers/**, /api/promotions/**
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOriginPatterns:
+                  - "http://localhost:*"
+                  - "http://127.0.0.1:*"
+                  - "*"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true
+                exposedHeaders:
+                  - "Authorization"
+                  - "Set-Cookie"
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin, RETAIN_UNIQUE
+            - DedupeResponseHeader=Access-Control-Allow-Credentials, RETAIN_UNIQUE
+          routes:
+            # Route 0: Điều hướng xác thực & tài khoản sang auth-service (8081)
+            - id: auth-service-route
+              uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/auth/**, /api/users/**, /api/roles/**, /api/permissions/**
 
-        # Route WebSocket sang sales-service (8083)
-        - id: sales-service-websocket
-          uri: ${SALES_WS_URL:ws://localhost:8083}
-          predicates:
-            - Path=/ws-pos/**
+            # Route 1: Điều hướng các API bán hàng và đơn hàng sang sales-service (8083)
+            - id: sales-service-route
+              uri: ${SALES_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/orders/**, /api/sales/**, /api/customers/**, /api/promotions/**
 
-        # Route 2: Điều hướng các API thực đơn, nguyên liệu, kho, NCC sang catalog-inventory-service (8082)
-        - id: catalog-inventory-service-route
-          uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
-          predicates:
-            - Path=/api/products/**, /api/categories/**, /api/modifier-groups/**, /api/ingredients/**, /api/recipes/**, /api/inventory/**, /api/suppliers/**, /api/purchase-orders/**, /api/files/**, /uploads/**
+            # Route WebSocket sang sales-service (8083) - hỗ trợ cả HTTP SockJS và native WebSocket
+            - id: sales-service-websocket
+              uri: ${SALES_WS_URL:http://localhost:8083}
+              predicates:
+                - Path=/ws-pos/**
+
+            # Route 2: Điều hướng các API thực đơn, nguyên liệu, kho, NCC sang catalog-inventory-service (8082)
+            - id: catalog-inventory-service-route
+              uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/products/**, /api/categories/**, /api/modifier-groups/**, /api/ingredients/**, /api/recipes/**, /api/inventory/**, /api/suppliers/**, /api/purchase-orders/**, /api/files/**, /uploads/**
+
+# Cấu hình JWT cho Gateway filter giải mã và chuyển tiếp thông tin người dùng
+app:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
 
 management:
   endpoints:

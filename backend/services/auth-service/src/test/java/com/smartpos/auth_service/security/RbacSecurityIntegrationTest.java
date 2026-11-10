@@ -1,14 +1,12 @@
 package com.smartpos.auth_service.security;
 
+import com.smartpos.auth_service.config.SecurityConfig;
 import com.smartpos.auth_service.controller.UserController;
+import com.smartpos.auth_service.service.AuthUserDetailsService;
+import com.smartpos.auth_service.service.JwtService;
 import com.smartpos.auth_service.service.UserService;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -29,7 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @WebMvcTest(UserController.class)
 @Import({
-        com.smartpos.auth_service.config.SecurityConfig.class,
+        SecurityConfig.class,
+        JwtAuthenticationFilter.class,
         RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class
 })
@@ -42,18 +41,10 @@ class RbacSecurityIntegrationTest {
     private UserService userService;
 
     @MockitoBean
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
+    private JwtService jwtService;
 
-    @BeforeEach
-    void setUp() throws Exception {
-        Mockito.doAnswer(invocation -> {
-            ServletRequest req = invocation.getArgument(0);
-            ServletResponse res = invocation.getArgument(1);
-            FilterChain chain = invocation.getArgument(2);
-            chain.doFilter(req, res);
-            return null;
-        }).when(jwtAuthenticationFilter).doFilter(any(ServletRequest.class), any(ServletResponse.class), any(FilterChain.class));
-    }
+    @MockitoBean
+    private AuthUserDetailsService authUserDetailsService;
 
     @Test
     @DisplayName("Chưa đăng nhập gọi API riêng tư /api/users trả về HTTP 401 Unauthorized")

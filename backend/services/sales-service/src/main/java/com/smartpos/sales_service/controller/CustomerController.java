@@ -4,6 +4,7 @@ import com.smartpos.sales_service.dto.request.CustomerRequest;
 import com.smartpos.sales_service.dto.response.ApiResponse;
 import com.smartpos.sales_service.dto.response.CustomerResponse;
 import com.smartpos.sales_service.dto.response.PointTransactionResponse;
+import com.smartpos.sales_service.security.RequirePermissions;
 import com.smartpos.sales_service.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/customers")
 @RequiredArgsConstructor
+@RequirePermissions(anyOf = {"POS_ACCESS", "PAYMENT_PROCESS", "REPORT_VIEW", "ADMIN_DASHBOARD"})
 @Tag(name = "Customer Controller", description = "Quản lý khách hàng thân thiết & tích điểm")
 public class CustomerController {
 

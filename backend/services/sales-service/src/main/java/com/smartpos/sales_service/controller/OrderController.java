@@ -7,6 +7,7 @@ import com.smartpos.sales_service.dto.response.PageResponse;
 import com.smartpos.sales_service.dto.response.SalesStatisticsResponse;
 import com.smartpos.sales_service.entity.ItemKdsStatus;
 import com.smartpos.sales_service.entity.OrderStatus;
+import com.smartpos.sales_service.security.RequirePermissions;
 import com.smartpos.sales_service.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +30,7 @@ public class OrderController {
     private final OrderService orderService;
 
     @PostMapping
+    @RequirePermissions(allowPublic = true)
     @Operation(summary = "Tạo mới đơn hàng (từ QR Ordering hoặc POS)")
     public ResponseEntity<ApiResponse<OrderResponse>> createOrder(@Valid @RequestBody CreateOrderRequest request) {
         OrderResponse createdOrder = orderService.createOrder(request);
@@ -37,6 +39,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
+    @RequirePermissions(anyOf = {"ORDER_READ", "POS_ACCESS", "KDS_VIEW", "REPORT_VIEW", "ADMIN_DASHBOARD"})
     @Operation(summary = "Lấy chi tiết đơn hàng theo ID")
     public ResponseEntity<ApiResponse<OrderResponse>> getOrderById(@PathVariable Long id) {
         OrderResponse order = orderService.getOrderById(id);
@@ -44,6 +47,7 @@ public class OrderController {
     }
 
     @GetMapping("/code/{orderCode}")
+    @RequirePermissions(anyOf = {"ORDER_READ", "POS_ACCESS", "KDS_VIEW", "REPORT_VIEW", "ADMIN_DASHBOARD"})
     @Operation(summary = "Lấy chi tiết đơn hàng theo mã đơn")
     public ResponseEntity<ApiResponse<OrderResponse>> getOrderByCode(@PathVariable String orderCode) {
         OrderResponse order = orderService.getOrderByCode(orderCode);
@@ -51,6 +55,7 @@ public class OrderController {
     }
 
     @GetMapping
+    @RequirePermissions(anyOf = {"ORDER_READ", "POS_ACCESS", "KDS_VIEW", "REPORT_VIEW", "ADMIN_DASHBOARD"}, allowPublicTableLookup = true)
     @Operation(summary = "Lấy danh sách đơn hàng (hỗ trợ phân trang, lọc thời gian hoặc lấy toàn bộ)")
     public ResponseEntity<ApiResponse<?>> getOrders(
             @RequestParam(required = false) OrderStatus status,
@@ -71,6 +76,7 @@ public class OrderController {
     }
 
     @GetMapping("/statistics")
+    @RequirePermissions(anyOf = {"REPORT_VIEW", "ADMIN_DASHBOARD"})
     @Operation(summary = "Thống kê doanh thu và báo cáo bán hàng theo kỳ (today, yesterday, week, month)")
     public ResponseEntity<ApiResponse<SalesStatisticsResponse>> getSalesStatistics(
             @RequestParam(required = false, defaultValue = "today") String period) {
@@ -79,6 +85,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/checkout")
+    @RequirePermissions(anyOf = {"PAYMENT_PROCESS", "POS_ACCESS"})
     @Operation(summary = "Thanh toán đơn hàng (hỗ trợ voucher, tích điểm, trừ kho)")
     public ResponseEntity<ApiResponse<OrderResponse>> checkoutOrder(
             @PathVariable Long id,
@@ -88,6 +95,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/items")
+    @RequirePermissions(allowPublic = true)
     @Operation(summary = "Thêm món vào đơn hàng đang phục vụ")
     public ResponseEntity<ApiResponse<OrderResponse>> addItemsToOrder(
             @PathVariable Long id,
@@ -97,6 +105,7 @@ public class OrderController {
     }
 
     @PatchMapping("/{orderId}/items/{itemId}/kds-status")
+    @RequirePermissions(anyOf = {"KDS_UPDATE"})
     @Operation(summary = "Cập nhật trạng thái chế biến KDS của món ăn")
     public ResponseEntity<ApiResponse<OrderResponse>> updateOrderItemKdsStatus(
             @PathVariable Long orderId,
@@ -107,6 +116,7 @@ public class OrderController {
     }
 
     @PatchMapping("/{id}/status")
+    @RequirePermissions(anyOf = {"KDS_UPDATE", "ORDER_UPDATE", "POS_ACCESS"})
     @Operation(summary = "Cập nhật trạng thái đơn hàng (CONFIRMED, PREPARING, READY, COMPLETED, ...)")
     public ResponseEntity<ApiResponse<OrderResponse>> updateStatus(
             @PathVariable Long id,
@@ -116,6 +126,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/complete")
+    @RequirePermissions(anyOf = {"PAYMENT_PROCESS", "POS_ACCESS"})
     @Operation(summary = "Hoàn tất đơn hàng và tự động trừ kho nguyên liệu")
     public ResponseEntity<ApiResponse<OrderResponse>> completeOrder(@PathVariable Long id) {
         OrderResponse completed = orderService.completeOrder(id);
@@ -123,6 +134,7 @@ public class OrderController {
     }
 
     @PatchMapping("/{id}/payment")
+    @RequirePermissions(anyOf = {"PAYMENT_PROCESS", "POS_ACCESS"})
     @Operation(summary = "Cập nhật thông tin thanh toán cho đơn hàng")
     public ResponseEntity<ApiResponse<OrderResponse>> updatePayment(
             @PathVariable Long id,
@@ -132,6 +144,7 @@ public class OrderController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermissions(anyOf = {"ORDER_CANCEL", "POS_ACCESS"})
     @Operation(summary = "Hủy đơn hàng")
     public ResponseEntity<ApiResponse<Void>> cancelOrder(
             @PathVariable Long id,
@@ -141,6 +154,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/cancel")
+    @RequirePermissions(anyOf = {"ORDER_CANCEL", "POS_ACCESS"})
     @Operation(summary = "Hủy đơn hàng có kèm lý do")
     public ResponseEntity<ApiResponse<Void>> cancelOrderWithBody(
             @PathVariable Long id,

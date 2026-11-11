@@ -193,7 +193,7 @@ function ModifierModalDialog({
                   alt={item.name}
                   fill
                   className="object-cover"
-                  unoptimized={item.imageUrl.startsWith("http")}
+                  unoptimized={item.imageUrl.startsWith("http") || item.imageUrl.startsWith("/uploads/")}
                 />
               ) : (
                 <Utensils size={28} className="text-orange-300" />

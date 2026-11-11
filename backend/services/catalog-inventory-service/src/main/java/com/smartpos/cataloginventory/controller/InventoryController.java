@@ -8,6 +8,7 @@ import com.smartpos.cataloginventory.dto.response.ApiResponse;
 import com.smartpos.cataloginventory.dto.response.DeductInventoryResponse;
 import com.smartpos.cataloginventory.dto.response.InventoryTransactionResponse;
 import com.smartpos.cataloginventory.dto.response.LowStockAlertResponse;
+import com.smartpos.cataloginventory.security.RequirePermissions;
 import com.smartpos.cataloginventory.service.InventoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @PostMapping("/deduct")
+    @RequirePermissions(anyOf = {"INVENTORY_EXPORT"}, allowInternal = true)
     public ResponseEntity<ApiResponse<DeductInventoryResponse>> deductInventory(
             @Valid @RequestBody DeductInventoryRequest request) {
         DeductInventoryResponse response = inventoryService.deductInventory(request);
@@ -35,6 +37,7 @@ public class InventoryController {
     }
 
     @PostMapping("/adjust")
+    @RequirePermissions(anyOf = {"INVENTORY_EXPORT", "INVENTORY_IMPORT"})
     public ResponseEntity<ApiResponse<InventoryAdjustmentResponse>> adjustInventory(
             @Valid @RequestBody InventoryAdjustmentRequest request) {
         InventoryAdjustmentResponse response = inventoryService.adjustInventory(request);
@@ -45,12 +48,14 @@ public class InventoryController {
     }
 
     @GetMapping("/low-stock")
+    @RequirePermissions(anyOf = {"INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<List<LowStockAlertResponse>>> getLowStockAlerts() {
         List<LowStockAlertResponse> response = inventoryService.getLowStockAlerts();
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @GetMapping("/transactions")
+    @RequirePermissions(anyOf = {"INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<List<InventoryTransactionResponse>>> getTransactions(
             @RequestParam(required = false) Long ingredientId,
             @RequestParam(required = false) InventoryTransactionType type,

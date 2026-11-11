@@ -5,6 +5,7 @@ import com.smartpos.sales_service.dto.request.PromotionRequest;
 import com.smartpos.sales_service.dto.response.ApiResponse;
 import com.smartpos.sales_service.dto.response.ApplyPromotionResponse;
 import com.smartpos.sales_service.dto.response.PromotionResponse;
+import com.smartpos.sales_service.security.RequirePermissions;
 import com.smartpos.sales_service.service.PromotionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +26,7 @@ public class PromotionController {
     private final PromotionService promotionService;
 
     @PostMapping
+    @RequirePermissions(anyOf = {"ADMIN_DASHBOARD"})
     @Operation(summary = "Tạo mã khuyến mãi mới")
     public ResponseEntity<ApiResponse<PromotionResponse>> createPromotion(@Valid @RequestBody PromotionRequest request) {
         PromotionResponse response = promotionService.createPromotion(request);
@@ -33,6 +35,7 @@ public class PromotionController {
     }
 
     @GetMapping
+    @RequirePermissions(anyOf = {"POS_ACCESS", "ORDER_READ", "REPORT_VIEW", "ADMIN_DASHBOARD"})
     @Operation(summary = "Lấy danh sách mã khuyến mãi")
     public ResponseEntity<ApiResponse<List<PromotionResponse>>> getAllPromotions(
             @RequestParam(required = false) Boolean activeOnly) {
@@ -41,6 +44,7 @@ public class PromotionController {
     }
 
     @GetMapping("/{id}")
+    @RequirePermissions(anyOf = {"POS_ACCESS", "ORDER_READ", "REPORT_VIEW", "ADMIN_DASHBOARD"})
     @Operation(summary = "Chi tiết khuyến mãi theo ID")
     public ResponseEntity<ApiResponse<PromotionResponse>> getPromotionById(@PathVariable Long id) {
         PromotionResponse response = promotionService.getPromotionById(id);
@@ -48,6 +52,7 @@ public class PromotionController {
     }
 
     @GetMapping("/code/{code}")
+    @RequirePermissions(anyOf = {"POS_ACCESS", "ORDER_READ", "REPORT_VIEW", "ADMIN_DASHBOARD"})
     @Operation(summary = "Tra cứu khuyến mãi theo mã")
     public ResponseEntity<ApiResponse<PromotionResponse>> getPromotionByCode(@PathVariable String code) {
         PromotionResponse response = promotionService.getPromotionByCode(code);
@@ -55,6 +60,7 @@ public class PromotionController {
     }
 
     @PutMapping("/{id}/status")
+    @RequirePermissions(anyOf = {"ADMIN_DASHBOARD"})
     @Operation(summary = "Bật / tắt trạng thái khuyến mãi")
     public ResponseEntity<ApiResponse<PromotionResponse>> toggleStatus(
             @PathVariable Long id,
@@ -64,6 +70,7 @@ public class PromotionController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermissions(anyOf = {"ADMIN_DASHBOARD"})
     @Operation(summary = "Xóa mã khuyến mãi")
     public ResponseEntity<ApiResponse<Void>> deletePromotion(@PathVariable Long id) {
         promotionService.deletePromotion(id);
@@ -71,6 +78,7 @@ public class PromotionController {
     }
 
     @PostMapping("/apply")
+    @RequirePermissions(allowPublic = true)
     @Operation(summary = "Kiểm tra và tính toán giảm giá của voucher")
     public ResponseEntity<ApiResponse<ApplyPromotionResponse>> applyPromotion(
             @Valid @RequestBody ApplyPromotionRequest request) {

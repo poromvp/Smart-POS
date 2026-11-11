@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class UserContextFilter extends OncePerRequestFilter {
 
     public static final String HEADER_USER_ID = "X-User-Id";

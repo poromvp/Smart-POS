@@ -77,3 +77,12 @@ yarn-error.log*
 Thumbs.db
 desktop.ini
 $RECYCLE.BIN/
+
+# ==========================================
+# 7. PLAYWRIGHT E2E TESTING
+# ==========================================
+e2e/.auth/
+e2e/playwright-report/
+e2e/test-results/
+e2e/blob-report/
+e2e/logs/

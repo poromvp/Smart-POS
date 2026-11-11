@@ -40,6 +40,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -65,7 +67,10 @@ public class OrderServiceImpl implements OrderService {
     private SimpMessagingTemplate messagingTemplate;
 
     private void publishOrderEvent(OrderResponse response) {
-        if (messagingTemplate != null && response != null) {
+        if (messagingTemplate == null || response == null) {
+            return;
+        }
+        Runnable sendTask = () -> {
             try {
                 messagingTemplate.convertAndSend("/topic/orders", response);
                 messagingTemplate.convertAndSend("/topic/kds", response);
@@ -75,6 +80,19 @@ public class OrderServiceImpl implements OrderService {
             } catch (Exception e) {
                 log.warn("Không thể gửi thông điệp WebSocket: {}", e.getMessage());
             }
+        };
+
+        // Đợi transaction commit xong rồi mới phát STOMP để client fetch lại không đọc dữ liệu chưa commit
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendTask.run();
+                }
+            });
+        } else {
+            sendTask.run();
         }
     }
 

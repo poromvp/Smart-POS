@@ -2,6 +2,7 @@ package com.smartpos.cataloginventory.controller;
 
 import com.smartpos.cataloginventory.dto.response.ApiResponse;
 import com.smartpos.cataloginventory.dto.response.FileUploadResponse;
+import com.smartpos.cataloginventory.security.RequirePermissions;
 import com.smartpos.cataloginventory.service.FileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class FileController {
     private final FileStorageService fileStorageService;
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequirePermissions(anyOf = {"MENU_CREATE", "MENU_UPDATE"})
     public ResponseEntity<ApiResponse<FileUploadResponse>> uploadFile(
             @RequestParam("file") MultipartFile file,
             HttpServletRequest request) {

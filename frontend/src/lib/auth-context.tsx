@@ -9,10 +9,11 @@ import React, {
   ReactNode,
 } from "react";
 import {
-  getAccessToken,
   setAccessToken,
   clearAccessToken,
 } from "./token-manager";
+import { customFetch } from "./api";
+import { wsManager } from "./websocket";
 
 export interface CurrentUser {
   id: number;
@@ -69,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await res.json();
         if (data.accessToken) {
           setAccessToken(data.accessToken);
+          wsManager.setAuthToken(data.accessToken);
           const me = await fetchMe(data.accessToken);
           return me !== null;
         }
@@ -77,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ignore refresh error on unauthenticated visits
     }
     clearAccessToken();
+    wsManager.setAuthToken(null);
     setCurrentUser(null);
     return false;
   }, [fetchMe]);
@@ -119,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await res.json();
       setAccessToken(data.accessToken);
+      wsManager.setAuthToken(data.accessToken);
 
       const me = await fetchMe(data.accessToken);
       if (!me) {
@@ -130,17 +134,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    const token = getAccessToken();
     try {
-      await fetch("/api/auth/logout", {
+      await customFetch("/api/auth/logout", {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",
       });
     } catch {
       // ignore network errors on logout
     } finally {
       clearAccessToken();
+      wsManager.setAuthToken(null);
       setCurrentUser(null);
     }
   }, []);

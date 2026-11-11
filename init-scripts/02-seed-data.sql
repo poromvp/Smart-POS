@@ -24,18 +24,35 @@ SELECT setval('roles_id_seq', (SELECT COALESCE(MAX(id), 1) FROM roles));
 -- ============================================================================
 \c pos_catalog_inventory_db;
 
--- 1. KHU VỰC & BÀN ĂN
+-- 1. KHU VỰC & BÀN ĂN (Đủ 20 bàn khớp sơ đồ POS)
 INSERT INTO "areas" ("id", "name", "description") VALUES 
 (1, 'Tầng 1', 'Khu vực máy lạnh'), 
-(2, 'Sân thượng', 'Khu vực ngoài trời thoáng mát')
+(2, 'Tầng 2 (VIP)', 'Khu vực yên tĩnh cho nhóm'),
+(3, 'Sân thượng', 'Khu vực ngoài trời thoáng mát')
 ON CONFLICT (id) DO NOTHING;
 SELECT setval('areas_id_seq', (SELECT COALESCE(MAX(id), 1) FROM areas));
 
 INSERT INTO "dining_tables" ("id", "area_id", "table_number", "capacity", "status") VALUES 
-(1, 1, 'T1-01', 4, 'EMPTY'), 
-(2, 1, 'T1-02', 4, 'EMPTY'),
-(3, 2, 'ST-01', 6, 'EMPTY'),
-(4, 2, 'ST-02', 4, 'EMPTY')
+(1, 1, '1', 4, 'OCCUPIED'), 
+(2, 1, '2', 4, 'OCCUPIED'),
+(3, 1, '3', 4, 'OCCUPIED'),
+(4, 1, '4', 4, 'EMPTY'),
+(5, 1, '5', 4, 'OCCUPIED'),
+(6, 1, '6', 4, 'EMPTY'),
+(7, 1, '7', 4, 'EMPTY'),
+(8, 1, '8', 6, 'OCCUPIED'),
+(9, 2, '9', 4, 'EMPTY'),
+(10, 2, '10', 4, 'EMPTY'),
+(11, 2, '11', 6, 'EMPTY'),
+(12, 2, '12', 6, 'EMPTY'),
+(13, 2, '13', 8, 'RESERVED'),
+(14, 2, '14', 4, 'EMPTY'),
+(15, 3, '15', 4, 'EMPTY'),
+(16, 3, '16', 4, 'EMPTY'),
+(17, 3, '17', 6, 'EMPTY'),
+(18, 3, '18', 6, 'EMPTY'),
+(19, 3, '19', 4, 'EMPTY'),
+(20, 3, '20', 8, 'EMPTY')
 ON CONFLICT (id) DO NOTHING;
 SELECT setval('dining_tables_id_seq', (SELECT COALESCE(MAX(id), 1) FROM dining_tables));
 

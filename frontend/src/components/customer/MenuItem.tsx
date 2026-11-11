@@ -29,7 +29,7 @@ export default function MenuItem({ item, onClick }: MenuItemProps) {
             fill
             sizes="(min-width: 640px) 112px, 96px"
             className="object-cover transition duration-300 group-hover:scale-105"
-            unoptimized={item.imageUrl.startsWith("http")}
+            unoptimized={item.imageUrl.startsWith("http") || item.imageUrl.startsWith("/uploads/")}
           />
         ) : (
           <div className="flex flex-col items-center justify-center text-orange-300">

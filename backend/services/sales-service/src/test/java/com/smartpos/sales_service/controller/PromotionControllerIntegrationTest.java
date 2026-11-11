@@ -6,6 +6,7 @@ import com.smartpos.sales_service.dto.request.ApplyPromotionRequest;
 import com.smartpos.sales_service.dto.request.PromotionRequest;
 import com.smartpos.sales_service.dto.response.ApplyPromotionResponse;
 import com.smartpos.sales_service.dto.response.PromotionResponse;
+import com.smartpos.sales_service.security.UserContextFilter;
 import com.smartpos.sales_service.service.PromotionService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,7 +41,7 @@ class PromotionControllerIntegrationTest {
     private PromotionService promotionService;
 
     @Test
-    @DisplayName("POST /api/promotions với dữ liệu hợp lệ trả về HTTP 201 Created")
+    @DisplayName("POST /api/promotions với dữ liệu hợp lệ và quyền ADMIN_DASHBOARD trả về HTTP 201 Created")
     void testCreatePromotion_ValidInput_ReturnsCreated() throws Exception {
         PromotionRequest request = PromotionRequest.builder()
                 .code("SALE20")
@@ -63,6 +64,8 @@ class PromotionControllerIntegrationTest {
         when(promotionService.createPromotion(any(PromotionRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/promotions")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "MANAGER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "ADMIN_DASHBOARD")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -77,12 +80,13 @@ class PromotionControllerIntegrationTest {
         PromotionRequest request = PromotionRequest.builder()
                 .code("SUPERDISCOUNT")
                 .name("Giảm 150%")
-                .discountPercent(new BigDecimal("150.00")) // Vượt quá max 100%
+                .discountPercent(new BigDecimal("150.00"))
                 .startDate(LocalDateTime.now())
                 .endDate(LocalDateTime.now().plusDays(5))
                 .build();
 
         mockMvc.perform(post("/api/promotions")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -90,7 +94,7 @@ class PromotionControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/promotions/apply kiểm tra tính toán giảm giá trả về HTTP 200 OK")
+    @DisplayName("POST /api/promotions/apply (QR public) kiểm tra tính toán giảm giá trả về HTTP 200 OK")
     void testApplyPromotion_Success_ReturnsOk() throws Exception {
         ApplyPromotionRequest request = ApplyPromotionRequest.builder()
                 .code("SALE10")
@@ -130,9 +134,30 @@ class PromotionControllerIntegrationTest {
         when(promotionService.togglePromotionStatus(eq(1L), eq(false))).thenReturn(response);
 
         mockMvc.perform(put("/api/promotions/1/status")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "MANAGER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "ADMIN_DASHBOARD")
                         .param("active", "false"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.isActive").value(false));
+    }
+
+    @Test
+    @DisplayName("Trả 403 Forbidden khi CASHIER tạo mới khuyến mãi")
+    void testCreatePromotion_ForbiddenForCashier() throws Exception {
+        PromotionRequest request = PromotionRequest.builder()
+                .code("CASHIER10")
+                .name("Không hợp lệ")
+                .discountPercent(new BigDecimal("10.00"))
+                .startDate(LocalDateTime.now())
+                .endDate(LocalDateTime.now().plusDays(1))
+                .build();
+
+        mockMvc.perform(post("/api/promotions")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "CASHIER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "POS_ACCESS,PAYMENT_PROCESS")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
     }
 }

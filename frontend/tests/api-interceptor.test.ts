@@ -6,6 +6,7 @@ import {
   clearAccessToken,
 } from "../src/lib/token-manager.ts";
 import { customFetch } from "../src/lib/api.ts";
+import { wsManager } from "../src/lib/websocket.ts";
 
 // Set window global for node test environment
 if (typeof (globalThis as any).window === "undefined") {
@@ -81,14 +82,17 @@ test("customFetch intercepts HTTP 401, calls refresh, and replays request with n
     assert.equal(recordedTokens[0], "Bearer expired-token");
     assert.equal(recordedTokens[1], "Bearer fresh-new-token-456");
     assert.equal(getAccessToken(), "fresh-new-token-456");
+    assert.equal(wsManager.getAuthToken(), "fresh-new-token-456");
   } finally {
     globalThis.fetch = originalFetch;
     clearAccessToken();
+    wsManager.setAuthToken(null);
   }
 });
 
 test("customFetch clears access token when refresh fails on 401", async () => {
   setAccessToken("invalid-token");
+  wsManager.setAuthToken("invalid-token");
 
   const originalFetch = globalThis.fetch;
 
@@ -108,8 +112,10 @@ test("customFetch clears access token when refresh fails on 401", async () => {
     const res = await customFetch("/api/catalog/ingredients");
     assert.equal(res.status, 401);
     assert.equal(getAccessToken(), null);
+    assert.equal(wsManager.getAuthToken(), null);
   } finally {
     globalThis.fetch = originalFetch;
     clearAccessToken();
+    wsManager.setAuthToken(null);
   }
 });

@@ -1,0 +1,26 @@
+services:
+  postgres-e2e:
+    image: postgres:16-alpine
+    container_name: smartpos-postgres-e2e
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password123}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_e2e_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_admin}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - smartpos-e2e-net
+
+volumes:
+  postgres_e2e_data:
+
+networks:
+  smartpos-e2e-net:
+    driver: bridge

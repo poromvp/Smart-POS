@@ -26,9 +26,17 @@ server:
 
 # Logging
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{correlationId:-no-cid}] %logger{36} - %msg%n"
   level:
     org.springframework: INFO
     com.smart_pos.auth: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
 
 # JWT
 app:

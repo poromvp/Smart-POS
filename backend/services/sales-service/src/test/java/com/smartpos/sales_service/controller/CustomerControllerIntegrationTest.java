@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartpos.sales_service.dto.request.CustomerRequest;
 import com.smartpos.sales_service.dto.response.CustomerResponse;
 import com.smartpos.sales_service.exception.ResourceNotFoundException;
+import com.smartpos.sales_service.security.UserContextFilter;
 import com.smartpos.sales_service.service.CustomerService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class CustomerControllerIntegrationTest {
     private CustomerService customerService;
 
     @Test
-    @DisplayName("POST /api/customers với dữ liệu hợp lệ trả về HTTP 201 Created")
+    @DisplayName("POST /api/customers với dữ liệu hợp lệ và quyền POS_ACCESS trả về HTTP 201 Created")
     void testCreateCustomer_ValidInput_ReturnsCreated() throws Exception {
         CustomerRequest request = CustomerRequest.builder()
                 .phone("0901234567")
@@ -54,6 +55,8 @@ class CustomerControllerIntegrationTest {
         when(customerService.createCustomer(any(CustomerRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/customers")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "CASHIER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "POS_ACCESS,PAYMENT_PROCESS")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -72,6 +75,8 @@ class CustomerControllerIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/customers")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "CASHIER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "POS_ACCESS")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -92,6 +97,8 @@ class CustomerControllerIntegrationTest {
         when(customerService.getCustomerByPhone("0909999888")).thenReturn(response);
 
         mockMvc.perform(get("/api/customers/search")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "CASHIER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "POS_ACCESS")
                         .param("phone", "0909999888"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -105,9 +112,23 @@ class CustomerControllerIntegrationTest {
         when(customerService.getCustomerById(999L))
                 .thenThrow(new ResourceNotFoundException("Không tìm thấy khách hàng với ID: 999"));
 
-        mockMvc.perform(get("/api/customers/999"))
+        mockMvc.perform(get("/api/customers/999")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "ADMIN"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Không tìm thấy khách hàng với ID: 999"));
+    }
+
+    @Test
+    @DisplayName("Trả 403 Forbidden khi CHEF hoặc GUEST gọi API khách hàng")
+    void testCustomers_ForbiddenForUnauthorizedRole() throws Exception {
+        mockMvc.perform(get("/api/customers"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/customers/search")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "CHEF")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "KDS_VIEW,KDS_UPDATE")
+                        .param("phone", "0909999888"))
+                .andExpect(status().isForbidden());
     }
 }

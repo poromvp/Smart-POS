@@ -8,13 +8,14 @@ import com.smartpos.cataloginventory.dto.request.InventoryAdjustmentRequest;
 import com.smartpos.cataloginventory.dto.response.DeductInventoryResponse;
 import com.smartpos.cataloginventory.dto.response.InventoryAdjustmentResponse;
 import com.smartpos.cataloginventory.exception.InsufficientStockException;
+import com.smartpos.cataloginventory.security.UserContextFilter;
 import com.smartpos.cataloginventory.service.InventoryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,6 +25,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -40,7 +42,7 @@ class InventoryControllerIntegrationTest {
     private InventoryService inventoryService;
 
     @Test
-    @DisplayName("POST /api/inventory/deduct khi đủ kho trả về HTTP 200 OK")
+    @DisplayName("POST /api/inventory/deduct khi đủ kho (có quyền INVENTORY_EXPORT) trả về HTTP 200 OK")
     void testDeductInventory_SufficientStock_ReturnsOk() throws Exception {
         DeductItemRequest item = new DeductItemRequest();
         item.setProductId(101L);
@@ -59,6 +61,9 @@ class InventoryControllerIntegrationTest {
         when(inventoryService.deductInventory(any(DeductInventoryRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/inventory/deduct")
+                        .header(UserContextFilter.HEADER_USER_ID, "2")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "MANAGER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "INVENTORY_EXPORT")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -68,7 +73,37 @@ class InventoryControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/inventory/deduct khi thiếu kho trả về lỗi và thông tin nguyên liệu thiếu")
+    @DisplayName("POST /api/inventory/deduct từ sales-service qua Internal Secret trả về HTTP 200 OK")
+    void testDeductInventory_InternalServiceSecret_ReturnsOk() throws Exception {
+        DeductItemRequest item = new DeductItemRequest();
+        item.setProductId(101L);
+        item.setQuantity(1);
+        item.setModifierOptionIds(Collections.emptySet());
+
+        DeductInventoryRequest request = new DeductInventoryRequest();
+        request.setOrderCode("ORD-20261105-INT");
+        request.setItems(List.of(item));
+
+        DeductInventoryResponse response = DeductInventoryResponse.builder()
+                .orderCode("ORD-20261105-INT")
+                .deductions(List.of())
+                .build();
+
+        when(inventoryService.deductInventory(any(DeductInventoryRequest.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/inventory/deduct")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "CASHIER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "PAYMENT_PROCESS")
+                        .header(UserContextFilter.HEADER_INTERNAL_SERVICE, "sales-service")
+                        .header(UserContextFilter.HEADER_INTERNAL_SECRET, "smartpos-internal-secret-2026")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("POST /api/inventory/deduct khi thiếu kho trả về lỗi 409 Conflict")
     void testDeductInventory_InsufficientStock_ReturnsConflict() throws Exception {
         DeductItemRequest item = new DeductItemRequest();
         item.setProductId(101L);
@@ -83,6 +118,7 @@ class InventoryControllerIntegrationTest {
                 .thenThrow(new InsufficientStockException(1L, "Thịt bò Mỹ", new BigDecimal("0.50"), new BigDecimal("1.00")));
 
         mockMvc.perform(post("/api/inventory/deduct")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "ADMIN")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
@@ -110,11 +146,48 @@ class InventoryControllerIntegrationTest {
         when(inventoryService.adjustInventory(any(InventoryAdjustmentRequest.class))).thenReturn(res);
 
         mockMvc.perform(post("/api/inventory/adjust")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "MANAGER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "INVENTORY_EXPORT")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Ghi nhận xuất hủy hỏng hóc thành công"))
                 .andExpect(jsonPath("$.data.stockAfter").value(8.00));
+    }
+
+    @Test
+    @DisplayName("Trả 403 Forbidden khi CASHIER hoặc GUEST không có quyền gọi endpoint kho")
+    void testInventoryEndpoints_ForbiddenWhenMissingPermission() throws Exception {
+        DeductItemRequest item = new DeductItemRequest();
+        item.setProductId(101L);
+        item.setQuantity(1);
+        item.setModifierOptionIds(Collections.emptySet());
+
+        DeductInventoryRequest req = new DeductInventoryRequest();
+        req.setOrderCode("ORD-403");
+        req.setItems(List.of(item));
+
+        // CASHIER không có INVENTORY_EXPORT và không có internal secret
+        mockMvc.perform(post("/api/inventory/deduct")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "CASHIER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "POS_ACCESS,PAYMENT_PROCESS")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"));
+
+        // WAITER không có quyền xem giao dịch kho
+        mockMvc.perform(get("/api/inventory/transactions")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "WAITER")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "MENU_READ,ORDER_CREATE"))
+                .andExpect(status().isForbidden());
+
+        // CHEF có INVENTORY_VIEW -> được xem cảnh báo tồn thấp
+        when(inventoryService.getLowStockAlerts()).thenReturn(List.of());
+        mockMvc.perform(get("/api/inventory/low-stock")
+                        .header(UserContextFilter.HEADER_USER_ROLE, "CHEF")
+                        .header(UserContextFilter.HEADER_USER_PERMISSIONS, "KDS_VIEW,INVENTORY_VIEW"))
+                .andExpect(status().isOk());
     }
 }

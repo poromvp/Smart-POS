@@ -5,6 +5,7 @@ import com.smartpos.cataloginventory.dto.request.PurchaseOrderCreateRequest;
 import com.smartpos.cataloginventory.dto.request.PurchaseOrderUpdateRequest;
 import com.smartpos.cataloginventory.dto.response.ApiResponse;
 import com.smartpos.cataloginventory.dto.response.PurchaseOrderResponse;
+import com.smartpos.cataloginventory.security.RequirePermissions;
 import com.smartpos.cataloginventory.service.PurchaseOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class PurchaseOrderController {
     private final PurchaseOrderService purchaseOrderService;
 
     @PostMapping
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> createPurchaseOrder(
             @Valid @RequestBody PurchaseOrderCreateRequest request) {
         PurchaseOrderResponse response = purchaseOrderService.createPurchaseOrder(request);
@@ -32,6 +34,7 @@ public class PurchaseOrderController {
     }
 
     @GetMapping
+    @RequirePermissions(anyOf = {"INVENTORY_VIEW", "INVENTORY_IMPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<List<PurchaseOrderResponse>>> getPurchaseOrders(
             @RequestParam(required = false) PurchaseOrderStatus status,
             @RequestParam(required = false) Long supplierId,
@@ -42,12 +45,14 @@ public class PurchaseOrderController {
     }
 
     @GetMapping("/{id}")
+    @RequirePermissions(anyOf = {"INVENTORY_VIEW", "INVENTORY_IMPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> getPurchaseOrderById(@PathVariable Long id) {
         PurchaseOrderResponse response = purchaseOrderService.getPurchaseOrderById(id);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @PutMapping("/{id}")
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> updatePurchaseOrder(
             @PathVariable Long id,
             @Valid @RequestBody PurchaseOrderUpdateRequest request) {
@@ -56,12 +61,14 @@ public class PurchaseOrderController {
     }
 
     @PatchMapping("/{id}/complete")
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> completePurchaseOrder(@PathVariable Long id) {
         PurchaseOrderResponse response = purchaseOrderService.completePurchaseOrder(id);
         return ResponseEntity.ok(ApiResponse.ok(response, "Nhập kho và cập nhật tồn kho thành công"));
     }
 
     @PatchMapping("/{id}/cancel")
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> cancelPurchaseOrder(@PathVariable Long id) {
         PurchaseOrderResponse response = purchaseOrderService.cancelPurchaseOrder(id);
         return ResponseEntity.ok(ApiResponse.ok(response, "Hủy phiếu nhập kho thành công"));

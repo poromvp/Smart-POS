@@ -1,4 +1,5 @@
 import { getAccessToken, setAccessToken, clearAccessToken } from "./token-manager.ts";
+import { wsManager } from "./websocket.ts";
 import type {
   ApiResponse,
   CategoryMenuResponse,
@@ -116,6 +117,7 @@ export async function customFetch(
           const data = await refreshRes.json();
           if (data.accessToken) {
             setAccessToken(data.accessToken);
+            wsManager.setAuthToken(data.accessToken);
             onRefreshed(data.accessToken);
 
             const retryHeaders = new Headers(init?.headers || {});
@@ -128,9 +130,11 @@ export async function customFetch(
           }
         }
         clearAccessToken();
+        wsManager.setAuthToken(null);
         onRefreshed(null);
       } catch {
         clearAccessToken();
+        wsManager.setAuthToken(null);
         onRefreshed(null);
       } finally {
         isRefreshing = false;

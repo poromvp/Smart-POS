@@ -23,7 +23,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Component
-@Profile("dev")
+@Profile("dev | !test")
 public class DataInitializer implements CommandLineRunner {
 
     private final PermissionRepository permissionRepository;
@@ -138,7 +138,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 2. Creates the 5 standard roles
+     * 2. Creates the 5 standard roles + 1 custom role for testing role editing/deletion
      */
     private Map<String, Role> seedRoles() {
         List<Role> defaultRoles = List.of(
@@ -146,7 +146,8 @@ public class DataInitializer implements CommandLineRunner {
                 new Role("MANAGER", "Quản lý nhà hàng", true),
                 new Role("CHEF", "Đầu bếp (KDS)", true),
                 new Role("CASHIER", "Thu ngân (POS)", true),
-                new Role("WAITER", "Nhân viên phục vụ", true)
+                new Role("WAITER", "Nhân viên phục vụ", true),
+                new Role("PART_TIME", "Nhân viên bán thời gian (Có thể chỉnh sửa/xóa)", false)
         );
 
         for (Role role : defaultRoles) {
@@ -200,6 +201,11 @@ public class DataInitializer implements CommandLineRunner {
                         "MENU_READ",
                         "ORDER_TAKING_ACCESS",
                         "ORDER_CREATE", "ORDER_READ", "ORDER_UPDATE"
+                ),
+                "PART_TIME", Set.of(
+                        "MENU_READ",
+                        "ORDER_TAKING_ACCESS",
+                        "ORDER_CREATE", "ORDER_READ"
                 )
         );
 
@@ -233,9 +239,9 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 4. Seeds 2 test accounts per role with default password '12345678'
+     * 4. Seeds test accounts across roles (including a locked user for negative login test)
      */
-    private record SeedUserDto(String username, String fullName, String phone, String roleName) {}
+    private record SeedUserDto(String username, String fullName, String phone, String roleName, boolean isActive) {}
 
     private void seedUsers(Map<String, Role> roles) {
         String resolvedAdminUsername = (adminUsername == null || adminUsername.isBlank()) ? "admin" : adminUsername;
@@ -244,16 +250,21 @@ public class DataInitializer implements CommandLineRunner {
         String encodedPassword = passwordEncoder.encode(defaultPassword);
 
         List<SeedUserDto> defaultUsers = List.of(
-                new SeedUserDto(resolvedAdminUsername, adminFullName, resolvedAdminPhone, "ADMIN"),
-                new SeedUserDto("admin02", "Phó Quản trị Hệ thống", "0901234568", "ADMIN"),
-                new SeedUserDto("manager01", "Trần Quản Lý", "0902345671", "MANAGER"),
-                new SeedUserDto("manager02", "Lê Quản Lý", "0902345672", "MANAGER"),
-                new SeedUserDto("chef01", "Nguyễn Bếp Trưởng", "0903456781", "CHEF"),
-                new SeedUserDto("chef02", "Phạm Bếp Phó", "0903456782", "CHEF"),
-                new SeedUserDto("cashier01", "Vũ Thu Ngân", "0904567891", "CASHIER"),
-                new SeedUserDto("cashier02", "Đặng Thu Ngân", "0904567892", "CASHIER"),
-                new SeedUserDto("waiter01", "Hoàng Phục Vụ", "0905678901", "WAITER"),
-                new SeedUserDto("waiter02", "Bùi Phục Vụ", "0905678902", "WAITER")
+                new SeedUserDto(resolvedAdminUsername, adminFullName, resolvedAdminPhone, "ADMIN", true),
+                new SeedUserDto("admin02", "Phó Quản trị Hệ thống", "0901234568", "ADMIN", true),
+                new SeedUserDto("manager01", "Trần Quản Lý", "0902345671", "MANAGER", true),
+                new SeedUserDto("manager02", "Lê Quản Lý", "0902345672", "MANAGER", true),
+                new SeedUserDto("chef01", "Nguyễn Bếp Trưởng", "0903456781", "CHEF", true),
+                new SeedUserDto("chef02", "Phạm Bếp Phó", "0903456782", "CHEF", true),
+                new SeedUserDto("chef03", "Trịnh Phụ Bếp", "0903456783", "CHEF", true),
+                new SeedUserDto("cashier01", "Vũ Thu Ngân", "0904567891", "CASHIER", true),
+                new SeedUserDto("cashier02", "Đặng Thu Ngân", "0904567892", "CASHIER", true),
+                new SeedUserDto("cashier03", "Ngô Thu Ngân Ca Tối", "0904567893", "CASHIER", true),
+                new SeedUserDto("waiter01", "Hoàng Phục Vụ", "0905678901", "WAITER", true),
+                new SeedUserDto("waiter02", "Bùi Phục Vụ", "0905678902", "WAITER", true),
+                new SeedUserDto("waiter03", "Lý Phục Vụ Tầng 2", "0905678903", "WAITER", true),
+                new SeedUserDto("parttime01", "Đoàn Sinh Viên Part-time", "0906789011", "PART_TIME", true),
+                new SeedUserDto("locked_staff", "Nhân viên Đã Khóa (Test)", "0909999999", "CASHIER", false)
         );
 
         for (SeedUserDto u : defaultUsers) {
@@ -262,7 +273,7 @@ public class DataInitializer implements CommandLineRunner {
                 if (role != null) {
                     User user = new User(u.username(), encodedPassword, u.fullName(), u.phone());
                     user.setRole(role);
-                    user.setActive(true);
+                    user.setActive(u.isActive());
                     userRepository.save(user);
                 }
             }

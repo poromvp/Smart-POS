@@ -1,5 +1,6 @@
 server:
   port: ${PORT:8088}
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
 
 spring:
   application:
@@ -9,13 +10,13 @@ spring:
     gateway:
       server:
         webflux:
+          httpclient:
+            connect-timeout: 5000
+            response-timeout: 15s
           globalcors:
             cors-configurations:
               '[/**]':
-                allowedOriginPatterns:
-                  - "http://localhost:*"
-                  - "http://127.0.0.1:*"
-                  - "*"
+                allowedOriginPatterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
                 allowedMethods:
                   - GET
                   - POST
@@ -28,6 +29,7 @@ spring:
                 exposedHeaders:
                   - "Authorization"
                   - "Set-Cookie"
+                  - "X-Correlation-Id"
           default-filters:
             - DedupeResponseHeader=Access-Control-Allow-Origin, RETAIN_UNIQUE
             - DedupeResponseHeader=Access-Control-Allow-Credentials, RETAIN_UNIQUE
@@ -38,11 +40,28 @@ spring:
               predicates:
                 - Path=/api/auth/**, /api/users/**, /api/roles/**, /api/permissions/**
 
-            # Route 1: Điều hướng các API bán hàng và đơn hàng sang sales-service (8083)
+            # Route 1a: Health check của sales-service giữ nguyên đường dẫn /api/sales/health
+            - id: sales-service-health-route
+              uri: ${SALES_SERVICE_URL:http://localhost:8083}
+              order: 1
+              predicates:
+                - Path=/api/sales/health
+
+            # Route 1b: Điều hướng API bán hàng qua prefix /api/sales/** từ Frontend (cắt bỏ /sales -> /api/**)
+            - id: sales-service-frontend-route
+              uri: ${SALES_SERVICE_URL:http://localhost:8083}
+              order: 2
+              predicates:
+                - Path=/api/sales/**
+              filters:
+                - RewritePath=/api/sales/(?<segment>.*), /api/$\{segment}
+
+            # Route 1c: Điều hướng các API bán hàng trực tiếp sang sales-service (8083)
             - id: sales-service-route
               uri: ${SALES_SERVICE_URL:http://localhost:8083}
+              order: 3
               predicates:
-                - Path=/api/orders/**, /api/sales/**, /api/customers/**, /api/promotions/**
+                - Path=/api/orders/**, /api/customers/**, /api/promotions/**
 
             # Route WebSocket sang sales-service (8083) - hỗ trợ cả HTTP SockJS và native WebSocket
             - id: sales-service-websocket
@@ -50,16 +69,76 @@ spring:
               predicates:
                 - Path=/ws-pos/**
 
-            # Route 2: Điều hướng các API thực đơn, nguyên liệu, kho, NCC sang catalog-inventory-service (8082)
+            # Route 2.0a: Đọc thực đơn công khai qua prefix /api/catalog/products/menu có Circuit Breaker fallback
+            - id: catalog-menu-frontend-route
+              uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
+              order: 0
+              predicates:
+                - Path=/api/catalog/products/menu
+                - Method=GET
+              filters:
+                - RewritePath=/api/catalog/(?<segment>.*), /api/$\{segment}
+                - name: CircuitBreaker
+                  args:
+                    name: catalogMenuCB
+                    fallbackUri: forward:/fallback/catalog
+
+            # Route 2.0b: Đọc thực đơn trực tiếp /api/products/menu có Circuit Breaker fallback
+            - id: catalog-menu-direct-route
+              uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
+              order: 0
+              predicates:
+                - Path=/api/products/menu
+                - Method=GET
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: catalogMenuCB
+                    fallbackUri: forward:/fallback/catalog
+
+            # Route 2a: Điều hướng API thực đơn & kho qua prefix /api/catalog/** từ Frontend (cắt bỏ /catalog -> /api/**)
+            - id: catalog-inventory-frontend-route
+              uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
+              order: 1
+              predicates:
+                - Path=/api/catalog/**
+              filters:
+                - RewritePath=/api/catalog/(?<segment>.*), /api/$\{segment}
+
+            # Route 2b: Điều hướng các API thực đơn, nguyên liệu, kho, NCC trực tiếp sang catalog-inventory-service (8082)
             - id: catalog-inventory-service-route
               uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
+              order: 2
               predicates:
                 - Path=/api/products/**, /api/categories/**, /api/modifier-groups/**, /api/ingredients/**, /api/recipes/**, /api/inventory/**, /api/suppliers/**, /api/purchase-orders/**, /api/files/**, /uploads/**
 
-# Cấu hình JWT cho Gateway filter giải mã và chuyển tiếp thông tin người dùng
+resilience4j:
+  circuitbreaker:
+    instances:
+      catalogMenuCB:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+  timelimiter:
+    instances:
+      catalogMenuCB:
+        timeoutDuration: 15s
+
+# Cấu hình JWT & Rate Limiting cho Gateway
 app:
   jwt:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  gateway:
+    rate-limit:
+      enabled: ${RATE_LIMIT_ENABLED:true}
+      login-max-requests: ${RATE_LIMIT_LOGIN_MAX_REQUESTS:15}
+      login-window-seconds: ${RATE_LIMIT_LOGIN_WINDOW_SECONDS:60}
+      order-max-requests: ${RATE_LIMIT_ORDER_MAX_REQUESTS:30}
+      order-window-seconds: ${RATE_LIMIT_ORDER_WINDOW_SECONDS:60}
+      trust-forwarded-headers: ${RATE_LIMIT_TRUST_FORWARDED_HEADERS:false}
 
 management:
   endpoints:

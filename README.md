@@ -69,20 +69,22 @@ Nhóm cần bổ sung người phụ trách Backend, CSDL và các module còn l
 ```mermaid
 flowchart LR
     U["Khách hàng / Nhân viên"] --> FE["Next.js :3000 — QR, POS, KDS, Admin"]
-    FE --> PX["Next.js rewrites"]
-    PX --> CAT["Catalog & Inventory :8082"]
-    PX --> SALES["Sales :8083"]
+    FE -->|"REST Proxy (/api/*, /uploads/*)"| GW["API Gateway :8088<br/>(JWT, Rate Limit, Circuit Breaker, CORS, X-Correlation-Id)"]
+    U -.->|"WebSocket STOMP ws://localhost:8088/ws-pos"| GW
+    GW --> AUTH["Auth :8081 — JWT và RBAC"]
+    GW --> CAT["Catalog & Inventory :8082"]
+    GW --> SALES["Sales :8083"]
+    SALES -.->|"OpenFeign nội bộ: /api/inventory/deduct"| CAT
+    AUTH --> ADB[(pos_identity_db)]
     CAT --> CDB[(pos_catalog_inventory_db)]
     SALES --> SDB[(pos_sales_db)]
-    CLIENT["API client / Swagger"] --> AUTH["Auth :8081 — JWT và RBAC"]
-    AUTH --> ADB[(pos_identity_db)]
     PGA["pgAdmin :5050"] --> PG["PostgreSQL — cổng máy chủ 5433"]
     PG --- ADB
     PG --- CDB
     PG --- SDB
 ```
 
-Ba database cùng chạy trong một container PostgreSQL. Frontend proxy tới Catalog và Sales qua [cấu hình Next.js](frontend/next.config.mjs); đăng nhập giao diện chưa tích hợp Auth API. Module [gateway](backend/gateway) mới có cấu hình Maven, chưa phải một gateway đang hoạt động. KDS dùng HTTP polling mỗi 5 giây.
+Ba database cùng chạy trong một container PostgreSQL. Toàn bộ REST request từ [cấu hình Next.js](frontend/next.config.mjs) và kết nối WebSocket STOMP (`/ws-pos`) đều đi qua **API Gateway (`:8088`)** ([gateway](backend/gateway)). Gateway xử lý định tuyến, xác thực Bearer JWT (`401`), chống giả mạo header `X-User-*`, giới hạn tần suất (Rate Limiting), Circuit Breaker fallback, CORS và gắn `X-Correlation-Id` xuyên suốt 3 microservices.
 
 ### 3.2. Công nghệ và phiên bản
 
@@ -92,15 +94,15 @@ Ba database cùng chạy trong một container PostgreSQL. Frontend proxy tới 
 | --- | --- | --- |
 | Frontend | Next.js `^16.3.5`, React `^19.2.8` | [package.json](frontend/package.json) |
 | Ngôn ngữ và giao diện | TypeScript `^6.0.3`, Tailwind CSS `^4.3.3` | [package.json](frontend/package.json) |
-| Runtime frontend | Khuyến nghị Node.js 24 LTS và npm đi kèm; repo chưa pin runtime | [package-lock.json](frontend/package-lock.json) |
-| Backend | Java 25, Spring Boot 4.1.1, Spring Data JPA | [POM gốc](backend/pom.xml) |
-| Xác thực | Spring Security; JJWT 0.13.0 trong Auth | [POM Auth](backend/services/auth-service/pom.xml) |
+| Runtime frontend | Khuyến nghị Node.js 24 LTS và npm đi kèm; repo chưa pin runtime | [package-lock.json](frontend/package.json) |
+| Backend | Java 21, Spring Boot 4.1.1, Spring Cloud Gateway Server WebFlux (`2025.1.3`), Spring Data JPA | [POM gốc](backend/pom.xml) |
+| Xác thực & Phân quyền | Spring Security + JJWT 0.13.0 tại Auth/Gateway/Sales STOMP; AuthZ `X-User-*` tại Catalog & Sales | [POM Gateway](backend/gateway/pom.xml) |
 | API docs | springdoc-openapi 3.1.0 trong Auth và Sales | [POM Sales](backend/services/sales-service/pom.xml) |
 | CSDL | PostgreSQL `16-alpine` | [Docker Compose](docker-compose.yml) |
 | Quản trị CSDL | pgAdmin 4, image đang dùng tag `latest` | [Docker Compose](docker-compose.yml) |
 | Build Java | Maven; wrapper Auth khai báo 3.10.0 | [Maven Wrapper](backend/services/auth-service/.mvn/wrapper/maven-wrapper.properties) |
-| Hạ tầng | Docker Engine/Desktop, Compose v2; chưa pin phiên bản | [Docker Compose](docker-compose.yml) |
-| Đồng bộ KDS | REST polling 5 giây; WebSocket/STOMP dự kiến | [Màn hình KDS](frontend/src/app/kds/page.tsx) |
+| Hạ tầng | Docker Engine/Desktop, Compose v2; hỗ trợ Gateway container qua `docker-compose.full.yml` | [Docker Compose Full](docker-compose.full.yml) |
+| Đồng bộ realtime | WebSocket STOMP (`/ws-pos` qua Gateway `:8088`) + fallback polling | [WebSocket Manager](frontend/src/lib/websocket.ts) |
 
 ### 3.3. Địa chỉ cục bộ
 
@@ -110,7 +112,10 @@ Ba database cùng chạy trong một container PostgreSQL. Frontend proxy tới 
 | Khách gọi món bàn 01 | http://localhost:3000/menu?table=01 |
 | Menu chỉ xem | http://localhost:3000/menu |
 | POS / KDS / quản trị | http://localhost:3000/pos · http://localhost:3000/kds · http://localhost:3000/admin |
-| Auth / Catalog / Sales API | http://localhost:8081/api/auth · http://localhost:8082/api · http://localhost:8083/api |
+| API Gateway (Single Entry Point) | http://localhost:8088 · WebSocket `ws://localhost:8088/ws-pos` |
+| Gateway Healthcheck | http://localhost:8088/actuator/health |
+| Auth / Catalog / Sales API (nội bộ) | http://localhost:8081/api/auth · http://localhost:8082/api · http://localhost:8083/api |
+| Healthcheck 3 microservices | `:8081/actuator/health` · `:8082/actuator/health` · `:8083/api/sales/health` |
 | Swagger Auth / Sales | http://localhost:8081/swagger-ui/index.html · http://localhost:8083/swagger-ui/index.html |
 | pgAdmin | http://localhost:5050 |
 | PostgreSQL từ máy chủ | `localhost:5433` |
@@ -124,21 +129,22 @@ Smart-POS/
 ├── backend/
 │   ├── pom.xml
 │   ├── shared/                         # Module dùng chung
-│   ├── gateway/                        # Khung module Maven
+│   ├── gateway/                        # API Gateway (Spring Cloud Gateway WebFlux, :8088)
 │   └── services/
-│       ├── auth-service/               # Tài khoản, vai trò, JWT
-│       ├── catalog-inventory-service/  # Thực đơn, BOM, kho, nhập hàng
-│       └── sales-service/              # Đơn hàng, trạng thái, thanh toán
+│       ├── auth-service/               # Tài khoản, vai trò, JWT (:8081)
+│       ├── catalog-inventory-service/  # Thực đơn, BOM, kho, nhập hàng (:8082)
+│       └── sales-service/              # Đơn hàng, KDS, thanh toán, STOMP WS (:8083)
 ├── frontend/
 │   ├── src/app/                        # Các trang Next.js
 │   ├── src/components/                 # Thành phần giao diện
-│   ├── src/lib/                        # API client, kiểu dữ liệu, auth demo
-│   └── tests/                          # Kiểm thử bộ đếm KDS
+│   ├── src/lib/                        # API client, WebSocket client, AuthContext
+│   └── tests/                          # Unit tests frontend
 ├── database/dbdiagram                  # Thiết kế dữ liệu
 ├── init-scripts/                       # SQL tạo schema và seed
 ├── docs/                               # Báo cáo, sơ đồ, đặc tả, wireframe
-├── .env.example                        # Mẫu hiện tại, còn thiếu biến Docker
-└── docker-compose.yml                  # PostgreSQL và pgAdmin
+├── .env.example                        # Mẫu biến môi trường (DB, Auth, Services, Gateway, Frontend)
+├── docker-compose.yml                  # PostgreSQL và pgAdmin
+└── docker-compose.full.yml             # PostgreSQL, pgAdmin và Gateway container
 ```
 
 ## 5. Thiết lập môi trường
@@ -268,6 +274,11 @@ $env:SPRING_PROFILES_ACTIVE = 'dev'
 mvn -f backend/services/auth-service/pom.xml spring-boot:run
 ```
 
+```powershell
+# Terminal API Gateway (cổng 8088)
+mvn -f backend/gateway/pom.xml spring-boot:run
+```
+
 Kiểm tra log, kết nối CSDL và API từng dịch vụ. Nếu Maven không resolve dependency, kiểm tra version khai báo và repository; không tự thay version mà không cập nhật cấu hình liên quan.
 
 ### 5.5. Chạy frontend
@@ -278,7 +289,7 @@ npm ci
 npm run dev
 ```
 
-Mặc định frontend dùng `/api/catalog` và `/api/sales`, được Next.js chuyển tới cổng 8082/8083. Khi cần đổi endpoint, tạo `.env.local` trong thư mục frontend với `NEXT_PUBLIC_API_URL` và `NEXT_PUBLIC_SALES_API_URL`, rồi khởi động lại Next.js. URL gọi trực tiếp phải có hậu tố `/api` và backend phải cho phép origin tương ứng.
+Mặc định frontend gọi `/api/auth`, `/api/catalog`, `/api/sales`, `/uploads` qua Next.js rewrites tới **API Gateway (`http://localhost:8088`, biến `API_GATEWAY_URL`)** và kết nối WebSocket STOMP tới **`ws://localhost:8088/ws-pos` (`NEXT_PUBLIC_WS_URL`)**. Khi cần đổi endpoint, tạo `.env.local` trong thư mục frontend rồi khởi động lại Next.js. URL gọi trực tiếp phải có hậu tố `/api` và Gateway/backend phải cho phép origin tương ứng.
 
 Để quét QR trên điện thoại cùng mạng, chạy `npm run dev -- --hostname 0.0.0.0`, dùng IP LAN của máy thay `localhost` trong URL QR. Cập nhật `allowedDevOrigins` trong [cấu hình Next.js](frontend/next.config.mjs) nếu IP khác cấu hình hiện có. `/menu` không có tham số bàn chỉ cho xem; ví dụ đặt món là `/menu?table=01`.
 

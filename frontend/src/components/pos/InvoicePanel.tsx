@@ -15,10 +15,16 @@ import {
   Check,
   X,
   AlertCircle,
+  Clock,
+  Flame,
+  CheckCircle2,
+  UtensilsCrossed,
+  AlertTriangle,
+  Send,
 } from "lucide-react";
 import type { RestaurantTable } from "./TableMap";
 import type { ProductDetailResponse } from "@/lib/types/menu";
-import type { CustomerResponse, ApplyPromotionResponse } from "@/lib/types/sales";
+import type { CustomerResponse, ApplyPromotionResponse, OrderStatus } from "@/lib/types/sales";
 import { searchCustomerByPhone, createCustomer, applyPromotion } from "@/lib/api";
 
 export interface MenuItem {
@@ -32,6 +38,9 @@ export interface MenuItem {
 export interface OrderItem {
   id: string;
   menuItemId: string;
+  productId?: number;
+  variantId?: number;
+  modifierOptionIds?: number[];
   name: string;
   price: number;
   quantity: number;
@@ -46,6 +55,8 @@ export interface InvoicePanelProps {
   table: RestaurantTable | null;
   orderItems: OrderItem[];
   menuItems: MenuItem[];
+  orderStatus?: OrderStatus;
+  orderCode?: string;
   onAddItem: (menuItem: MenuItem, spicyLevel?: string) => void;
   onSelectItem?: (menuItem: MenuItem) => void;
   onChangeQuantity: (orderItemId: string, quantity: number) => void;
@@ -59,6 +70,8 @@ export interface InvoicePanelProps {
     finalTotal: number;
   }) => void;
   onCancelOrder?: () => void;
+  onSendToKitchen?: () => void;
+  isSendingToKitchen?: boolean;
 }
 
 export const formatCurrency = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`;
@@ -67,17 +80,22 @@ export default function InvoicePanel({
   table,
   orderItems,
   menuItems,
+  orderStatus,
+  orderCode,
   onAddItem,
   onSelectItem,
   onChangeQuantity,
   onPayment,
   onCancelOrder,
+  onSendToKitchen,
+  isSendingToKitchen = false,
 }: InvoicePanelProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [query, setQuery] = useState("");
   const [pendingItem, setPendingItem] = useState<MenuItem | null>(null);
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showKitchenWarning, setShowKitchenWarning] = useState(false);
 
   // Khách hàng & Loyalty
   const [phoneInput, setPhoneInput] = useState("");
@@ -209,7 +227,50 @@ export default function InvoicePanel({
     setShowRegisterCustomer(false);
   };
 
-  const handleProceedPayment = () => {
+  const getKitchenStatusBadge = () => {
+    if (!orderStatus) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 border border-slate-200">
+          <UtensilsCrossed size={12} />
+          Chưa gửi bếp
+        </span>
+      );
+    }
+    switch (orderStatus) {
+      case "READY":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-300 shadow-2xs">
+            <CheckCircle2 size={13} className="text-emerald-600" />
+            Bếp đã hoàn tất (READY)
+          </span>
+        );
+      case "SERVED":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-800 border border-blue-300">
+            <Check size={13} className="text-blue-600" />
+            Đã ra món
+          </span>
+        );
+      case "PREPARING":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-800 border border-amber-300 animate-pulse">
+            <Flame size={13} className="text-amber-600" />
+            Bếp đang nấu...
+          </span>
+        );
+      case "PENDING":
+      case "CONFIRMED":
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2.5 py-0.5 text-[11px] font-bold text-yellow-800 border border-yellow-300">
+            <Clock size={13} className="text-yellow-600" />
+            Chờ bếp chế biến
+          </span>
+        );
+    }
+  };
+
+  const proceedWithPayment = () => {
     onPayment({
       customer,
       promotion: promoResponse,
@@ -221,12 +282,27 @@ export default function InvoicePanel({
     });
   };
 
+  const handleProceedPayment = () => {
+    // Nếu đơn hàng đang trong bếp chưa hoàn tất (PENDING, CONFIRMED, PREPARING)
+    if (orderStatus && orderStatus !== "READY" && orderStatus !== "SERVED") {
+      setShowKitchenWarning(true);
+      return;
+    }
+    proceedWithPayment();
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Header Panel */}
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 p-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">{table?.name ?? "Chưa chọn bàn"}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900">{table?.name ?? "Chưa chọn bàn"}</h2>
+            {orderCode && (
+              <span className="text-xs font-bold text-slate-500">#{orderCode}</span>
+            )}
+            {getKitchenStatusBadge()}
+          </div>
           <p className="mt-1 text-xs text-slate-500">
             {orderItems.length} loại món · {count} phần
           </p>
@@ -639,15 +715,38 @@ export default function InvoicePanel({
             <span>Hủy đơn</span>
           </button>
 
+          {/* Nút Gửi đơn xuống bếp (nếu chưa có đơn trên backend) */}
+          {!orderStatus && orderItems.length > 0 && onSendToKitchen && (
+            <button
+              type="button"
+              onClick={onSendToKitchen}
+              disabled={isSendingToKitchen}
+              className="flex min-h-12 items-center justify-center gap-1.5 rounded-xl border border-orange-300 bg-orange-50 px-3.5 text-xs font-bold text-orange-700 hover:bg-orange-100 disabled:opacity-50 cursor-pointer transition"
+              title="Gửi danh sách món xuống cho bếp chế biến"
+            >
+              <Send size={15} className={isSendingToKitchen ? "animate-pulse" : ""} />
+              <span>{isSendingToKitchen ? "Đang gửi..." : "Gửi bếp"}</span>
+            </button>
+          )}
+
           {/* Nút Thanh toán */}
           <button
             type="button"
             onClick={handleProceedPayment}
             disabled={!table || orderItems.length === 0}
-            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 text-sm font-bold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer shadow-lg shadow-orange-500/20 transition"
+            className={`flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold text-white shadow-lg transition cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 ${
+              orderStatus && orderStatus !== "READY" && orderStatus !== "SERVED"
+                ? "bg-amber-600 hover:bg-amber-700 shadow-amber-500/20"
+                : "bg-orange-600 hover:bg-orange-700 shadow-orange-500/20"
+            }`}
           >
             <ShoppingBag size={18} />
-            Thanh toán
+            <span>Thanh toán</span>
+            {orderStatus && orderStatus !== "READY" && orderStatus !== "SERVED" && (
+              <span className="ml-1 rounded-full bg-amber-800/60 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">
+                Bếp chưa xong
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -684,6 +783,63 @@ export default function InvoicePanel({
                 className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 cursor-pointer shadow-xs"
               >
                 Đồng ý hủy đơn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cảnh báo Bếp chưa hoàn tất món ăn */}
+      {showKitchenWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-amber-200 space-y-4">
+            <div className="flex items-center gap-3 text-amber-600">
+              <div className="flex size-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Bếp chưa hoàn tất món ăn!
+                </h3>
+                <p className="text-xs text-amber-700 font-semibold">
+                  Trạng thái:{" "}
+                  {orderStatus === "PREPARING"
+                    ? "Bếp đang chế biến"
+                    : orderStatus === "PENDING"
+                    ? "Chờ bếp tiếp nhận"
+                    : "Chưa xong món"}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-amber-50/80 p-3.5 border border-amber-200 text-xs text-slate-700 space-y-1.5 leading-relaxed">
+              <p>
+                Đơn hàng của <strong>{table?.name}</strong>{" "}
+                {orderCode ? `(#${orderCode}) ` : ""}chưa được bếp báo hoàn thành (READY).
+              </p>
+              <p className="text-amber-800 font-medium">
+                ⚠️ Nếu bạn thanh toán ngay lúc này, đơn hàng sẽ chuyển sang trạng thái{" "}
+                <strong>COMPLETED</strong> và tự động gỡ khỏi màn hình điều phối bếp (KDS).
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowKitchenWarning(false)}
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer transition"
+              >
+                Quay lại & Chờ bếp
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowKitchenWarning(false);
+                  proceedWithPayment();
+                }}
+                className="rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2.5 text-xs font-bold text-white cursor-pointer shadow-xs transition"
+              >
+                Vẫn tiếp tục thanh toán
               </button>
             </div>
           </div>

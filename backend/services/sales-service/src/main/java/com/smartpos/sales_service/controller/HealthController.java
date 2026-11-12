@@ -1,6 +1,7 @@
 package com.smartpos.sales_service.controller;
 
 import com.smartpos.sales_service.dto.response.ApiResponse;
+import com.smartpos.sales_service.security.RequirePermissions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import java.util.Map;
 public class HealthController {
 
     @GetMapping("/health")
+    @RequirePermissions(allowPublic = true)
     @Operation(summary = "Kiểm tra trạng thái hoạt động của sales-service")
     public ResponseEntity<ApiResponse<Map<String, String>>> healthCheck() {
         Map<String, String> healthData = Map.of(

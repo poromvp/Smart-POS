@@ -16,8 +16,8 @@ import {
   ArrowRight,
   RefreshCw,
 } from "lucide-react";
-import { fetchOrders, fetchLowStockAlerts } from "@/lib/api";
-import type { OrderResponse, OrderStatus } from "@/lib/types/sales";
+import { fetchOrders, fetchLowStockAlerts, fetchSalesStatistics } from "@/lib/api";
+import type { OrderResponse, OrderStatus, SalesStatisticsResponse } from "@/lib/types/sales";
 import type { LowStockAlertResponse } from "@/lib/types/inventory";
 
 const formatCurrency = (amount: number) =>
@@ -25,6 +25,7 @@ const formatCurrency = (amount: number) =>
 
 export default function AdminOverviewPage() {
   const [period, setPeriod] = useState("today");
+  const [stats, setStats] = useState<SalesStatisticsResponse | null>(null);
   const [orders, setOrders] = useState<OrderResponse[]>([]);
   const [lowStockAlerts, setLowStockAlerts] = useState<LowStockAlertResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,10 +35,12 @@ export default function AdminOverviewPage() {
 
   const loadDashboardData = async () => {
     try {
-      const [ordersData, alertsData] = await Promise.all([
+      const [statsData, ordersData, alertsData] = await Promise.all([
+        fetchSalesStatistics(period).catch(() => null),
         fetchOrders().catch(() => [] as OrderResponse[]),
         fetchLowStockAlerts().catch(() => [] as LowStockAlertResponse[]),
       ]);
+      setStats(statsData);
       setOrders(ordersData || []);
       setLowStockAlerts(alertsData || []);
     } catch (err) {
@@ -50,7 +53,7 @@ export default function AdminOverviewPage() {
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [period]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -80,11 +83,19 @@ export default function AdminOverviewPage() {
 
   // 1. Tổng doanh thu theo kỳ
   const totalRevenue = useMemo(() => {
+    if (stats?.totalRevenue != null) {
+      return stats.totalRevenue;
+    }
     return filteredCompletedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-  }, [filteredCompletedOrders]);
+  }, [stats, filteredCompletedOrders]);
 
   // 2. Tổng đơn hoàn tất theo kỳ
-  const completedCount = filteredCompletedOrders.length;
+  const completedCount = useMemo(() => {
+    if (stats?.totalOrders != null) {
+      return stats.totalOrders;
+    }
+    return filteredCompletedOrders.length;
+  }, [stats, filteredCompletedOrders]);
 
   // 3. Thời gian bếp trung bình (tính từ createdAt đến updatedAt nếu có)
   const avgKitchenTimeStr = useMemo(() => {
@@ -138,6 +149,14 @@ export default function AdminOverviewPage() {
 
   // 5. Món bán chạy nhất
   const bestSellers = useMemo(() => {
+    if (stats?.topSellingItems && stats.topSellingItems.length > 0) {
+      return stats.topSellingItems.slice(0, 5).map((item, idx) => ({
+        rank: idx + 1,
+        name: item.name,
+        sold: `${item.quantity} phần`,
+      }));
+    }
+
     const countMap: Record<string, number> = {};
 
     for (const o of filteredCompletedOrders) {
@@ -164,7 +183,7 @@ export default function AdminOverviewPage() {
       name: item.name,
       sold: `${item.qty} phần`,
     }));
-  }, [filteredCompletedOrders]);
+  }, [stats, filteredCompletedOrders]);
 
   // 6. Đơn hàng gần đây (5 đơn mới nhất)
   const recentOrders = useMemo(() => {

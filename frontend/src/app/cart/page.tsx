@@ -18,7 +18,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGuestCart } from "@/components/customer/guestCartStore";
 import { getGuestTableId, getGuestTableLabel, getGuestTableQuery } from "@/components/customer/guestTable";
-import { createOrder, applyPromotion } from "@/lib/api";
+import { createOrder, addItemsToOrder, fetchOrders, applyPromotion } from "@/lib/api";
 import type { OrderResponse, ApplyPromotionResponse } from "@/lib/types/sales";
 
 const formatCurrency = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`;
@@ -108,12 +108,22 @@ function GuestCartContent() {
         };
       });
 
-      const response = await createOrder({
-        tableNumber: tableId,
-        orderType: "DINE_IN",
-        promotionCode: appliedPromo?.code,
-        items,
-      });
+      const existingOrders = await fetchOrders({ tableNumber: tableId }).catch(() => []);
+      const activeOrder = existingOrders.find(
+        (o) => o.status !== "COMPLETED" && o.status !== "CANCELLED"
+      );
+
+      let response: OrderResponse;
+      if (activeOrder) {
+        response = await addItemsToOrder(activeOrder.id, items);
+      } else {
+        response = await createOrder({
+          tableNumber: tableId,
+          orderType: "DINE_IN",
+          promotionCode: appliedPromo?.code,
+          items,
+        });
+      }
 
       setCreatedOrder(response);
       clearCart();

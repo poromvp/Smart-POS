@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   Clock,
   User,
+  ChefHat,
+  UtensilsCrossed,
 } from "lucide-react";
 import InvoicePanel, {
   type MenuItem,
@@ -22,24 +24,29 @@ import type { ProductDetailResponse } from "@/lib/types/menu";
 import PaymentQRModal from "@/components/pos/PaymentQRModal";
 import TableMap, { type RestaurantTable } from "@/components/pos/TableMap";
 import TopHeader from "@/components/layout/TopHeader";
-import WorkspaceSidebar from "@/components/layout/WorkspaceSidebar";
+import WorkspaceSidebar, { type WorkspaceNavItem } from "@/components/layout/WorkspaceSidebar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useAuth } from "@/lib/auth-context";
 import OrderDetailModal, { formatCurrency } from "@/components/pos/OrderDetailModal";
 import {
   fetchMenu,
   fetchOrders,
   createOrder,
+  checkoutOrder,
+  addItemsToOrder,
   completeOrder,
   updateOrderPayment,
   cancelOrder,
 } from "@/lib/api";
+import { wsManager } from "@/lib/websocket";
 import type {
   OrderResponse,
   OrderItemResponse,
   PaymentMethod,
   CustomerResponse,
   ApplyPromotionResponse,
+  OrderStatus,
 } from "@/lib/types/sales";
 
 const TOTAL_TABLES_COUNT = 20;
@@ -83,6 +90,9 @@ function mapBackendItemToPosItem(backendItem: OrderItemResponse): OrderItem {
   return {
     id: `item-${backendItem.id}`,
     menuItemId: String(backendItem.productId || backendItem.itemId || ""),
+    productId: backendItem.productId,
+    variantId: backendItem.variantId ?? undefined,
+    modifierOptionIds: backendItem.modifierOptionIds,
     name: backendItem.name,
     price: backendItem.unitPrice + (backendItem.modifierTotal || 0),
     quantity: backendItem.quantity,
@@ -108,6 +118,7 @@ export default function PosPage() {
   const [selectedModalProduct, setSelectedModalProduct] =
     useState<ProductDetailResponse | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSendingToKitchen, setIsSendingToKitchen] = useState(false);
 
   // Lịch sử hóa đơn
   const [completedOrders, setCompletedOrders] = useState<OrderResponse[]>([]);
@@ -127,6 +138,7 @@ export default function PosPage() {
   } | null>(null);
 
   const toast = useToast();
+  const { hasPermission } = useAuth();
 
   // 1. Tải thực đơn từ Catalog Service
   useEffect(() => {
@@ -222,13 +234,25 @@ export default function PosPage() {
   useEffect(() => {
     loadActiveOrders();
     loadCompletedOrders();
+
+    // Subscribe WebSocket sự kiện đơn hàng thời gian thực (< 100ms)
+    const unsubscribe = wsManager.subscribe("/topic/orders", () => {
+      loadActiveOrders();
+      loadCompletedOrders();
+    });
+
+    // Fallback polling mỗi 60 giây đề phòng rớt mạng
     const interval = setInterval(() => {
       loadActiveOrders();
       if (activeView === "history") {
         loadCompletedOrders();
       }
-    }, 6000);
-    return () => clearInterval(interval);
+    }, 60000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, [loadActiveOrders, loadCompletedOrders, activeView]);
 
   const handleManualRefresh = async () => {
@@ -297,6 +321,9 @@ export default function PosPage() {
           {
             id: orderItemId,
             menuItemId: String(selection.product.id),
+            productId: selection.product.id,
+            variantId: selection.variant?.id,
+            modifierOptionIds: selection.modifiers.map((m) => m.optionId),
             name: selection.product.name,
             price: selection.unitPrice,
             quantity: selection.quantity,
@@ -341,6 +368,7 @@ export default function PosPage() {
             {
               id: orderItemId,
               menuItemId: menuItem.id,
+              productId: parseInt(menuItem.id, 10) || 1,
               name: menuItem.name,
               price: menuItem.price,
               quantity: 1,
@@ -428,6 +456,69 @@ export default function PosPage() {
     }
   };
 
+  // Gửi đơn hàng chưa thanh toán xuống cho Bếp (KDS) chế biến
+  const handleSendToKitchen = async () => {
+    if (!selectedTableId) return;
+    const currentItems = ordersByTable[selectedTableId] || [];
+    if (currentItems.length === 0) {
+      toast.warning("Chưa có món", "Vui lòng chọn món trước khi gửi đơn xuống bếp");
+      return;
+    }
+
+    setIsSendingToKitchen(true);
+    try {
+      const tableNumber = getTableNumberOnly(selectedTableId);
+      const existingBackendOrder = backendOrdersByTable[selectedTableId];
+
+      const createItems = currentItems.map((item) => {
+        const numericId = item.productId || parseInt(item.menuItemId, 10);
+        return {
+          productId: !isNaN(numericId) ? numericId : 1,
+          variantId: item.variantId,
+          modifierOptionIds: item.modifierOptionIds,
+          name: item.name,
+          quantity: item.quantity,
+          basePrice: item.price,
+          toppings: item.toppings,
+          note: item.note,
+        };
+      });
+
+      let updatedOrder: OrderResponse;
+      if (existingBackendOrder) {
+        updatedOrder = await addItemsToOrder(existingBackendOrder.id, createItems);
+        toast.success(
+          `Đã bổ sung món vào đơn #${updatedOrder.orderCode}!`,
+          `${selectedTable?.name} (${createItems.length} món) đã được cập nhật sang KDS.`
+        );
+      } else {
+        updatedOrder = await createOrder({
+          tableNumber,
+          orderType: "DINE_IN",
+          items: createItems,
+        });
+        toast.success(
+          `Đã gửi đơn #${updatedOrder.orderCode} xuống bếp!`,
+          `${selectedTable?.name} (${currentItems.length} món) đã được gửi sang KDS để chế biến.`
+        );
+      }
+
+      setBackendOrdersByTable((prev) => ({
+        ...prev,
+        [selectedTableId]: updatedOrder,
+      }));
+
+      await loadActiveOrders();
+    } catch (err) {
+      toast.error(
+        "Lỗi gửi bếp",
+        err instanceof Error ? err.message : "Không thể gửi đơn xuống hệ thống bếp."
+      );
+    } finally {
+      setIsSendingToKitchen(false);
+    }
+  };
+
   // Bắt đầu quá trình thanh toán từ InvoicePanel
   const handleStartPayment = (data: {
     customer?: CustomerResponse | null;
@@ -456,22 +547,25 @@ export default function PosPage() {
 
       let orderCode = "";
       if (existingBackendOrder) {
-        await updateOrderPayment(existingBackendOrder.id, {
-          paymentStatus: "PAID",
+        const checkoutRes = await checkoutOrder(existingBackendOrder.id, {
           paymentMethod,
+          customerId: pendingPaymentData?.customer?.id,
+          customerPhone: pendingPaymentData?.customer?.phone,
+          promotionCode: pendingPaymentData?.promotion?.code,
+          pointsToRedeem: pendingPaymentData?.pointsToRedeem,
         });
-
-        await completeOrder(existingBackendOrder.id);
-        orderCode = existingBackendOrder.orderCode;
+        orderCode = checkoutRes.orderCode;
       } else {
         const tableNumber = getTableNumberOnly(paidTableId);
         const currentItems = ordersByTable[paidTableId] || [];
 
         if (currentItems.length > 0) {
           const createItems = currentItems.map((item) => {
-            const numericId = parseInt(item.menuItemId, 10);
+            const numericId = item.productId || parseInt(item.menuItemId, 10);
             return {
               productId: !isNaN(numericId) ? numericId : 1,
+              variantId: item.variantId,
+              modifierOptionIds: item.modifierOptionIds,
               name: item.name,
               quantity: item.quantity,
               basePrice: item.price,
@@ -490,13 +584,14 @@ export default function PosPage() {
             items: createItems,
           });
 
-          await updateOrderPayment(created.id, {
-            paymentStatus: "PAID",
+          const checkoutRes = await checkoutOrder(created.id, {
             paymentMethod,
+            customerId: pendingPaymentData?.customer?.id,
+            customerPhone: pendingPaymentData?.customer?.phone,
+            promotionCode: pendingPaymentData?.promotion?.code,
+            pointsToRedeem: pendingPaymentData?.pointsToRedeem,
           });
-
-          await completeOrder(created.id);
-          orderCode = created.orderCode;
+          orderCode = checkoutRes.orderCode;
         }
       }
 
@@ -550,11 +645,60 @@ export default function PosPage() {
     [completedOrders]
   );
 
+  const kitchenStatusesByTable = useMemo(() => {
+    const result: Record<string, OrderStatus> = {};
+    for (const [tableId, order] of Object.entries(backendOrdersByTable)) {
+      if (order?.status) {
+        result[tableId] = order.status;
+      }
+    }
+    return result;
+  }, [backendOrdersByTable]);
+
+  // Thanh điều hướng thanh bên tùy biến cho Thu ngân
+  const posSidebarItems: WorkspaceNavItem[] = [
+    {
+      id: "tables",
+      label: "Sơ đồ bàn (POS)",
+      icon: LayoutGrid,
+      active: activeView === "tables",
+      onClick: () => setActiveView("tables"),
+    },
+    {
+      id: "history",
+      label: "Lịch sử hóa đơn",
+      icon: ReceiptText,
+      active: activeView === "history",
+      badge: completedOrders.length > 0 ? completedOrders.length : undefined,
+      onClick: () => {
+        setActiveView("history");
+        loadCompletedOrders();
+      },
+    },
+    ...(hasPermission("KDS_VIEW")
+      ? [
+          {
+            id: "kds",
+            label: "Màn hình bếp (KDS)",
+            icon: ChefHat,
+            href: "/kds",
+          },
+        ]
+      : []),
+    {
+      id: "menu",
+      label: "Thực đơn món (QR)",
+      icon: UtensilsCrossed,
+      href: "/menu",
+    },
+  ];
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-slate-50 text-slate-900">
       <TopHeader
         title="Màn hình thu ngân (POS)"
         branchName="Chi nhánh chính"
+        showPortalLink={true}
         rightContent={
           <div className="flex items-center gap-3">
             {/* Chuyển chế độ Sơ đồ bàn vs Lịch sử hóa đơn */}
@@ -612,7 +756,11 @@ export default function PosPage() {
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <WorkspaceSidebar defaultCollapsed={true} />
+        <WorkspaceSidebar
+          defaultCollapsed={true}
+          items={posSidebarItems}
+          title="Thu ngân"
+        />
 
         <main className="mx-auto flex w-full max-w-[1800px] flex-1 min-h-0 flex-col p-3.5 lg:p-5">
           {activeView === "tables" ? (
@@ -648,6 +796,7 @@ export default function PosPage() {
                       items.reduce((sum, item) => sum + item.price * item.quantity, 0),
                     ])
                   )}
+                  kitchenStatuses={kitchenStatusesByTable}
                   selectedTableId={selectedTableId}
                   onSelectTable={handleSelectTable}
                 />
@@ -683,11 +832,15 @@ export default function PosPage() {
                     table={selectedTable}
                     orderItems={selectedOrder}
                     menuItems={menuItems}
+                    orderStatus={backendOrdersByTable[selectedTable.id]?.status}
+                    orderCode={backendOrdersByTable[selectedTable.id]?.orderCode}
                     onAddItem={handleAddItem}
                     onSelectItem={handleSelectItem}
                     onChangeQuantity={handleChangeQuantity}
                     onPayment={handleStartPayment}
                     onCancelOrder={handleCancelOrder}
+                    onSendToKitchen={handleSendToKitchen}
+                    isSendingToKitchen={isSendingToKitchen}
                   />
                 </section>
               )}

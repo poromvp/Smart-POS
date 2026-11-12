@@ -1,8 +1,16 @@
 /** @type {import('next').NextConfig} */
+const GATEWAY_URL = process.env.API_GATEWAY_URL || "http://localhost:8088";
+
 const nextConfig = {
   allowedDevOrigins: ["192.168.10.147"],
   images: {
     remotePatterns: [
+      {
+        protocol: "http",
+        hostname: "localhost",
+        port: "8088",
+        pathname: "/**",
+      },
       {
         protocol: "http",
         hostname: "localhost",
@@ -14,24 +22,40 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        source: "/api/auth/:path*",
+        destination: `${GATEWAY_URL}/api/auth/:path*`,
+      },
+      {
+        source: "/api/users/:path*",
+        destination: `${GATEWAY_URL}/api/users/:path*`,
+      },
+      {
+        source: "/api/roles/:path*",
+        destination: `${GATEWAY_URL}/api/roles/:path*`,
+      },
+      {
+        source: "/api/permissions/:path*",
+        destination: `${GATEWAY_URL}/api/permissions/:path*`,
+      },
+      {
         source: "/api/catalog/:path*",
-        destination: "http://localhost:8082/api/:path*",
+        destination: `${GATEWAY_URL}/api/catalog/:path*`,
       },
       {
         source: "/api/sales/:path*",
-        destination: "http://localhost:8083/api/:path*",
+        destination: `${GATEWAY_URL}/api/sales/:path*`,
       },
       {
         source: "/api/customers/:path*",
-        destination: "http://localhost:8083/api/customers/:path*",
+        destination: `${GATEWAY_URL}/api/customers/:path*`,
       },
       {
         source: "/api/promotions/:path*",
-        destination: "http://localhost:8083/api/promotions/:path*",
+        destination: `${GATEWAY_URL}/api/promotions/:path*`,
       },
       {
         source: "/uploads/:path*",
-        destination: "http://localhost:8082/uploads/:path*",
+        destination: `${GATEWAY_URL}/uploads/:path*`,
       },
     ];
   },

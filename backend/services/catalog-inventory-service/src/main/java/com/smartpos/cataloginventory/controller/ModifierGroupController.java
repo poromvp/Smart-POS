@@ -6,6 +6,7 @@ import com.smartpos.cataloginventory.dto.request.ModifierOptionRequest;
 import com.smartpos.cataloginventory.dto.response.ApiResponse;
 import com.smartpos.cataloginventory.dto.response.ModifierGroupResponse;
 import com.smartpos.cataloginventory.dto.response.ModifierOptionResponse;
+import com.smartpos.cataloginventory.security.RequirePermissions;
 import com.smartpos.cataloginventory.service.ModifierGroupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class ModifierGroupController {
     private final ModifierGroupService modifierGroupService;
 
     @PostMapping
+    @RequirePermissions(anyOf = {"MENU_CREATE"})
     public ResponseEntity<ApiResponse<ModifierGroupResponse>> createGroup(
             @Valid @RequestBody ModifierGroupCreateRequest request) {
         ModifierGroupResponse response = modifierGroupService.createGroup(request);
@@ -31,6 +33,7 @@ public class ModifierGroupController {
     }
 
     @GetMapping
+    @RequirePermissions(anyOf = {"MENU_READ", "MENU_CREATE", "MENU_UPDATE", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<List<ModifierGroupResponse>>> getAllGroups(
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly) {
         List<ModifierGroupResponse> response = modifierGroupService.getAllGroups(activeOnly);
@@ -38,12 +41,14 @@ public class ModifierGroupController {
     }
 
     @GetMapping("/{id}")
+    @RequirePermissions(anyOf = {"MENU_READ", "MENU_CREATE", "MENU_UPDATE", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<ModifierGroupResponse>> getGroupById(@PathVariable Long id) {
         ModifierGroupResponse response = modifierGroupService.getGroupById(id);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @PutMapping("/{id}")
+    @RequirePermissions(anyOf = {"MENU_UPDATE", "MENU_CREATE"})
     public ResponseEntity<ApiResponse<ModifierGroupResponse>> updateGroup(
             @PathVariable Long id,
             @Valid @RequestBody ModifierGroupUpdateRequest request) {
@@ -52,6 +57,7 @@ public class ModifierGroupController {
     }
 
     @PatchMapping("/{id}/status")
+    @RequirePermissions(anyOf = {"MENU_UPDATE", "MENU_CREATE"})
     public ResponseEntity<ApiResponse<Void>> toggleStatus(
             @PathVariable Long id,
             @RequestParam Boolean isActive) {
@@ -60,6 +66,7 @@ public class ModifierGroupController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermissions(anyOf = {"MENU_DELETE"})
     public ResponseEntity<ApiResponse<Void>> deleteGroup(@PathVariable Long id) {
         modifierGroupService.deleteGroup(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "Xóa nhóm tùy chọn thành công"));
@@ -67,6 +74,7 @@ public class ModifierGroupController {
 
     // API thêm riêng 1 option vào nhóm đã tồn tại
     @PostMapping("/{id}/options")
+    @RequirePermissions(anyOf = {"MENU_UPDATE", "MENU_CREATE"})
     public ResponseEntity<ApiResponse<ModifierOptionResponse>> addOption(
             @PathVariable Long id,
             @Valid @RequestBody ModifierOptionRequest request) {
@@ -77,6 +85,7 @@ public class ModifierGroupController {
 
     // API xóa 1 option khỏi nhóm
     @DeleteMapping("/{id}/options/{optionId}")
+    @RequirePermissions(anyOf = {"MENU_UPDATE", "MENU_DELETE"})
     public ResponseEntity<ApiResponse<Void>> deleteOption(
             @PathVariable Long id,
             @PathVariable Long optionId) {

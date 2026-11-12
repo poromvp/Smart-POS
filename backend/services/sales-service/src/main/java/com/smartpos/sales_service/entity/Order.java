@@ -24,8 +24,14 @@ public class Order {
     @Column(name = "order_code", unique = true, nullable = false, length = 64)
     private String orderCode;
 
+    @Column(name = "table_id")
+    private Long tableId;
+
     @Column(name = "table_number", length = 32)
     private String tableNumber;
+
+    @Column(name = "staff_id")
+    private Long staffId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id")
@@ -73,6 +79,16 @@ public class Order {
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
+    @Column(name = "cancel_reason", length = 500)
+    private String cancelReason;
+
+    @Column(name = "cancelled_by", length = 100)
+    private String cancelledBy;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
@@ -85,8 +101,12 @@ public class Order {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+        if (this.updatedAt == null) {
+            this.updatedAt = LocalDateTime.now();
+        }
         if (this.subtotal == null) {
             this.subtotal = BigDecimal.ZERO;
         }

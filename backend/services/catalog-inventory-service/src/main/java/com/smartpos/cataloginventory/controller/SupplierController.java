@@ -4,6 +4,7 @@ import com.smartpos.cataloginventory.dto.request.SupplierCreateRequest;
 import com.smartpos.cataloginventory.dto.request.SupplierUpdateRequest;
 import com.smartpos.cataloginventory.dto.response.ApiResponse;
 import com.smartpos.cataloginventory.dto.response.SupplierResponse;
+import com.smartpos.cataloginventory.security.RequirePermissions;
 import com.smartpos.cataloginventory.service.SupplierService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class SupplierController {
     private final SupplierService supplierService;
 
     @PostMapping
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<SupplierResponse>> createSupplier(
             @Valid @RequestBody SupplierCreateRequest request) {
         SupplierResponse response = supplierService.createSupplier(request);
@@ -29,6 +31,7 @@ public class SupplierController {
     }
 
     @GetMapping
+    @RequirePermissions(anyOf = {"INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<List<SupplierResponse>>> getSuppliers(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Boolean activeOnly) {
@@ -37,12 +40,14 @@ public class SupplierController {
     }
 
     @GetMapping("/{id}")
+    @RequirePermissions(anyOf = {"INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<SupplierResponse>> getSupplierById(@PathVariable Long id) {
         SupplierResponse response = supplierService.getSupplierById(id);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @PutMapping("/{id}")
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<SupplierResponse>> updateSupplier(
             @PathVariable Long id,
             @Valid @RequestBody SupplierUpdateRequest request) {
@@ -51,6 +56,7 @@ public class SupplierController {
     }
 
     @PatchMapping("/{id}/status")
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<Void>> toggleSupplierStatus(
             @PathVariable Long id,
             @RequestParam Boolean isActive) {
@@ -59,6 +65,7 @@ public class SupplierController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<Void>> deleteSupplier(@PathVariable Long id) {
         supplierService.deleteSupplier(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "Xóa nhà cung cấp thành công"));

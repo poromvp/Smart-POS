@@ -16,6 +16,7 @@ import {
   LogOut,
   ChevronRight,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 interface AdminNavItem {
   label: string;
@@ -77,6 +78,12 @@ const adminNavItems: AdminNavItem[] = [
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+  };
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between shrink-0 min-h-[calc(100vh-4rem)] p-4 select-none">
@@ -134,7 +141,8 @@ export default function AdminSidebar() {
 
       <div className="pt-4 border-t border-gray-100">
         <button
-          onClick={() => router.push("/login")}
+          type="button"
+          onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
         >
           <LogOut className="w-5 h-5" />

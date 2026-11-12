@@ -125,7 +125,13 @@ public class RoleService {
     ) {
         Role role = findRoleOrThrowById(roleId);
 
-        validateRoleIsEditable(role);
+        // Allow customizing permissions of non-ADMIN roles (including MANAGER, CASHIER, CHEF, WAITER)
+        // while keeping ADMIN protected so administrators cannot accidentally lock themselves out.
+        if ("ADMIN".equalsIgnoreCase(role.getName())) {
+            throw new BusinessException(
+                    "Cannot modify ADMIN role permissions"
+            );
+        }
 
         Set<Permission> permissions = findPermissionsByIds(request.permissionIds());
 

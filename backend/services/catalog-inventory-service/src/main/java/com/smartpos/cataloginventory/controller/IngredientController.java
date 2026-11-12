@@ -4,6 +4,7 @@ import com.smartpos.cataloginventory.dto.request.IngredientCreateRequest;
 import com.smartpos.cataloginventory.dto.request.IngredientUpdateRequest;
 import com.smartpos.cataloginventory.dto.response.ApiResponse;
 import com.smartpos.cataloginventory.dto.response.IngredientResponse;
+import com.smartpos.cataloginventory.security.RequirePermissions;
 import com.smartpos.cataloginventory.service.IngredientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class IngredientController {
     private final IngredientService ingredientService;
 
     @PostMapping
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "INVENTORY_EXPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<IngredientResponse>> createIngredient(
             @Valid @RequestBody IngredientCreateRequest request) {
         IngredientResponse response = ingredientService.createIngredient(request);
@@ -28,6 +30,7 @@ public class IngredientController {
     }
 
     @GetMapping
+    @RequirePermissions(anyOf = {"INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "MENU_CREATE", "MENU_UPDATE", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<List<IngredientResponse>>> getAllIngredients(
             @RequestParam(required = false) String search,
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly) {
@@ -35,11 +38,13 @@ public class IngredientController {
     }
 
     @GetMapping("/{id}")
+    @RequirePermissions(anyOf = {"INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "MENU_CREATE", "MENU_UPDATE", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<IngredientResponse>> getIngredientById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(ingredientService.getIngredientById(id)));
     }
 
     @PutMapping("/{id}")
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "INVENTORY_EXPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<IngredientResponse>> updateIngredient(
             @PathVariable Long id,
             @Valid @RequestBody IngredientUpdateRequest request) {
@@ -48,6 +53,7 @@ public class IngredientController {
     }
 
     @PatchMapping("/{id}/status")
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "INVENTORY_EXPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<Void>> toggleStatus(
             @PathVariable Long id,
             @RequestParam Boolean isActive) {
@@ -56,6 +62,7 @@ public class IngredientController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermissions(anyOf = {"INVENTORY_IMPORT", "INVENTORY_EXPORT", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<Void>> deleteIngredient(@PathVariable Long id) {
         ingredientService.deleteIngredient(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "Xóa nguyên liệu thành công"));

@@ -7,41 +7,52 @@
 -- ============================================================================
 \c pos_identity_db;
 
-INSERT INTO "roles" ("id", "name", "description") VALUES 
-(1, 'ADMIN', 'Quản trị viên toàn quyền'),
-(2, 'CASHIER', 'Nhân viên thu ngân'),
-(3, 'KITCHEN', 'Nhân viên bếp')
+INSERT INTO "roles" ("id", "name", "description", "is_system") VALUES 
+(1, 'ADMIN', 'Quản trị viên toàn quyền', true),
+(2, 'CASHIER', 'Nhân viên thu ngân', true),
+(3, 'CHEF', 'Nhân viên bếp', true),
+(4, 'MANAGER', 'Quản lý nhà hàng', true),
+(5, 'WAITER', 'Nhân viên phục vụ', true)
 ON CONFLICT (id) DO NOTHING;
 SELECT setval('roles_id_seq', (SELECT COALESCE(MAX(id), 1) FROM roles));
 
-INSERT INTO "users" ("id", "username", "password_hash", "full_name", "phone") VALUES 
-(1, 'admin', '$2a$10$w3Yv72D5jN773JzW26hBLeR2/9Wn4U3bQZ/xsmXm240HwQxX7B9ye', 'Kiệt Lê (Admin)', '0901234567'),
-(2, 'thungan1', '$2a$10$w3Yv72D5jN773JzW26hBLeR2/9Wn4U3bQZ/xsmXm240HwQxX7B9ye', 'Nguyễn Thị Thu Ngân', '0911222333')
-ON CONFLICT (id) DO NOTHING;
-SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users));
-
-INSERT INTO "user_roles" ("user_id", "role_id") VALUES 
-(1, 1),
-(2, 2)
-ON CONFLICT DO NOTHING;
+-- Users, Permissions & Role-Permissions sẽ được khởi tạo đồng bộ bởi Auth Service (DataInitializer)
+-- với mật khẩu mặc định là 12345678 cho 10 tài khoản kiểm thử (2 tài khoản/vai trò).
 
 -- ============================================================================
 -- DỊCH VỤ 2: CATALOG & INVENTORY SERVICE (pos_catalog_inventory_db)
 -- ============================================================================
 \c pos_catalog_inventory_db;
 
--- 1. KHU VỰC & BÀN ĂN
+-- 1. KHU VỰC & BÀN ĂN (Đủ 20 bàn khớp sơ đồ POS)
 INSERT INTO "areas" ("id", "name", "description") VALUES 
 (1, 'Tầng 1', 'Khu vực máy lạnh'), 
-(2, 'Sân thượng', 'Khu vực ngoài trời thoáng mát')
+(2, 'Tầng 2 (VIP)', 'Khu vực yên tĩnh cho nhóm'),
+(3, 'Sân thượng', 'Khu vực ngoài trời thoáng mát')
 ON CONFLICT (id) DO NOTHING;
 SELECT setval('areas_id_seq', (SELECT COALESCE(MAX(id), 1) FROM areas));
 
 INSERT INTO "dining_tables" ("id", "area_id", "table_number", "capacity", "status") VALUES 
-(1, 1, 'T1-01', 4, 'EMPTY'), 
-(2, 1, 'T1-02', 4, 'EMPTY'),
-(3, 2, 'ST-01', 6, 'EMPTY'),
-(4, 2, 'ST-02', 4, 'EMPTY')
+(1, 1, '1', 4, 'OCCUPIED'), 
+(2, 1, '2', 4, 'OCCUPIED'),
+(3, 1, '3', 4, 'OCCUPIED'),
+(4, 1, '4', 4, 'EMPTY'),
+(5, 1, '5', 4, 'OCCUPIED'),
+(6, 1, '6', 4, 'EMPTY'),
+(7, 1, '7', 4, 'EMPTY'),
+(8, 1, '8', 6, 'OCCUPIED'),
+(9, 2, '9', 4, 'EMPTY'),
+(10, 2, '10', 4, 'EMPTY'),
+(11, 2, '11', 6, 'EMPTY'),
+(12, 2, '12', 6, 'EMPTY'),
+(13, 2, '13', 8, 'RESERVED'),
+(14, 2, '14', 4, 'EMPTY'),
+(15, 3, '15', 4, 'EMPTY'),
+(16, 3, '16', 4, 'EMPTY'),
+(17, 3, '17', 6, 'EMPTY'),
+(18, 3, '18', 6, 'EMPTY'),
+(19, 3, '19', 4, 'EMPTY'),
+(20, 3, '20', 8, 'EMPTY')
 ON CONFLICT (id) DO NOTHING;
 SELECT setval('dining_tables_id_seq', (SELECT COALESCE(MAX(id), 1) FROM dining_tables));
 

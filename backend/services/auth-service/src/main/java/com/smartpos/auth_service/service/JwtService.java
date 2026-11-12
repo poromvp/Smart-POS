@@ -1,5 +1,6 @@
 package com.smartpos.auth_service.service;
 
+import com.smartpos.auth_service.entity.Permission;
 import com.smartpos.auth_service.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 
 @Service
 public class JwtService {
@@ -34,15 +36,22 @@ public class JwtService {
         Instant now = Instant.now();
         Instant expiration = now.plusMillis(accessTokenExpiration);
 
+        List<String> permissions = (user.getRole() != null && user.getRole().getPermissions() != null)
+                ? user.getRole().getPermissions().stream()
+                        .map(Permission::getCode)
+                        .toList()
+                : List.of();
+
         return Jwts.builder()
                 .subject(user.getUsername())
                 .claim("userId", user.getId())
-                .claim("role", user.getRole().getName())
+                .claim("fullName", user.getFullName())
+                .claim("role", user.getRole() != null ? user.getRole().getName() : "")
+                .claim("permissions", permissions)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiration))
                 .signWith(signingKey)
                 .compact();
-
     }
 
     // 2. Parse token and verify signature
@@ -69,16 +78,30 @@ public class JwtService {
         return extractClaims(token).get("role", String.class);
     }
 
-    // 6. Get access token lifetime in seconds
+    // 6. Extract full name
+    public String extractFullName(String token) {
+        return extractClaims(token).get("fullName", String.class);
+    }
+
+    // 7. Extract permissions
+    @SuppressWarnings("unchecked")
+    public List<String> extractPermissions(String token) {
+        Object raw = extractClaims(token).get("permissions");
+        if (raw instanceof List<?> list) {
+            return list.stream().map(Object::toString).toList();
+        }
+        return List.of();
+    }
+
+    // 8. Get access token lifetime in seconds
     public long getAccessTokenExpirationSeconds() {
         return accessTokenExpiration / 1000;
     }
 
-    // 7. Validate token against expected username
+    // 9. Validate token against expected username
     public boolean isTokenValid(String token, String username) {
         try {
             Claims claims = extractClaims(token);
-
             return username.equals(claims.getSubject());
         } catch (JwtException | IllegalArgumentException exception) {
             return false;

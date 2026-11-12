@@ -1,13 +1,13 @@
 package com.smartpos.sales_service.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.smartpos.sales_service.converter.LongListJsonConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -60,7 +60,6 @@ public class OrderItem {
 
     // 4. Danh sách các ID tùy chọn topping, đường, đá đã chọn
     @JdbcTypeCode(SqlTypes.JSON)
-    @Convert(converter = LongListJsonConverter.class)
     @Column(name = "modifier_option_ids", columnDefinition = "jsonb")
     @Builder.Default
     private List<Long> modifierOptionIds = new ArrayList<>();
@@ -74,4 +73,28 @@ public class OrderItem {
 
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "kds_status", nullable = false, length = 30)
+    @Builder.Default
+    private ItemKdsStatus kdsStatus = ItemKdsStatus.PENDING;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+        if (this.kdsStatus == null) {
+            this.kdsStatus = ItemKdsStatus.PENDING;
+        }
+        if (this.modifierTotal == null) {
+            this.modifierTotal = BigDecimal.ZERO;
+        }
+        if (this.modifierOptionIds == null) {
+            this.modifierOptionIds = new ArrayList<>();
+        }
+    }
 }

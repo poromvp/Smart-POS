@@ -5,13 +5,18 @@ import com.smartpos.cataloginventory.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Component
+@Profile("!test")
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
@@ -38,194 +43,188 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 1. Nạp danh mục, nhóm tùy chọn/topping, món ăn và biến thể size
+     * 1. Nạp danh mục, nhóm tùy chọn/topping, món ăn và biến thể size (Idempotent theo tên/mã)
      */
     private void initCatalogData() {
-        if (categoryRepository.count() > 0) {
-            log.info("Dữ liệu Catalog đã tồn tại ({} danh mục), bỏ qua.", categoryRepository.count());
-            return;
-        }
+        log.info("Bắt đầu đồng bộ dữ liệu Catalog mẫu...");
 
-        log.info("Bắt đầu nạp dữ liệu Catalog mẫu...");
+        Category catMiCay = getOrCreateCategory("Mì Cay", 1);
+        Category catAnKem = getOrCreateCategory("Món Ăn Kèm", 2);
+        Category catComLau = getOrCreateCategory("Cơm & Lẩu Mini", 3);
+        Category catNuoc = getOrCreateCategory("Trà & Thức Uống", 4);
+        Category catTrangMieng = getOrCreateCategory("Tráng Miệng", 5);
+        Category catCombo = getOrCreateCategory("Combo Tiết Kiệm", 6);
 
-        Category catMiCay = categoryRepository.save(Category.builder()
-                .name("Mì Cay")
-                .displayOrder(1)
-                .isActive(true)
-                .build());
+        ModifierGroup modToppingMi = getOrCreateModifierGroup("Topping Mì Cay", true, false, Map.of(
+                "Thịt bò thêm", "25000",
+                "Trứng gà chần", "10000",
+                "Xúc xích Đức", "15000",
+                "Phô mai sợi", "15000",
+                "Nấm kim châm", "8000"
+        ));
 
-        Category catAnKem = categoryRepository.save(Category.builder()
-                .name("Món Ăn Kèm")
-                .displayOrder(2)
-                .isActive(true)
-                .build());
+        ModifierGroup modDuong = getOrCreateModifierGroup("Lượng Đường", false, false, Map.of(
+                "100% đường (Bình thường)", "0",
+                "70% đường", "0",
+                "50% đường (Ít ngọt)", "0",
+                "Không đường", "0"
+        ));
 
-        Category catNuoc = categoryRepository.save(Category.builder()
-                .name("Trà & Thức Uống")
-                .displayOrder(3)
-                .isActive(true)
-                .build());
+        ModifierGroup modDa = getOrCreateModifierGroup("Lượng Đá", false, false, Map.of(
+                "100% đá", "0",
+                "50% đá", "0",
+                "Không đá", "0"
+        ));
 
-        // Nhóm Topping Mì Cay
-        ModifierGroup modToppingMi = ModifierGroup.builder()
-                .name("Topping Mì Cay")
-                .isMultiple(true)
-                .isRequired(false)
-                .options(new LinkedHashSet<>())
-                .build();
-        addTopping(modToppingMi, "Thịt bò thêm", new BigDecimal("25000"));
-        addTopping(modToppingMi, "Trứng gà chần", new BigDecimal("10000"));
-        addTopping(modToppingMi, "Xúc xích Đức", new BigDecimal("15000"));
-        addTopping(modToppingMi, "Phô mai sợi", new BigDecimal("15000"));
-        addTopping(modToppingMi, "Nấm kim châm", new BigDecimal("8000"));
-        modToppingMi = modifierGroupRepository.save(modToppingMi);
+        ModifierGroup modToppingNuoc = getOrCreateModifierGroup("Topping Thức Uống", true, false, Map.of(
+                "Miếng đào giòn thêm", "10000",
+                "Thạch nha đam", "8000",
+                "Trân châu đen", "8000"
+        ));
 
-        // Nhóm Lượng Đường
-        ModifierGroup modDuong = ModifierGroup.builder()
-                .name("Lượng Đường")
-                .isMultiple(false)
-                .isRequired(false)
-                .options(new LinkedHashSet<>())
-                .build();
-        addTopping(modDuong, "100% đường (Bình thường)", BigDecimal.ZERO);
-        addTopping(modDuong, "70% đường", BigDecimal.ZERO);
-        addTopping(modDuong, "50% đường (Ít ngọt)", BigDecimal.ZERO);
-        addTopping(modDuong, "Không đường", BigDecimal.ZERO);
-        modDuong = modifierGroupRepository.save(modDuong);
+        ModifierGroup modSotKem = getOrCreateModifierGroup("Nước Chấm & Sốt Kèm", true, false, Map.of(
+                "Sốt Phô Mai Cay", "8000",
+                "Sốt Mù Tạt Mật Ong", "5000",
+                "Tương Ớt Hàn Quốc", "0"
+        ));
 
-        // Nhóm Lượng Đá
-        ModifierGroup modDa = ModifierGroup.builder()
-                .name("Lượng Đá")
-                .isMultiple(false)
-                .isRequired(false)
-                .options(new LinkedHashSet<>())
-                .build();
-        addTopping(modDa, "100% đá", BigDecimal.ZERO);
-        addTopping(modDa, "50% đá", BigDecimal.ZERO);
-        addTopping(modDa, "Không đá", BigDecimal.ZERO);
-        modDa = modifierGroupRepository.save(modDa);
+        ModifierGroup modDoCayLau = getOrCreateModifierGroup("Độ Cay Lẩu", false, true, Map.of(
+                "Không cay", "0",
+                "Cay vừa", "0",
+                "Siêu cay nồng", "0"
+        ));
 
-        // Nhóm Topping Nước
-        ModifierGroup modToppingNuoc = ModifierGroup.builder()
-                .name("Topping Thức Uống")
-                .isMultiple(true)
-                .isRequired(false)
-                .options(new LinkedHashSet<>())
-                .build();
-        addTopping(modToppingNuoc, "Miếng đào giòn thêm", new BigDecimal("10000"));
-        addTopping(modToppingNuoc, "Thạch nha đam", new BigDecimal("8000"));
-        addTopping(modToppingNuoc, "Trân châu đen", new BigDecimal("8000"));
-        modToppingNuoc = modifierGroupRepository.save(modToppingNuoc);
+        // === 6 MÓN GỐC (Giữ đúng thứ tự ID 1..6 & Variant ID 1..12 đồng bộ với seed-data.sql và sales-service) ===
+        createProductIfNotExists("MC-BO", "Mì Cay Bò Mỹ", catMiCay, "75000", "/menu/beef-noodles.jpg",
+                "Mì sợi dai Hàn Quốc, thịt bò Mỹ cao cấp kết hợp nước dùng chua cay đậm đà chuẩn vị.",
+                Set.of(modToppingMi),
+                List.of(
+                        new VariantDef("Cấp 1 (Cay nhẹ)", "0", "MC-BO-C1"),
+                        new VariantDef("Cấp 3 (Cay vừa)", "0", "MC-BO-C3"),
+                        new VariantDef("Cấp 7 (Siêu cay)", "5000", "MC-BO-C7")
+                ));
 
-        // Món 1: Mì Cay Bò Mỹ
-        Product p1 = Product.builder()
-                .category(catMiCay)
-                .name("Mì Cay Bò Mỹ")
-                .code("MC-BO")
-                .basePrice(new BigDecimal("75000"))
-                .imageUrl("/menu/beef-noodles.jpg")
-                .description("Mì sợi dai Hàn Quốc, thịt bò Mỹ cao cấp kết hợp nước dùng chua cay đậm đà chuẩn vị.")
-                .isActive(true)
-                .variants(new LinkedHashSet<>())
-                .modifierGroups(new LinkedHashSet<>(Set.of(modToppingMi)))
-                .build();
-        addVariant(p1, "Cấp 1 (Cay nhẹ)", BigDecimal.ZERO, "MC-BO-C1");
-        addVariant(p1, "Cấp 3 (Cay vừa)", BigDecimal.ZERO, "MC-BO-C3");
-        addVariant(p1, "Cấp 7 (Siêu cay)", new BigDecimal("5000"), "MC-BO-C7");
-        productRepository.save(p1);
+        createProductIfNotExists("MC-HS", "Mì Cay Hải Sản", catMiCay, "85000", "/menu/beef-noodles.jpg",
+                "Tôm sú tươi giòn ngọt, mực tươi kèm nấm kim châm và rau củ tươi ngon.",
+                Set.of(modToppingMi),
+                List.of(
+                        new VariantDef("Cấp 1 (Cay nhẹ)", "0", "MC-HS-C1"),
+                        new VariantDef("Cấp 3 (Cay vừa)", "0", "MC-HS-C3"),
+                        new VariantDef("Cấp 7 (Siêu cay)", "5000", "MC-HS-C7")
+                ));
 
-        // Món 2: Mì Cay Hải Sản
-        Product p2 = Product.builder()
-                .category(catMiCay)
-                .name("Mì Cay Hải Sản")
-                .code("MC-HS")
-                .basePrice(new BigDecimal("85000"))
-                .imageUrl("/menu/beef-noodles.jpg")
-                .description("Tôm sú tươi giòn ngọt, mực tươi kèm nấm kim châm và rau củ tươi ngon.")
-                .isActive(true)
-                .variants(new LinkedHashSet<>())
-                .modifierGroups(new LinkedHashSet<>(Set.of(modToppingMi)))
-                .build();
-        addVariant(p2, "Cấp 1 (Cay nhẹ)", BigDecimal.ZERO, "MC-HS-C1");
-        addVariant(p2, "Cấp 3 (Cay vừa)", BigDecimal.ZERO, "MC-HS-C3");
-        addVariant(p2, "Cấp 7 (Siêu cay)", new BigDecimal("5000"), "MC-HS-C7");
-        productRepository.save(p2);
+        createProductIfNotExists("AK-GA-CAY", "Gà Sốt Cay Hàn Quốc", catAnKem, "89000", "/menu/spicy-chicken.jpg",
+                "Gà giòn rụm áo sốt cay ngọt Hàn Quốc thơm nức mè rang.",
+                Set.of(modSotKem),
+                List.of(
+                        new VariantDef("Phần 4 miếng", "0", "AK-GA-4M"),
+                        new VariantDef("Phần 8 miếng", "60000", "AK-GA-8M")
+                ));
 
-        // Món 3: Gà Sốt Cay Hàn Quốc
-        Product p3 = Product.builder()
-                .category(catAnKem)
-                .name("Gà Sốt Cay Hàn Quốc")
-                .code("AK-GA-CAY")
-                .basePrice(new BigDecimal("89000"))
-                .imageUrl("/menu/spicy-chicken.jpg")
-                .description("Gà giòn rụm áo sốt cay ngọt Hàn Quốc thơm nức mè rang.")
-                .isActive(true)
-                .variants(new LinkedHashSet<>())
-                .modifierGroups(new LinkedHashSet<>())
-                .build();
-        addVariant(p3, "Phần 4 miếng", BigDecimal.ZERO, "AK-GA-4M");
-        addVariant(p3, "Phần 8 miếng", new BigDecimal("60000"), "AK-GA-8M");
-        productRepository.save(p3);
+        createProductIfNotExists("NU-TRA-DAO", "Trà Đào Cam Sả", catNuoc, "45000", "/menu/peach-tea.jpg",
+                "Trà thanh mát kết hợp lát đào giòn ngọt và hương sả thơm lừng giải nhiệt.",
+                Set.of(modDuong, modDa, modToppingNuoc),
+                List.of(
+                        new VariantDef("Size M", "0", "NU-DAO-M"),
+                        new VariantDef("Size L", "8000", "NU-DAO-L")
+                ));
 
-        // Món 4: Trà Đào Cam Sả
-        Product p4 = Product.builder()
-                .category(catNuoc)
-                .name("Trà Đào Cam Sả")
-                .code("NU-TRA-DAO")
-                .basePrice(new BigDecimal("45000"))
-                .imageUrl("/menu/peach-tea.jpg")
-                .description("Trà thanh mát kết hợp lát đào giòn ngọt và hương sả thơm lừng giải nhiệt.")
-                .isActive(true)
-                .variants(new LinkedHashSet<>())
-                .modifierGroups(new LinkedHashSet<>(Set.of(modDuong, modDa, modToppingNuoc)))
-                .build();
-        addVariant(p4, "Size M", BigDecimal.ZERO, "NU-DAO-M");
-        addVariant(p4, "Size L", new BigDecimal("8000"), "NU-DAO-L");
-        productRepository.save(p4);
+        createProductIfNotExists("NU-MATCHA", "Matcha Latte", catNuoc, "55000", "/menu/matcha-latte.jpg",
+                "Bột trà xanh Nhật Bản nguyên chất hòa quyện cùng sữa tươi béo ngậy.",
+                Set.of(modDuong, modDa, modToppingNuoc),
+                List.of(
+                        new VariantDef("Size M", "0", "NU-MATCHA-M"),
+                        new VariantDef("Size L", "10000", "NU-MATCHA-L")
+                ));
 
-        // Món 5: Matcha Latte
-        Product p5 = Product.builder()
-                .category(catNuoc)
-                .name("Matcha Latte")
-                .code("NU-MATCHA")
-                .basePrice(new BigDecimal("55000"))
-                .imageUrl("/menu/matcha-latte.jpg")
-                .description("Bột trà xanh Nhật Bản nguyên chất hòa quyện cùng sữa tươi béo ngậy.")
-                .isActive(true)
-                .variants(new LinkedHashSet<>())
-                .modifierGroups(new LinkedHashSet<>(Set.of(modDuong, modDa, modToppingNuoc)))
-                .build();
-        addVariant(p5, "Size M", BigDecimal.ZERO, "NU-MATCHA-M");
-        addVariant(p5, "Size L", new BigDecimal("10000"), "NU-MATCHA-L");
-        productRepository.save(p5);
+        createProductIfNotExists("NU-CF-SUA", "Cà Phê Sữa Đá", catNuoc, "35000", "/menu/iced-coffee.jpg",
+                "Cà phê pha phin truyền thống đậm đà sánh quyện sữa đặc thơm béo.",
+                Set.of(modDuong, modDa),
+                List.of());
 
-        // Món 6: Cà Phê Sữa Đá
-        Product p6 = Product.builder()
-                .category(catNuoc)
-                .name("Cà Phê Sữa Đá")
-                .code("NU-CF-SUA")
-                .basePrice(new BigDecimal("35000"))
-                .imageUrl("/menu/iced-coffee.jpg")
-                .description("Cà phê pha phin truyền thống đậm đà sánh quyện sữa đặc thơm béo.")
-                .isActive(true)
-                .variants(new LinkedHashSet<>())
-                .modifierGroups(new LinkedHashSet<>(Set.of(modDuong, modDa)))
-                .build();
-        productRepository.save(p6);
+        // === CÁC MÓN MỞ RỘNG (ID 7 trở đi) ===
+        createProductIfNotExists("MC-GA", "Mì Cay Gà Giòn", catMiCay, "79000", "/menu/beef-noodles.jpg",
+                "Thịt gà phi lê chiên giòn rụm dùng kèm nước mì cay chua thanh hấp dẫn.",
+                Set.of(modToppingMi),
+                List.of(
+                        new VariantDef("Cấp 1 (Cay nhẹ)", "0", "MC-GA-C1"),
+                        new VariantDef("Cấp 3 (Cay vừa)", "0", "MC-GA-C3"),
+                        new VariantDef("Cấp 7 (Siêu cay)", "5000", "MC-GA-C7")
+                ));
 
-        log.info(">>> Khởi tạo Catalog hoàn tất!");
+        createProductIfNotExists("MC-TC", "Mì Cay Thập Cẩm Đặc Biệt", catMiCay, "95000", "/menu/beef-noodles.jpg",
+                "Đầy ắp thịt bò Mỹ, tôm sú, mực ống, xúc xích Đức và nấm kim châm tươi.",
+                Set.of(modToppingMi),
+                List.of(
+                        new VariantDef("Cấp 1 (Cay nhẹ)", "0", "MC-TC-C1"),
+                        new VariantDef("Cấp 3 (Cay vừa)", "0", "MC-TC-C3"),
+                        new VariantDef("Cấp 7 (Siêu cay)", "5000", "MC-TC-C7")
+                ));
+
+        createProductIfNotExists("MC-TD", "Mì Tương Đen Jajangmyeon", catMiCay, "72000", "/menu/beef-noodles.jpg",
+                "Sợi mì tươi quyện sốt tương đen truyền thống Hàn Quốc béo thơm đậm vị.",
+                Set.of(modToppingMi),
+                List.of());
+
+        createProductIfNotExists("AK-TOKBOKKI", "Tokbokki Lắc Phô Mai", catAnKem, "55000", "/menu/spicy-chicken.jpg",
+                "Bánh gạo Hàn Quốc mềm dẻo chiên giòn lắc cùng bột phô mai béo ngậy.",
+                Set.of(modSotKem),
+                List.of(
+                        new VariantDef("Phần Thường", "0", "AK-TOK-STD"),
+                        new VariantDef("Phần Lớn", "20000", "AK-TOK-LRG")
+                ));
+
+        createProductIfNotExists("AK-KHOAI", "Khoai Tây Chiên Phô Mai", catAnKem, "39000", "/menu/spicy-chicken.jpg",
+                "Khoai tây cọng giòn tan phủ bột phô mai mặn ngọt thơm lừng.",
+                Set.of(modSotKem),
+                List.of());
+
+        createProductIfNotExists("AK-KIMBAP", "Kimbap Truyền Thống", catAnKem, "49000", "/menu/spicy-chicken.jpg",
+                "Cơm cuộn rong biển nhân trứng chiên, xúc xích, cà rốt và dưa leo giòn ngon.",
+                Set.of(modSotKem),
+                List.of());
+
+        createProductIfNotExists("CL-BIBIMBAP", "Cơm Trộn Bibimbap Bò", catComLau, "85000", "/menu/beef-noodles.jpg",
+                "Cơm dẻo Nhật Bản trộn thịt bò xào, kim chi, nấm và trứng ốp la lòng đào.",
+                Set.of(modSotKem),
+                List.of());
+
+        createProductIfNotExists("CL-LAU-KC", "Lẩu Kim Chi Mini 1 Người", catComLau, "119000", "/menu/beef-noodles.jpg",
+                "Nồi lẩu kim chi chua cay nóng hổi đầy đủ thịt bò, nấm kim châm và mì sợi.",
+                Set.of(modDoCayLau, modToppingMi),
+                List.of(
+                        new VariantDef("Size Tiêu Chuẩn", "0", "CL-LAU-STD"),
+                        new VariantDef("Size Đặc Biệt (Thêm Bò)", "30000", "CL-LAU-SP")
+                ));
+
+        createProductIfNotExists("NU-TS-DD", "Trà Sữa Trân Châu Đường Đen", catNuoc, "49000", "/menu/matcha-latte.jpg",
+                "Trà đen đậm vị hòa quyện sữa tươi thanh trùng cùng trân châu đen dẻo mềm.",
+                Set.of(modDuong, modDa, modToppingNuoc),
+                List.of(
+                        new VariantDef("Size M", "0", "NU-TSDD-M"),
+                        new VariantDef("Size L", "10000", "NU-TSDD-L")
+                ));
+
+        createProductIfNotExists("TM-PANNA", "Panna Cotta Dâu Tây", catTrangMieng, "35000", "/menu/peach-tea.jpg",
+                "Panna Cotta mềm mịn béo nhẹ hòa quyện cùng sốt dâu tây chua ngọt thanh mát.",
+                Set.of(),
+                List.of());
+
+        createProductIfNotExists("CB-BO-DAO", "Combo Mì Cay Bò + Trà Đào", catCombo, "109000", "/menu/beef-noodles.jpg",
+                "Tiết kiệm hơn với 1 phần Mì Cay Bò Mỹ Cấp 3 kèm 1 ly Trà Đào Cam Sả thanh mát.",
+                Set.of(modToppingMi, modDuong, modDa),
+                List.of());
+
+        log.info(">>> Đồng bộ Catalog hoàn tất! Tổng số món hiện có: {}", productRepository.count());
     }
 
     /**
-     * 2. Nạp danh mục nguyên liệu thô (Ingredients).
-     * Kiểm tra theo từng mã nguyên liệu (code) để đảm bảo luôn nạp đủ 21 nguyên liệu mẫu,
-     * kể cả khi trong DB đã có sẵn các bản ghi nguyên liệu trước đó.
+     * 2. Nạp danh mục nguyên liệu thô (Ingredients) - gồm cả các nguyên liệu Low Stock để test cảnh báo.
      */
     private void initIngredientsData() {
         log.info("Bắt đầu kiểm tra và đồng bộ nguyên liệu mẫu vào kho...");
 
         List<Ingredient> ingredients = List.of(
-                // Đạm tươi & thực phẩm mì cay
                 createIng("NL-BO", "Thịt bò Mỹ đông lạnh", "kg", "220000", "25.500", "5.000"),
                 createIng("NL-TOM", "Tôm sú tươi sống", "kg", "260000", "15.000", "3.000"),
                 createIng("NL-MUC", "Mực ống tươi", "kg", "180000", "12.000", "3.000"),
@@ -237,7 +236,6 @@ public class DataInitializer implements CommandLineRunner {
                 createIng("NL-RAU", "Rau củ tươi Đà Lạt", "kg", "35000", "30.000", "10.000"),
                 createIng("NL-NUOCDUNG", "Cốt nước dùng mì cay", "lít", "25000", "40.000", "10.000"),
 
-                // Nguyên liệu pha chế thức uống
                 createIng("NL-TRA", "Trà đen Phúc Long khô", "g", "250", "5000.000", "1000.000"),
                 createIng("NL-CAPHE", "Hạt cà phê rang Robusta", "g", "200", "4500.000", "1000.000"),
                 createIng("NL-DAO-HOP", "Đào ngâm Kronos", "hộp", "42000", "20.000", "5.000"),
@@ -250,8 +248,15 @@ public class DataInitializer implements CommandLineRunner {
                 createIng("NL-TRAN-CHAU", "Trân châu đen tươi Gia Thịnh", "g", "60", "6000.000", "1500.000"),
                 createIng("NL-NHA-DAM", "Thạch nha đam Aloka", "kg", "40000", "15.000", "3.000"),
 
-                // Mặt hàng sắp hết để test cờ cảnh báo lowStock trên giao diện (2.5kg < minThreshold 5.0kg)
-                createIng("NL-GA", "Gà phi lê tươi CP", "kg", "85000", "2.500", "5.000")
+                // Nguyên liệu bổ sung cho món ăn mới
+                createIng("NL-TOKBOKKI", "Bánh gạo Hàn Quốc Tokbokki", "kg", "55000", "18.000", "4.000"),
+                createIng("NL-KHOAI", "Khoai tây cọng đông lạnh", "kg", "48000", "22.000", "5.000"),
+                createIng("NL-COM", "Gạo dẻo Nhật Bản", "kg", "32000", "35.000", "10.000"),
+
+                // Các nguyên liệu sắp hết (Low Stock) phục vụ kiểm thử cảnh báo & lỗi hết kho
+                createIng("NL-GA", "Gà phi lê tươi CP", "kg", "85000", "2.500", "5.000"),
+                createIng("NL-KIMCHI", "Kim chi cải thảo Hàn Quốc", "kg", "45000", "3.000", "5.000"),
+                createIng("NL-PHOMAI-BOT", "Bột phô mai lắc Hàn Quốc", "kg", "180000", "0.200", "1.000")
         );
 
         int addedCount = 0;
@@ -261,259 +266,297 @@ public class DataInitializer implements CommandLineRunner {
                 addedCount++;
             }
         }
-        log.info(">>> Đồng bộ nguyên liệu hoàn tất (đã thêm {} nguyên liệu mới, tổng hiện có: {})",
-                addedCount, ingredientRepository.count());
+        log.info(">>> Đồng bộ nguyên liệu hoàn tất (đã thêm {} mới, tổng: {})", addedCount, ingredientRepository.count());
     }
 
     /**
-     * 3. Nạp công thức BOM định lượng 3 tầng: Món gốc, Size biến thể, và Topping.
-     * Sử dụng addRecipeIfValid để đảm bảo nguyên liệu tồn tại, không bao giờ chèn ingredient_id = null.
+     * 3. Nạp công thức BOM định lượng 3 tầng cho cả các món cũ và món mới (Idempotent theo từng món)
      */
     private void initRecipesData() {
-        if (recipeRepository.count() > 0) {
-            log.info("Dữ liệu công thức BOM đã tồn tại ({} công thức), bỏ qua.", recipeRepository.count());
-            return;
-        }
+        log.info("Bắt đầu kiểm tra và đồng bộ công thức định lượng BOM...");
 
-        log.info("Bắt đầu nạp công thức định lượng BOM mẫu...");
+        Map<String, Ingredient> ingMap = ingredientRepository.findAll().stream()
+                .filter(i -> i.getCode() != null)
+                .collect(Collectors.toMap(i -> i.getCode().toUpperCase(), Function.identity(), (a, b) -> a));
 
-        Map<String, Ingredient> ingMap = new HashMap<>();
-        ingredientRepository.findAll().forEach(i -> {
-            if (i.getCode() != null) {
-                ingMap.put(i.getCode().toUpperCase(), i);
-            }
-        });
+        Map<String, Product> prodMap = productRepository.findAll().stream()
+                .filter(p -> p.getCode() != null)
+                .collect(Collectors.toMap(p -> p.getCode().toUpperCase(), Function.identity(), (a, b) -> a));
 
-        List<Recipe> recipes = new ArrayList<>();
+        List<Recipe> newRecipes = new ArrayList<>();
 
-        // 1. Công thức Mì Cay Bò Mỹ (MC-BO)
-        productRepository.findAll().stream()
-                .filter(p -> "MC-BO".equalsIgnoreCase(p.getCode()))
-                .findFirst()
-                .ifPresent(p -> {
-                    // Món gốc (Base)
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-MI"), "1.000");
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-NUOCDUNG"), "0.500");
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-BO"), "0.100");
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-NAM"), "0.500");
+        // Công thức cho từng món nếu món đó chưa có công thức base
+        seedProductBaseRecipe(newRecipes, prodMap.get("MC-BO"), ingMap, Map.of(
+                "NL-MI", "1.000", "NL-NUOCDUNG", "0.500", "NL-BO", "0.100", "NL-NAM", "0.500"));
+        seedVariantRecipe(newRecipes, prodMap.get("MC-BO"), "MC-BO-C7", ingMap.get("NL-NUOCDUNG"), "0.100");
 
-                    // Size Cấp 7 siêu cay (cộng thêm nước cốt)
-                    productVariantRepository.findByProductId(p.getId()).stream()
-                            .filter(v -> "MC-BO-C7".equalsIgnoreCase(v.getSku()))
-                            .findFirst()
-                            .ifPresent(v -> addRecipeIfValid(recipes, null, v, null, ingMap.get("NL-NUOCDUNG"), "0.100"));
-                });
+        seedProductBaseRecipe(newRecipes, prodMap.get("MC-HS"), ingMap, Map.of(
+                "NL-MI", "1.000", "NL-NUOCDUNG", "0.500", "NL-TOM", "0.100", "NL-MUC", "0.080"));
+        seedProductBaseRecipe(newRecipes, prodMap.get("MC-GA"), ingMap, Map.of(
+                "NL-MI", "1.000", "NL-NUOCDUNG", "0.500", "NL-GA", "0.120"));
+        seedProductBaseRecipe(newRecipes, prodMap.get("MC-TC"), ingMap, Map.of(
+                "NL-MI", "1.000", "NL-NUOCDUNG", "0.500", "NL-BO", "0.080", "NL-TOM", "0.080", "NL-XUCXICH", "1.000"));
+        seedProductBaseRecipe(newRecipes, prodMap.get("AK-GA-CAY"), ingMap, Map.of(
+                "NL-GA", "0.250"));
+        seedProductBaseRecipe(newRecipes, prodMap.get("AK-TOKBOKKI"), ingMap, Map.of(
+                "NL-TOKBOKKI", "0.250", "NL-PHOMAI-BOT", "0.030"));
+        seedProductBaseRecipe(newRecipes, prodMap.get("AK-KHOAI"), ingMap, Map.of(
+                "NL-KHOAI", "0.200", "NL-PHOMAI-BOT", "0.020"));
+        seedProductBaseRecipe(newRecipes, prodMap.get("CL-BIBIMBAP"), ingMap, Map.of(
+                "NL-COM", "0.200", "NL-BO", "0.100", "NL-KIMCHI", "0.080", "NL-TRUNG", "1.000"));
+        seedProductBaseRecipe(newRecipes, prodMap.get("CL-LAU-KC"), ingMap, Map.of(
+                "NL-KIMCHI", "0.200", "NL-BO", "0.150", "NL-MI", "1.000", "NL-NUOCDUNG", "0.700"));
+        seedProductBaseRecipe(newRecipes, prodMap.get("NU-CF-SUA"), ingMap, Map.of(
+                "NL-CAPHE", "25.000", "NL-SUA-DAC", "40.000", "NL-DUONG", "5.000"));
+        seedProductBaseRecipe(newRecipes, prodMap.get("NU-TRA-DAO"), ingMap, Map.of(
+                "NL-TRA", "15.000", "NL-CAM", "0.050", "NL-SA", "0.030", "NL-DUONG", "30.000"));
+        seedVariantRecipe(newRecipes, prodMap.get("NU-TRA-DAO"), "NU-DAO-L", ingMap.get("NL-TRA"), "5.000");
 
-        // 2. Công thức Cà Phê Sữa Đá (NU-CF-SUA)
-        productRepository.findAll().stream()
-                .filter(p -> "NU-CF-SUA".equalsIgnoreCase(p.getCode()))
-                .findFirst()
-                .ifPresent(p -> {
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-CAPHE"), "25.000");
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-SUA-DAC"), "40.000");
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-DUONG"), "5.000");
-                });
+        seedProductBaseRecipe(newRecipes, prodMap.get("NU-MATCHA"), ingMap, Map.of(
+                "NL-MATCHA", "10.000", "NL-SUA-TUOI", "150.000", "NL-SUA-DAC", "20.000"));
+        seedVariantRecipe(newRecipes, prodMap.get("NU-MATCHA"), "NU-MATCHA-L", ingMap.get("NL-SUA-TUOI"), "50.000");
 
-        // 3. Công thức Trà Đào Cam Sả (NU-TRA-DAO)
-        productRepository.findAll().stream()
-                .filter(p -> "NU-TRA-DAO".equalsIgnoreCase(p.getCode()))
-                .findFirst()
-                .ifPresent(p -> {
-                    // Base Món gốc
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-TRA"), "15.000");
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-CAM"), "0.050");
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-SA"), "0.030");
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-DUONG"), "30.000");
+        seedProductBaseRecipe(newRecipes, prodMap.get("NU-TS-DD"), ingMap, Map.of(
+                "NL-TRA", "12.000", "NL-SUA-TUOI", "150.000", "NL-TRAN-CHAU", "50.000", "NL-DUONG", "25.000"));
+        seedProductBaseRecipe(newRecipes, prodMap.get("CB-BO-DAO"), ingMap, Map.of(
+                "NL-MI", "1.000", "NL-NUOCDUNG", "0.500", "NL-BO", "0.100", "NL-TRA", "15.000", "NL-DAO-HOP", "0.100"));
 
-                    // Size L (cộng thêm trà và đường)
-                    productVariantRepository.findByProductId(p.getId()).stream()
-                            .filter(v -> "NU-DAO-L".equalsIgnoreCase(v.getSku()))
-                            .findFirst()
-                            .ifPresent(v -> {
-                                addRecipeIfValid(recipes, null, v, null, ingMap.get("NL-TRA"), "5.000");
-                                addRecipeIfValid(recipes, null, v, null, ingMap.get("NL-DUONG"), "10.000");
-                            });
-                });
-
-        // 4. Công thức Matcha Latte (NU-MATCHA)
-        productRepository.findAll().stream()
-                .filter(p -> "NU-MATCHA".equalsIgnoreCase(p.getCode()))
-                .findFirst()
-                .ifPresent(p -> {
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-MATCHA"), "10.000");
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-SUA-TUOI"), "150.000");
-                    addRecipeIfValid(recipes, p, null, null, ingMap.get("NL-SUA-DAC"), "20.000");
-
-                    productVariantRepository.findByProductId(p.getId()).stream()
-                            .filter(v -> "NU-MATCHA-L".equalsIgnoreCase(v.getSku()))
-                            .findFirst()
-                            .ifPresent(v -> {
-                                addRecipeIfValid(recipes, null, v, null, ingMap.get("NL-SUA-TUOI"), "50.000");
-                                addRecipeIfValid(recipes, null, v, null, ingMap.get("NL-MATCHA"), "3.000");
-                            });
-                });
-
-        // 5. Công thức cho các Topping / Tùy chọn (Modifier Options)
+        // Công thức cho các Topping / Tùy chọn (Modifier Options)
         modifierOptionRepository.findAll().forEach(opt -> {
-            switch (opt.getName()) {
-                case "Thịt bò thêm" -> addRecipeIfValid(recipes, null, null, opt, ingMap.get("NL-BO"), "0.080");
-                case "Trứng gà chần" -> addRecipeIfValid(recipes, null, null, opt, ingMap.get("NL-TRUNG"), "1.000");
-                case "Xúc xích Đức" -> addRecipeIfValid(recipes, null, null, opt, ingMap.get("NL-XUCXICH"), "1.000");
-                case "Phô mai sợi" -> addRecipeIfValid(recipes, null, null, opt, ingMap.get("NL-PHOMAI"), "0.050");
-                case "Nấm kim châm" -> addRecipeIfValid(recipes, null, null, opt, ingMap.get("NL-NAM"), "0.500");
-                case "Miếng đào giòn thêm" -> addRecipeIfValid(recipes, null, null, opt, ingMap.get("NL-DAO-HOP"), "0.200");
-                case "Thạch nha đam" -> addRecipeIfValid(recipes, null, null, opt, ingMap.get("NL-NHA-DAM"), "0.050");
-                case "Trân châu đen" -> addRecipeIfValid(recipes, null, null, opt, ingMap.get("NL-TRAN-CHAU"), "40.000");
+            if (!recipeRepository.existsByModifierOptionId(opt.getId())) {
+                switch (opt.getName()) {
+                    case "Thịt bò thêm" -> addRecipeIfValid(newRecipes, null, null, opt, ingMap.get("NL-BO"), "0.080");
+                    case "Trứng gà chần" -> addRecipeIfValid(newRecipes, null, null, opt, ingMap.get("NL-TRUNG"), "1.000");
+                    case "Xúc xích Đức" -> addRecipeIfValid(newRecipes, null, null, opt, ingMap.get("NL-XUCXICH"), "1.000");
+                    case "Phô mai sợi" -> addRecipeIfValid(newRecipes, null, null, opt, ingMap.get("NL-PHOMAI"), "0.050");
+                    case "Nấm kim châm" -> addRecipeIfValid(newRecipes, null, null, opt, ingMap.get("NL-NAM"), "0.500");
+                    case "Miếng đào giòn thêm" -> addRecipeIfValid(newRecipes, null, null, opt, ingMap.get("NL-DAO-HOP"), "0.200");
+                    case "Thạch nha đam" -> addRecipeIfValid(newRecipes, null, null, opt, ingMap.get("NL-NHA-DAM"), "0.050");
+                    case "Trân châu đen" -> addRecipeIfValid(newRecipes, null, null, opt, ingMap.get("NL-TRAN-CHAU"), "40.000");
+                }
             }
         });
 
-        if (!recipes.isEmpty()) {
-            recipeRepository.saveAll(recipes);
-            log.info(">>> Khởi tạo {} dòng công thức định lượng BOM thành công!", recipes.size());
+        if (!newRecipes.isEmpty()) {
+            recipeRepository.saveAll(newRecipes);
+            log.info(">>> Đã bổ sung {} dòng công thức BOM mới!", newRecipes.size());
         }
     }
 
     /**
-     * 4. Nạp lịch sử giao dịch kho khởi tạo (IMPORT) để xem biểu đồ và bảng log giao dịch
+     * 4. Nạp lịch sử giao dịch kho (IMPORT, SALE_DEDUCT, AUDIT_ADJUST, SPOILAGE)
      */
     private void initInventoryTransactionsData() {
-        if (inventoryTransactionRepository.count() > 0) {
-            log.info("Lịch sử giao dịch kho đã tồn tại, bỏ qua.");
-            return;
+        if (!inventoryTransactionRepository.existsByOrderCodeAndTransactionType("INIT-STOCK-2026", InventoryTransactionType.IMPORT)) {
+            List<InventoryTransaction> initTxs = ingredientRepository.findAll().stream()
+                    .filter(ing -> ing.getCurrentStock() != null && ing.getCurrentStock().compareTo(BigDecimal.ZERO) > 0)
+                    .map(ing -> InventoryTransaction.builder()
+                            .ingredient(ing)
+                            .orderCode("INIT-STOCK-2026")
+                            .quantity(ing.getCurrentStock())
+                            .transactionType(InventoryTransactionType.IMPORT)
+                            .build())
+                    .toList();
+            if (!initTxs.isEmpty()) {
+                inventoryTransactionRepository.saveAll(initTxs);
+            }
         }
 
-        List<Ingredient> ingredients = ingredientRepository.findAll();
-        List<InventoryTransaction> txs = ingredients.stream()
-                .filter(ing -> ing.getCurrentStock() != null && ing.getCurrentStock().compareTo(BigDecimal.ZERO) > 0)
-                .map(ing -> InventoryTransaction.builder()
-                        .ingredient(ing)
-                        .orderCode("INIT-STOCK-2026")
-                        .quantity(ing.getCurrentStock())
-                        .transactionType(InventoryTransactionType.IMPORT)
-                        .build())
-                .toList();
-
-        if (!txs.isEmpty()) {
-            inventoryTransactionRepository.saveAll(txs);
-            log.info(">>> Khởi tạo {} giao dịch nhập kho ban đầu thành công!", txs.size());
+        // Thêm các giao dịch mẫu khác (Xuất hủy, Kiểm kê, Bán trừ kho) nếu chưa có
+        if (!inventoryTransactionRepository.existsByOrderCodeAndTransactionType("AUDIT-20261108", InventoryTransactionType.AUDIT_ADJUST)) {
+            List<InventoryTransaction> sampleTxs = new ArrayList<>();
+            ingredientRepository.findByCode("NL-RAU").ifPresent(ing -> sampleTxs.add(InventoryTransaction.builder()
+                    .ingredient(ing)
+                    .orderCode("SPOIL-20261108")
+                    .quantity(new BigDecimal("-1.500"))
+                    .transactionType(InventoryTransactionType.SPOILAGE)
+                    .build()));
+            ingredientRepository.findByCode("NL-TRUNG").ifPresent(ing -> sampleTxs.add(InventoryTransaction.builder()
+                    .ingredient(ing)
+                    .orderCode("AUDIT-20261108")
+                    .quantity(new BigDecimal("-4.000"))
+                    .transactionType(InventoryTransactionType.AUDIT_ADJUST)
+                    .build()));
+            ingredientRepository.findByCode("NL-BO").ifPresent(ing -> sampleTxs.add(InventoryTransaction.builder()
+                    .ingredient(ing)
+                    .orderCode("ORD-DEMO-1001")
+                    .quantity(new BigDecimal("-0.300"))
+                    .transactionType(InventoryTransactionType.SALE_DEDUCT)
+                    .build()));
+            if (!sampleTxs.isEmpty()) {
+                inventoryTransactionRepository.saveAll(sampleTxs);
+                log.info(">>> Đã bổ sung {} giao dịch kho mẫu (SPOILAGE/AUDIT/SALE_DEDUCT)!", sampleTxs.size());
+            }
         }
     }
 
     /**
-     * 5. Nạp Nhà cung cấp & Đơn nhập kho mẫu (Phase 3)
+     * 5. Nạp 5 Nhà cung cấp & 5 Đơn nhập kho mẫu đa trạng thái (COMPLETED, DRAFT, CANCELLED)
      */
     private void initSuppliersAndPurchaseOrdersData() {
-        if (supplierRepository.count() > 0) {
-            log.info("Dữ liệu Nhà cung cấp đã tồn tại ({} NCC), bỏ qua.", supplierRepository.count());
-            return;
-        }
+        log.info("Bắt đầu đồng bộ Nhà cung cấp & Phiếu nhập kho mẫu...");
 
-        log.info("Bắt đầu nạp dữ liệu Nhà cung cấp & Phiếu nhập kho mẫu...");
+        Supplier sup1 = getOrCreateSupplier("Công ty TNHH Thực Phẩm Tươi Sống Nam An", "0901234567",
+                "contact@namanfood.vn", "123 Kha Vạn Cân, TP. Thủ Đức, TP. HCM");
+        Supplier sup2 = getOrCreateSupplier("Nhà Cung Cấp Nông Sản Đà Lạt Xanh", "0988776655",
+                "sales@dalatxanh.com", "45 Lê Hồng Phong, TP. Đà Lạt");
+        Supplier sup3 = getOrCreateSupplier("Đại Lý Gia Vị & Đồ Khô Tân Bình", "0912348899",
+                "giavi.tanbinh@gmail.com", "78 Lý Thường Kiệt, Q. Tân Bình, TP. HCM");
+        Supplier sup4 = getOrCreateSupplier("Công Ty Cổ Phần Trà & Cà Phê Bảo Lộc", "0933445566",
+                "order@baolocbeverage.vn", "210 Trần Phú, TP. Bảo Lộc, Lâm Đồng");
+        Supplier sup5 = getOrCreateSupplier("Nhà Phân Phối Nguyên Liệu Hàn Quốc Seoul Mart", "0977889900",
+                "b2b@seoulmart.vn", "88 Nguyễn Văn Linh, Q. 7, TP. HCM");
 
-        Supplier sup1 = supplierRepository.save(Supplier.builder()
-                .name("Công ty TNHH Thực Phẩm Tươi Sống Nam An")
-                .phone("0901234567")
-                .email("contact@namanfood.vn")
-                .address("123 Kha Vạn Cân, TP. Thủ Đức, TP. HCM")
-                .isActive(true)
-                .build());
+        createPurchaseOrderIfNotExists("PO-20261028-1001", sup1, LocalDate.now().minusDays(12), LocalDate.now().minusDays(12),
+                PurchaseOrderStatus.COMPLETED, "Đơn nhập thịt tươi đầu tuần phục vụ cơ sở chính",
+                Map.of("NL-BO", new PoItemDef("20.000", "175000.00"), "NL-GA", new PoItemDef("15.000", "62000.00")));
 
-        Supplier sup2 = supplierRepository.save(Supplier.builder()
-                .name("Nhà Cung Cấp Nông Sản Đà Lạt Xanh")
-                .phone("0988776655")
-                .email("sales@dalatxanh.com")
-                .address("45 Lê Hồng Phong, TP. Đà Lạt")
-                .isActive(true)
-                .build());
+        createPurchaseOrderIfNotExists("PO-20261030-1002", sup2, LocalDate.now().minusDays(5), LocalDate.now().minusDays(4),
+                PurchaseOrderStatus.DRAFT, "Dự trù nấm và rau củ tươi cho cuối tuần",
+                Map.of("NL-NAM", new PoItemDef("10.000", "40000.00"), "NL-RAU", new PoItemDef("25.000", "14000.00")));
 
-        Supplier sup3 = supplierRepository.save(Supplier.builder()
-                .name("Đại Lý Gia Vị & Đồ Khô Tân Bình")
-                .phone("0912348899")
-                .email("giavi.tanbinh@gmail.com")
-                .address("78 Lý Thường Kiệt, Q. Tân Bình, TP. HCM")
-                .isActive(true)
-                .build());
+        createPurchaseOrderIfNotExists("PO-20261105-1003", sup4, LocalDate.now().minusDays(3), LocalDate.now().minusDays(3),
+                PurchaseOrderStatus.COMPLETED, "Nhập bổ sung trà Phúc Long và cà phê Robusta",
+                Map.of("NL-TRA", new PoItemDef("2000.000", "240.00"), "NL-CAPHE", new PoItemDef("2500.000", "195.00")));
 
-        // Lấy nguyên liệu để tạo đơn nhập kho mẫu
-        Optional<Ingredient> ingBoOpt = ingredientRepository.findByCode("NL-BO");
-        Optional<Ingredient> ingGaOpt = ingredientRepository.findByCode("NL-GA");
-        Optional<Ingredient> ingNamOpt = ingredientRepository.findByCode("NL-NAM");
-        Optional<Ingredient> ingRauOpt = ingredientRepository.findByCode("NL-RAU");
+        createPurchaseOrderIfNotExists("PO-20261109-1004", sup5, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1),
+                PurchaseOrderStatus.DRAFT, "Đặt gấp Kim Chi, Tokbokki và Bột Phô Mai (sắp hết kho)",
+                Map.of("NL-KIMCHI", new PoItemDef("15.000", "42000.00"), "NL-PHOMAI-BOT", new PoItemDef("5.000", "170000.00")));
 
-        if (ingBoOpt.isPresent() && ingGaOpt.isPresent()) {
-            Ingredient ingBo = ingBoOpt.get();
-            Ingredient ingGa = ingGaOpt.get();
-
-            PurchaseOrder poCompleted = PurchaseOrder.builder()
-                    .poNumber("PO-20261028-1001")
-                    .supplier(sup1)
-                    .staffId(1L)
-                    .orderDate(java.time.LocalDate.of(2026, 10, 28))
-                    .deliveryDate(java.time.LocalDate.of(2026, 10, 28))
-                    .status(PurchaseOrderStatus.COMPLETED)
-                    .note("Đơn nhập thịt tươi đầu tuần phục vụ cơ sở chính")
-                    .totalAmount(new BigDecimal("4430000.00"))
-                    .build();
-
-            PurchaseOrderItem item1 = PurchaseOrderItem.builder()
-                    .purchaseOrder(poCompleted)
-                    .ingredient(ingBo)
-                    .quantity(new BigDecimal("20.000"))
-                    .unitPrice(new BigDecimal("175000.00"))
-                    .totalPrice(new BigDecimal("3500000.00"))
-                    .build();
-
-            PurchaseOrderItem item2 = PurchaseOrderItem.builder()
-                    .purchaseOrder(poCompleted)
-                    .ingredient(ingGa)
-                    .quantity(new BigDecimal("15.000"))
-                    .unitPrice(new BigDecimal("62000.00"))
-                    .totalPrice(new BigDecimal("930000.00"))
-                    .build();
-
-            poCompleted.setItems(new ArrayList<>(List.of(item1, item2)));
-            purchaseOrderRepository.save(poCompleted);
-        }
-
-        if (ingNamOpt.isPresent() && ingRauOpt.isPresent()) {
-            Ingredient ingNam = ingNamOpt.get();
-            Ingredient ingRau = ingRauOpt.get();
-
-            PurchaseOrder poDraft = PurchaseOrder.builder()
-                    .poNumber("PO-20261030-1002")
-                    .supplier(sup2)
-                    .staffId(1L)
-                    .orderDate(java.time.LocalDate.of(2026, 10, 30))
-                    .deliveryDate(java.time.LocalDate.of(2026, 10, 31))
-                    .status(PurchaseOrderStatus.DRAFT)
-                    .note("Dự trù nấm và rau củ tươi cho cuối tuần")
-                    .totalAmount(new BigDecimal("750000.00"))
-                    .build();
-
-            PurchaseOrderItem item1 = PurchaseOrderItem.builder()
-                    .purchaseOrder(poDraft)
-                    .ingredient(ingNam)
-                    .quantity(new BigDecimal("10.000"))
-                    .unitPrice(new BigDecimal("40000.00"))
-                    .totalPrice(new BigDecimal("400000.00"))
-                    .build();
-
-            PurchaseOrderItem item2 = PurchaseOrderItem.builder()
-                    .purchaseOrder(poDraft)
-                    .ingredient(ingRau)
-                    .quantity(new BigDecimal("25.000"))
-                    .unitPrice(new BigDecimal("14000.00"))
-                    .totalPrice(new BigDecimal("350000.00"))
-                    .build();
-
-            poDraft.setItems(new ArrayList<>(List.of(item1, item2)));
-            purchaseOrderRepository.save(poDraft);
-        }
-
-        log.info(">>> Khởi tạo 3 Nhà cung cấp và 2 Đơn nhập kho mẫu thành công!");
+        createPurchaseOrderIfNotExists("PO-20261102-1005", sup3, LocalDate.now().minusDays(8), null,
+                PurchaseOrderStatus.CANCELLED, "Hủy do nhà cung cấp giao trễ hẹn",
+                Map.of("NL-DUONG", new PoItemDef("10000.000", "22.00")));
     }
 
-    // Các hàm phụ trợ
+    // === Helper records & methods ===
+    private record VariantDef(String sizeName, String priceAdjustment, String sku) {}
+    private record PoItemDef(String quantity, String unitPrice) {}
+
+    private Category getOrCreateCategory(String name, int displayOrder) {
+        return categoryRepository.findAll().stream()
+                .filter(c -> name.equalsIgnoreCase(c.getName()))
+                .findFirst()
+                .orElseGet(() -> categoryRepository.save(Category.builder()
+                        .name(name)
+                        .displayOrder(displayOrder)
+                        .isActive(true)
+                        .build()));
+    }
+
+    private ModifierGroup getOrCreateModifierGroup(String name, boolean isMultiple, boolean isRequired, Map<String, String> options) {
+        return modifierGroupRepository.findAll().stream()
+                .filter(g -> name.equalsIgnoreCase(g.getName()))
+                .findFirst()
+                .orElseGet(() -> {
+                    ModifierGroup group = ModifierGroup.builder()
+                            .name(name)
+                            .isMultiple(isMultiple)
+                            .isRequired(isRequired)
+                            .isActive(true)
+                            .options(new LinkedHashSet<>())
+                            .build();
+                    options.forEach((optName, optPrice) -> addTopping(group, optName, new BigDecimal(optPrice)));
+                    return modifierGroupRepository.save(group);
+                });
+    }
+
+    private void createProductIfNotExists(String code, String name, Category category, String basePrice,
+                                          String imageUrl, String description,
+                                          Set<ModifierGroup> modifierGroups, List<VariantDef> variants) {
+        if (productRepository.existsByCodeIgnoreCase(code)) {
+            return;
+        }
+        Product product = Product.builder()
+                .category(category)
+                .name(name)
+                .code(code)
+                .basePrice(new BigDecimal(basePrice))
+                .imageUrl(imageUrl)
+                .description(description)
+                .isActive(true)
+                .variants(new LinkedHashSet<>())
+                .modifierGroups(new LinkedHashSet<>(modifierGroups))
+                .build();
+        for (VariantDef v : variants) {
+            addVariant(product, v.sizeName(), new BigDecimal(v.priceAdjustment()), v.sku());
+        }
+        productRepository.save(product);
+    }
+
+    private void seedProductBaseRecipe(List<Recipe> recipes, Product p, Map<String, Ingredient> ingMap, Map<String, String> items) {
+        if (p == null || recipeRepository.existsByProductId(p.getId())) {
+            return;
+        }
+        items.forEach((code, qty) -> addRecipeIfValid(recipes, p, null, null, ingMap.get(code), qty));
+    }
+
+    private void seedVariantRecipe(List<Recipe> recipes, Product p, String sku, Ingredient ing, String qty) {
+        if (p == null || ing == null) {
+            return;
+        }
+        productVariantRepository.findByProductId(p.getId()).stream()
+                .filter(v -> sku.equalsIgnoreCase(v.getSku()))
+                .findFirst()
+                .ifPresent(v -> {
+                    if (!recipeRepository.existsByVariantId(v.getId())) {
+                        addRecipeIfValid(recipes, null, v, null, ing, qty);
+                    }
+                });
+    }
+
+    private Supplier getOrCreateSupplier(String name, String phone, String email, String address) {
+        return supplierRepository.findAll().stream()
+                .filter(s -> name.equalsIgnoreCase(s.getName()))
+                .findFirst()
+                .orElseGet(() -> supplierRepository.save(Supplier.builder()
+                        .name(name)
+                        .phone(phone)
+                        .email(email)
+                        .address(address)
+                        .isActive(true)
+                        .build()));
+    }
+
+    private void createPurchaseOrderIfNotExists(String poNumber, Supplier supplier, LocalDate orderDate,
+                                                LocalDate deliveryDate, PurchaseOrderStatus status, String note,
+                                                Map<String, PoItemDef> itemDefs) {
+        if (purchaseOrderRepository.existsByPoNumber(poNumber)) {
+            return;
+        }
+        PurchaseOrder po = PurchaseOrder.builder()
+                .poNumber(poNumber)
+                .supplier(supplier)
+                .staffId(1L)
+                .orderDate(orderDate)
+                .deliveryDate(deliveryDate)
+                .status(status)
+                .note(note)
+                .items(new ArrayList<>())
+                .build();
+
+        BigDecimal total = BigDecimal.ZERO;
+        for (Map.Entry<String, PoItemDef> entry : itemDefs.entrySet()) {
+            Optional<Ingredient> ingOpt = ingredientRepository.findByCode(entry.getKey());
+            if (ingOpt.isPresent()) {
+                BigDecimal qty = new BigDecimal(entry.getValue().quantity());
+                BigDecimal unitPrice = new BigDecimal(entry.getValue().unitPrice());
+                BigDecimal lineTotal = qty.multiply(unitPrice);
+                total = total.add(lineTotal);
+                po.getItems().add(PurchaseOrderItem.builder()
+                        .purchaseOrder(po)
+                        .ingredient(ingOpt.get())
+                        .quantity(qty)
+                        .unitPrice(unitPrice)
+                        .totalPrice(lineTotal)
+                        .build());
+            }
+        }
+        po.setTotalAmount(total);
+        if (!po.getItems().isEmpty()) {
+            purchaseOrderRepository.save(po);
+        }
+    }
+
     private Ingredient createIng(String code, String name, String unit, String cost, String stock, String min) {
         return Ingredient.builder()
                 .code(code)

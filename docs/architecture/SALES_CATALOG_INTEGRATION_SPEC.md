@@ -13,24 +13,24 @@
 
 Trong mô hình kiến trúc Microservices của Smart-POS:
 * **`catalog-inventory-service` (Port 8082):** Quản lý thực đơn (Món ăn, Size, Topping), định lượng công thức 3 tầng (BOM) và trừ kho nguyên liệu thô theo thời gian thực.
-* **`sales-service` (Port 8083):** Quản lý tiếp nhận đơn hàng (POS thu ngân, Khách quét QR tại bàn), màn hình bếp KDS, thanh toán hóa đơn và khuyến mại.
-* **`gateway` (Port 8080):** Đóng vai trò là điểm tiếp nhận duy nhất (Single Entry Point) từ Internet và Client (Web POS, Khách QR, Web Admin).
+* **`sales-service` (Port 8083):** Quản lý tiếp nhận đơn hàng (POS thu ngân, Khách quét QR tại bàn), màn hình bếp KDS, thanh toán hóa đơn, khuyến mại và WebSocket STOMP (`/ws-pos`).
+* **`gateway` (Port 8088):** Đóng vai trò là điểm tiếp nhận duy nhất (Single Entry Point) từ Internet và Client (Web POS, Khách QR, Web Admin).
 
 ```mermaid
 flowchart TD
     Client["Client (Web POS / QR Mobile / Admin)"]
-    GW["API Gateway (Port 8080)<br>Spring Cloud Gateway"]
+    GW["API Gateway (Port 8088)<br>Spring Cloud Gateway WebFlux"]
     
-    subgraph Services["Mạng Nội Bộ Docker (smartpos-net)"]
+    subgraph Services["Mạng Nội Bộ (smartpos-net / localhost)"]
         Auth["auth-service<br>(Port 8081)"]
         Catalog["catalog-inventory-service<br>(Port 8082)"]
         Sales["sales-service<br>(Port 8083)"]
     end
     
-    Client -->|Gọi API công khai| GW
-    GW -->|/api/auth/**| Auth
-    GW -->|/api/products/**, /api/inventory/**, /uploads/**| Catalog
-    GW -->|/api/orders/**, /api/tables/**, /api/payments/**| Sales
+    Client -->|REST & WebSocket| GW
+    GW -->|"/api/auth/**, /api/users/**, /api/roles/**, /api/permissions/**"| Auth
+    GW -->|"/api/catalog/** -> /api/**, /uploads/**"| Catalog
+    GW -->|"/api/sales/** -> /api/**, /ws-pos/**"| Sales
     
     Sales -.->|Trừ kho nội bộ: POST /api/inventory/deduct| Catalog
 ```
@@ -46,56 +46,103 @@ Khi khách hàng hoặc thu ngân xác nhận đơn hàng (hoặc sau khi thanh 
 ## 🌐 2. THIẾT KẾ ĐIỀU PHỐI QUA SERVICE GATEWAY
 
 ### 2.1. Bảng Định Tuyến Gateway (Gateway Routing Rules)
-Trong file cấu hình của `backend/gateway/src/main/resources/application.yml`, các đường dẫn cần được cấu hình như sau:
+Trong file cấu hình của `backend/gateway/src/main/resources/application.yml`, các đường dẫn đang được cấu hình như sau:
 
 ```yaml
 server:
-  port: 8080
+  port: ${PORT:8088}
 
 spring:
   application:
-    name: smartpos-gateway
+    name: api-gateway
   cloud:
     gateway:
-      routes:
-        # 1. Định tuyến Auth & Người dùng
-        - id: auth-service-route
-          uri: http://auth-service:8081 # Hoặc http://localhost:8081 khi chạy local
-          predicates:
-            - Path=/api/auth/**
+      server:
+        webflux:
+          routes:
+            # 1. Định tuyến Auth, Người dùng, Vai trò & Quyền
+            - id: auth-service-route
+              uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/auth/**, /api/users/**, /api/roles/**, /api/permissions/**
 
-        # 2. Định tuyến Thực đơn, Định lượng & Kho hàng
-        - id: catalog-inventory-route
-          uri: http://catalog-inventory-service:8082 # Hoặc http://localhost:8082 khi chạy local
-          predicates:
-            - Path=/api/products/**, /api/categories/**, /api/modifier-groups/**, /api/ingredients/**, /api/recipes/**, /api/suppliers/**, /api/purchase-orders/**, /api/inventory/**, /uploads/**
+            # 2. Định tuyến Bán hàng, KDS, Khách hàng, Khuyến mãi & WebSocket
+            - id: sales-service-health-route
+              uri: ${SALES_SERVICE_URL:http://localhost:8083}
+              order: 1
+              predicates:
+                - Path=/api/sales/health
 
-        # 3. Định tuyến Bán hàng, Bếp & Bàn ăn
-        - id: sales-service-route
-          uri: http://sales-service:8083 # Hoặc http://localhost:8083 khi chạy local
-          predicates:
-            - Path=/api/orders/**, /api/tables/**, /api/payments/**, /api/promotions/**, /api/kds/**
+            - id: sales-service-frontend-route
+              uri: ${SALES_SERVICE_URL:http://localhost:8083}
+              order: 2
+              predicates:
+                - Path=/api/sales/**
+              filters:
+                - RewritePath=/api/sales/(?<segment>.*), /api/$\{segment}
+
+            - id: sales-service-route
+              uri: ${SALES_SERVICE_URL:http://localhost:8083}
+              order: 3
+              predicates:
+                - Path=/api/orders/**, /api/customers/**, /api/promotions/**
+
+            - id: sales-service-websocket
+              uri: ${SALES_WS_URL:http://localhost:8083}
+              predicates:
+                - Path=/ws-pos/**
+
+            # 3. Định tuyến Thực đơn, Định lượng, Kho hàng & Ảnh tĩnh
+            - id: catalog-menu-frontend-route
+              uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
+              order: 0
+              predicates:
+                - Path=/api/catalog/products/menu
+                - Method=GET
+              filters:
+                - RewritePath=/api/catalog/(?<segment>.*), /api/$\{segment}
+                - name: CircuitBreaker
+                  args:
+                    name: catalogMenuCB
+                    fallbackUri: forward:/fallback/catalog
+
+            - id: catalog-inventory-frontend-route
+              uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
+              order: 1
+              predicates:
+                - Path=/api/catalog/**
+              filters:
+                - RewritePath=/api/catalog/(?<segment>.*), /api/$\{segment}
+
+            - id: catalog-inventory-service-route
+              uri: ${CATALOG_INVENTORY_URL:http://localhost:8082}
+              order: 2
+              predicates:
+                - Path=/api/products/**, /api/categories/**, /api/modifier-groups/**, /api/ingredients/**, /api/recipes/**, /api/inventory/**, /api/suppliers/**, /api/purchase-orders/**, /api/files/**, /uploads/**
 ```
 
 ### 2.2. Phương Thức Gọi Liên Dịch Vụ: Qua Gateway Hay Trực Tiếp Nội Bộ?
 > [!IMPORTANT]
 > **Khuyến nghị kiến trúc (Best Practice):**  
-> Các cuộc gọi giữa các dịch vụ backend nội bộ (`sales-service` $\rightarrow$ `catalog-inventory-service`) **NÊN ĐI TRỰC TIẾP** qua mạng nội bộ Docker (`http://catalog-inventory-service:8082`) hoặc `http://localhost:8082` (khi dev local), **KHÔNG NÊN** vòng qua Gateway (`http://gateway:8080`).
+> Các cuộc gọi giữa các dịch vụ backend nội bộ (`sales-service` $\rightarrow$ `catalog-inventory-service`) **NÊN ĐI TRỰC TIẾP** qua mạng nội bộ Docker (`http://catalog-inventory-service:8082`) hoặc `http://localhost:8082` (khi dev local), **KHÔNG NÊN** vòng qua Gateway (`http://gateway:8088`).
 
 * **Lý do:**
   1. Tránh tăng độ trễ (latency) mạng không cần thiết (không phải qua thêm 1 bước proxy hop).
   2. Gateway không bị nghẽn băng thông bởi các request giao dịch nội bộ có tần suất cao.
-  3. Cho phép phân tách quyền truy cập: Endpoint `/api/inventory/deduct` có thể chặn client bên ngoài gọi trực tiếp từ Internet nếu cần, chỉ mở cho IP mạng nội bộ hoặc qua Service Secret Token.
+  3. Cho phép phân tách quyền truy cập: Endpoint `/api/inventory/deduct` tại `catalog-inventory-service` yêu cầu quyền `INVENTORY_EXPORT` (cho quản trị viên test trên UI) hoặc xác thực `X-Internal-Service` + `X-Internal-Secret` khi `sales-service` gọi nội bộ.
 
-### 2.3. Xử Lý Token & Xác Thực Giữa 2 Dịch Vụ
-Khi `sales-service` gọi sang `catalog-inventory-service`:
-* **Cách 1 (Token Propagation - Khuyến nghị):** Lấy Header `Authorization: Bearer <jwt_token>` từ request của người dùng (Thu ngân/Admin) và chuyển tiếp nguyên vẹn sang Header của request nội bộ.
-* **Cách 2 (Internal Service Header):** Bổ sung thêm Header định danh dịch vụ:
+### 2.3. Xử Lý Token, Phân Quyền & Truy Vết Liên Dịch Vụ
+* **Từ Client qua Gateway (`:8088`):** Gateway xóa sạch các header `X-User-*` và header nội bộ `X-Internal-*` (`X-Internal-Service`, `X-Internal-Secret`) giả mạo từ client, kiểm tra Bearer JWT, và bơm `X-User-Id`, `X-User-Role`, `X-User-Name`, `X-User-Permissions` cùng `X-Correlation-Id` xuống downstream.
+* **Khi `sales-service` gọi sang `catalog-inventory-service` (`InventoryClient`):** OpenFeign `FeignTraceAndInternalInterceptor` tự động truyền tiếp:
   ```http
   X-Internal-Service: sales-service
+  X-Internal-Secret: <INTERNAL_SERVICE_SECRET>
   X-Correlation-Id: c8f3a9e2-45d1-4b2a-8ef0-9876543210ab
+  X-User-Id: <userId>
+  X-User-Role: <role>
+  X-User-Permissions: <permissions>
   ```
-  Giúp hệ thống ghi vết nhật ký (Distributed Tracing) xuyên suốt từ lúc tạo đơn ở `sales-service` đến lúc trừ kho ở `catalog-inventory-service`.
+  Giúp hệ thống ghi vết nhật ký (Distributed Tracing via MDC) và phân quyền nhất quán xuyên suốt từ lúc tạo/thanh toán đơn ở `sales-service` đến lúc trừ kho ở `catalog-inventory-service`.
 
 ---
 
@@ -206,7 +253,7 @@ Endpoint này **đã được xây dựng sẵn, kiểm thử kỹ lưỡng và 
 ### 4.1. Thông Tin Endpoint
 * **HTTP Method:** `POST`
 * **Đường dẫn nội bộ:** `http://catalog-inventory-service:8082/api/inventory/deduct`
-* **Đường dẫn qua Gateway:** `http://localhost:8080/api/inventory/deduct`
+* **Đường dẫn qua Gateway:** `http://localhost:8088/api/inventory/deduct` (hoặc `/api/catalog/inventory/deduct`)
 * **Content-Type:** `application/json`
 
 ---

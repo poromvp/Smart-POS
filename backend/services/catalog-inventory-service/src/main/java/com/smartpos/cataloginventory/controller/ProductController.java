@@ -6,6 +6,7 @@ import com.smartpos.cataloginventory.dto.response.ApiResponse;
 import com.smartpos.cataloginventory.dto.response.CategoryMenuResponse;
 import com.smartpos.cataloginventory.dto.response.ProductDetailResponse;
 import com.smartpos.cataloginventory.dto.response.ProductSummaryResponse;
+import com.smartpos.cataloginventory.security.RequirePermissions;
 import com.smartpos.cataloginventory.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping
+    @RequirePermissions(anyOf = {"MENU_CREATE"})
     public ResponseEntity<ApiResponse<ProductDetailResponse>> createProduct(
             @Valid @RequestBody ProductCreateRequest request) {
         ProductDetailResponse response = productService.createProduct(request);
@@ -31,6 +33,7 @@ public class ProductController {
     }
 
     @GetMapping
+    @RequirePermissions(anyOf = {"MENU_READ", "MENU_CREATE", "MENU_UPDATE", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<List<ProductSummaryResponse>>> getProducts(
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Boolean activeOnly,
@@ -41,18 +44,21 @@ public class ProductController {
 
     // Endpoint Thực đơn tổng hợp phục vụ hiển thị Menu trên Web POS & QR Order
     @GetMapping("/menu")
+    @RequirePermissions(allowPublic = true)
     public ResponseEntity<ApiResponse<List<CategoryMenuResponse>>> getMenu() {
         List<CategoryMenuResponse> response = productService.getMenu();
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @GetMapping("/{id}")
+    @RequirePermissions(anyOf = {"MENU_READ", "MENU_CREATE", "MENU_UPDATE", "ADMIN_DASHBOARD"})
     public ResponseEntity<ApiResponse<ProductDetailResponse>> getProductById(@PathVariable Long id) {
         ProductDetailResponse response = productService.getProductById(id);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @PutMapping("/{id}")
+    @RequirePermissions(anyOf = {"MENU_UPDATE"})
     public ResponseEntity<ApiResponse<ProductDetailResponse>> updateProduct(
             @PathVariable Long id,
             @Valid @RequestBody ProductUpdateRequest request) {
@@ -61,6 +67,7 @@ public class ProductController {
     }
 
     @PatchMapping("/{id}/status")
+    @RequirePermissions(anyOf = {"MENU_UPDATE"})
     public ResponseEntity<ApiResponse<Void>> toggleStatus(
             @PathVariable Long id,
             @RequestParam Boolean isActive) {
@@ -69,6 +76,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermissions(anyOf = {"MENU_DELETE"})
     public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "Xóa món ăn thành công"));

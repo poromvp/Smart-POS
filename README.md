@@ -3,18 +3,15 @@
 **Hệ thống Quản lý Nhà hàng và Gọi món Thông minh**
 
 Đồ án chuyên ngành · Trường Đại học Sài Gòn · Khoa Công nghệ Thông tin
-
 Nhóm **262701-DACN-08-Nhom2B** · Học phần **841476**, nhóm/lớp **03**
-
 Giảng viên hướng dẫn: **ThS. Trần Đình Nghĩa**
 
-Smart POS & KDS số hóa quy trình phục vụ nhà hàng: khách gọi món qua QR tại bàn, nhân viên tiếp nhận đơn, bếp theo dõi chế biến trên KDS, thu ngân xử lý hóa đơn và quản lý theo dõi nguyên liệu theo công thức định lượng (BOM).
-
-README mô tả mã nguồn hiện có và hướng dẫn chuẩn bị nghiệm thu tiến độ lần 2. **Có mã nguồn không đồng nghĩa đã kiểm thử đạt.** Các phần còn mô phỏng, chưa tích hợp hoặc chưa có minh chứng được ghi rõ bên dưới; chưa xác nhận hệ thống đạt toàn bộ điều kiện bàn giao.
+Smart POS & KDS số hóa quy trình phục vụ nhà hàng: khách gọi món qua QR tại bàn, bếp xử lý từng món trên KDS, thu ngân thanh toán trên POS, quản lý theo dõi thực đơn, kho, công thức định lượng (BOM), khách hàng và khuyến mãi.
 
 - Repository: [poromvp/Smart-POS](https://github.com/poromvp/Smart-POS).
-- Cơ sở phân tích và thiết kế: [Báo cáo tiến độ lần 1](docs/DACN_08_Nhom2B_BC_01.docx).
+- Cơ sở thiết kế: [Báo cáo tiến độ lần 1](docs/academic/DACN_08_Nhom2B_BC_01.docx).
 - Liên hệ: **Lê Quang Kiệt**, MSSV **3123410180**, quangkietle382@gmail.com / 3123410180@sv.sgu.edu.vn.
+- **Cập nhật ngày 13/11/2026**, đối chiếu mã nguồn tại commit `c7c85eb` và cấu hình trong checkout hiện tại. Đây là mô tả hiện thực; lần cập nhật tài liệu này không chạy lại toàn bộ hệ thống hoặc bộ test.
 
 ## Mục lục
 
@@ -25,187 +22,158 @@ README mô tả mã nguồn hiện có và hướng dẫn chuẩn bị nghiệm 
 5. [Thiết lập môi trường](#5-thiết-lập-môi-trường)
 6. [Tài khoản kiểm thử](#6-tài-khoản-kiểm-thử)
 7. [API và kịch bản demo](#7-api-và-kịch-bản-demo)
-8. [Kiểm thử sơ bộ](#8-kiểm-thử-sơ-bộ)
-9. [Lỗi tồn đọng và đóng băng tính năng](#9-lỗi-tồn-đọng-và-đóng-băng-tính-năng)
-10. [Checklist hồ sơ và bàn giao](#10-checklist-hồ-sơ-và-bàn-giao)
+8. [Kiểm thử](#8-kiểm-thử)
+9. [Giới hạn và công việc còn lại](#9-giới-hạn-và-công-việc-còn-lại)
+10. [Tài liệu và bàn giao](#10-tài-liệu-và-bàn-giao)
 
 ## 1. Phạm vi và tiến độ
 
-Theo mục 1.1.3 của báo cáo lần 1, giai đoạn hiện tại phục vụ **01 cửa hàng mì cay độc lập**, trong thời gian đồ án 12 tuần. Quản lý chuỗi nhiều chi nhánh, giao hàng, tính lương và kế toán là hướng phát triển sau.
+Phạm vi đồ án phục vụ **01 cửa hàng mì cay độc lập** trong 12 tuần. Quản lý chuỗi, giao hàng, tính lương và kế toán là hướng phát triển sau; giao diện có mục chi nhánh không đồng nghĩa đã hỗ trợ vận hành đa chi nhánh.
 
-Thiết kế gồm 8 phân hệ: quản trị và ca làm việc; bàn và khu vực; thực đơn; bán hàng; KDS; thanh toán; khách hàng và khuyến mãi; kho và BOM. Bảng dưới đối chiếu với mã nguồn, chưa phải kết quả nghiệm thu chạy thực tế.
+| Hạng mục                         | Hiện trạng trong mã nguồn                                                                                                       | Giới hạn cần lưu ý                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Gọi món QR                       | Menu, biến thể/tùy chọn, giỏ hàng, tạo đơn và thêm món vào đơn đang hoạt động qua API                                           | Bàn được truyền qua URL; chưa có cơ chế token QR có chữ ký để chứng minh quyền truy cập bàn               |
+| Đăng nhập và RBAC                | Frontend gọi Auth thật, nhận access token, refresh qua cookie, tải `/api/auth/me`; điều hướng và kiểm soát giao diện theo quyền | Quyền phía giao diện phải đi cùng kiểm tra backend; không dùng các tài khoản email mô phỏng của README cũ |
+| POS                              | Đọc đơn, nhận thông báo realtime, gọi API checkout; có xử lý khách hàng, voucher và điểm                                        | VietQR/chuyển khoản do nhân viên xác nhận, chưa có đối soát ngân hàng tự động                             |
+| KDS                              | Nhận `/topic/kds`, cập nhật trạng thái từng dòng món qua API                                                                    | POS và KDS có polling dự phòng mỗi **60 giây**, không còn mô tả polling 5 giây                            |
+| Kho và BOM                       | Quản lý nguyên liệu, công thức, nhập hàng, điều chỉnh và lịch sử kho; Sales gọi Catalog qua OpenFeign                           | **Trừ kho khi hoàn tất đơn/checkout**, không phải lúc bắt đầu chế biến                                    |
+| Chống trừ kho lặp                | Catalog kiểm tra `orderCode` + `SALE_DEDUCT` sau khi khóa nguyên liệu; Sales xử lý trường hợp đã trừ                            | Chưa phải giao dịch phân tán nguyên tử hoặc Saga hoàn chỉnh                                               |
+| Khách hàng, khuyến mãi, thống kê | Có API và giao diện, tích/đổi điểm, điều kiện voucher và thống kê bán hàng                                                      | Cần đối chiếu báo cáo test theo đúng phiên bản nghiệm thu                                                 |
+| Kiểm thử                         | Unit/integration backend, 8 file test frontend, 6 file E2E Playwright và GitHub Actions                                         | Có bộ test không đồng nghĩa mọi chức năng đã được nghiệm thu                                              |
 
-| Hạng mục | Thiết kế trong báo cáo lần 1 | Hiện trạng mã nguồn |
-| --- | --- | --- |
-| Gọi món QR | Chọn món, tùy chọn, gửi đơn theo bàn | Có menu, giỏ hàng và API tạo đơn; URL mang tham số `table`; chưa chứng minh xác thực token QR phía server |
-| POS | Sơ đồ bàn, bán hàng, hóa đơn | Có giao diện; còn dữ liệu mô phỏng và menu dự phòng khi API lỗi |
-| KDS | Điều phối theo trạm, cảnh báo trễ, WebSocket/STOMP | Có lấy đơn qua API, bộ đếm và cập nhật `READY`; tải lại mỗi 5 giây bằng polling |
-| Thực đơn, kho, BOM | CRUD, nhập kho, định lượng, lịch sử biến động | Có controller/service và giao diện quản trị; cần kiểm thử với CSDL thật |
-| Trừ kho khi chế biến | Tự trừ BOM lúc bắt đầu làm món | Có API trừ kho riêng; Sales chưa gọi trừ kho khi chuyển trạng thái |
-| Thanh toán | Tiền mặt, VietQR, đối soát tự động | Có API cập nhật thanh toán; màn hình POS vẫn là demo, QR chưa kết nối |
-| Tài khoản, phân quyền | Đăng nhập và RBAC | Backend có Auth/RBAC; đăng nhập frontend đang dùng tài khoản mô phỏng |
-| Chức năng còn lại | Ca làm việc, CRM, khuyến mãi, gộp/tách hóa đơn, báo cáo | Cần rà soát và bổ sung minh chứng trước khi đánh dấu hoàn thành |
-
-So với thiết kế lần 1, backend hiện khai báo Spring Boot **4.1.1**, frontend dùng **Next.js** trên React và CSDL đã chọn **PostgreSQL**. WebSocket/STOMP vẫn là kế hoạch tích hợp; chưa có Redux Toolkit trong dependency frontend.
+Nguồn chính: [Auth context](frontend/src/lib/auth-context.tsx), [POS](frontend/src/app/pos/page.tsx), [KDS](frontend/src/app/kds/page.tsx), [OrderServiceImpl](backend/services/sales-service/src/main/java/com/smartpos/sales_service/service/impl/OrderServiceImpl.java), [InventoryServiceImpl](backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/service/impl/InventoryServiceImpl.java).
 
 ## 2. Thành viên và phân công
 
 Danh sách thành viên lấy theo trang hành chính của báo cáo lần 1. Phân công dưới đây được cập nhật theo thông tin thành viên cung cấp; những nhiệm vụ chưa rõ và tỷ lệ đóng góp cần nhóm xác nhận bổ sung.
 
-| MSSV | Thành viên | Vai trò / phạm vi công việc | Đóng góp thực tế lần 2 |
-| --- | --- | --- | --- |
-| 3123410180 | Lê Quang Kiệt | Nhóm trưởng; nhiệm vụ lập trình cụ thể chờ xác nhận | Chờ nhóm xác nhận |
-| 3123410015 | Đỗ Trần Huy Bảo | Chờ xác nhận phạm vi công việc | Chờ nhóm xác nhận |
-| 3123410194 | Nguyễn Hoàng Lập | Frontend — phần gọi món bằng QR (QR Ordering) | Chờ nhóm xác nhận |
-| 3123410242 | Nguyễn Trọng Nhân | Lead Frontend | Chờ nhóm xác nhận |
-| 3123410179 | Lâm Tuấn Kiệt | Chờ xác nhận phạm vi công việc | Chờ nhóm xác nhận |
+| MSSV       | Thành viên        | Vai trò / phạm vi công việc                         | Đóng góp thực tế lần 2 |
+| ---------- | ----------------- | --------------------------------------------------- | ---------------------- |
+| 3123410180 | Lê Quang Kiệt     | Nhóm trưởng; nhiệm vụ lập trình cụ thể chờ xác nhận | Chờ nhóm xác nhận      |
+| 3123410015 | Đỗ Trần Huy Bảo   | Chờ xác nhận phạm vi công việc                      | Chờ nhóm xác nhận      |
+| 3123410194 | Nguyễn Hoàng Lập  | Frontend — phần gọi món bằng QR (QR Ordering)       | Chờ nhóm xác nhận      |
+| 3123410242 | Nguyễn Trọng Nhân | Lead Frontend                                       | Chờ nhóm xác nhận      |
+| 3123410179 | Lâm Tuấn Kiệt     | Chờ xác nhận phạm vi công việc                      | Chờ nhóm xác nhận      |
 
 Nhóm cần bổ sung người phụ trách Backend, CSDL và các module còn lại, đồng thời xác nhận tỷ lệ đóng góp thực tế với **tổng bằng 100%**. Chưa gán thêm KDS, bộ đếm hoặc cảnh báo trễ vào phân công của Nguyễn Hoàng Lập khi chưa được xác nhận. Không tự chuyển mức 20%/người của lần 1 sang giai đoạn lập trình. Đề tài hiện không có phân hệ AI/IoT.
 
 ## 3. Kiến trúc và công nghệ
 
-### 3.1. Kiến trúc hiện có
+### 3.1. Ba service nghiệp vụ và API Gateway
 
 ```mermaid
 flowchart LR
-    U["Khách hàng / Nhân viên"] --> FE["Next.js :3000 — QR, POS, KDS, Admin"]
-    FE -->|"REST Proxy (/api/*, /uploads/*)"| GW["API Gateway :8088<br/>(JWT, Rate Limit, Circuit Breaker, CORS, X-Correlation-Id)"]
-    U -.->|"WebSocket STOMP ws://localhost:8088/ws-pos"| GW
-    GW --> AUTH["Auth :8081 — JWT và RBAC"]
-    GW --> CAT["Catalog & Inventory :8082"]
-    GW --> SALES["Sales :8083"]
-    SALES -.->|"OpenFeign nội bộ: /api/inventory/deduct"| CAT
-    AUTH --> ADB[(pos_identity_db)]
-    CAT --> CDB[(pos_catalog_inventory_db)]
-    SALES --> SDB[(pos_sales_db)]
-    PGA["pgAdmin :5050"] --> PG["PostgreSQL — cổng máy chủ 5433"]
-    PG --- ADB
-    PG --- CDB
-    PG --- SDB
+    U[Khách hàng / Nhân viên] --> FE[Next.js :3000]
+    FE -->|REST qua Next.js rewrites| GW[API Gateway :8088]
+    U -->|WebSocket STOMP /ws-pos| GW
+    GW --> AUTH[Auth :8081]
+    GW --> CAT[Catalog & Inventory :8082]
+    GW --> SALES[Sales :8083]
+    SALES -->|OpenFeign: trừ BOM khi hoàn tất đơn| CAT
+    subgraph PG[PostgreSQL dùng chung một instance]
+        ADB[(pos_identity_db)]
+        CDB[(pos_catalog_inventory_db)]
+        SDB[(pos_sales_db)]
+    end
+    AUTH --> ADB
+    CAT --> CDB
+    SALES --> SDB
 ```
 
-Ba database cùng chạy trong một container PostgreSQL. Toàn bộ REST request từ [cấu hình Next.js](frontend/next.config.mjs) và kết nối WebSocket STOMP (`/ws-pos`) đều đi qua **API Gateway (`:8088`)** ([gateway](backend/gateway)). Gateway xử lý định tuyến, xác thực Bearer JWT (`401`), chống giả mạo header `X-User-*`, giới hạn tần suất (Rate Limiting), Circuit Breaker fallback, CORS và gắn `X-Correlation-Id` xuyên suốt 3 microservices.
+| Thành phần        | Trách nhiệm                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| Auth              | Tài khoản, vai trò, quyền, JWT, refresh token và phiên đăng nhập                                             |
+| Catalog–Inventory | Danh mục, món/biến thể/tùy chọn, nguyên liệu, BOM, nhà cung cấp, nhập và trừ kho                             |
+| Sales             | Đơn hàng, trạng thái từng món KDS, thanh toán, khách hàng, khuyến mãi, điểm và thống kê                      |
+| Gateway           | Định tuyến HTTP/WebSocket, JWT, lọc header, CORS, rate limit, correlation ID và circuit breaker cho đọc menu |
 
-### 3.2. Công nghệ và phiên bản
+Mỗi service sở hữu database riêng về mặt logic; cả ba database hiện chạy trong **cùng một container PostgreSQL**, nên vẫn chia sẻ tài nguyên và điểm lỗi hạ tầng. Các ứng dụng Spring Boot chạy riêng. POS/KDS/Admin là các giao diện nghiệp vụ, không phải ba microservice bổ sung. Module [shared](backend/shared) là thư viện dùng chung, không phải dịch vụ chạy độc lập.
 
-Đây là phiên bản **khai báo trong repository**, không phải xác nhận đã cài hoặc build thành công. Cài npm bằng lockfile để tái lập bộ dependency.
+Địa chỉ service được cấu hình bằng URL/biến môi trường; cấu hình hiện tại không dùng Eureka. Gateway dùng WebFlux; nghiệp vụ được triển khai trong các service Spring Boot với Spring Data JPA.
 
-| Thành phần | Công nghệ / phiên bản | Nguồn |
-| --- | --- | --- |
-| Frontend | Next.js `^16.3.5`, React `^19.2.8` | [package.json](frontend/package.json) |
-| Ngôn ngữ và giao diện | TypeScript `^6.0.3`, Tailwind CSS `^4.3.3` | [package.json](frontend/package.json) |
-| Runtime frontend | Khuyến nghị Node.js 24 LTS và npm đi kèm; repo chưa pin runtime | [package-lock.json](frontend/package.json) |
-| Backend | Java 21, Spring Boot 4.1.1, Spring Cloud Gateway Server WebFlux (`2025.1.3`), Spring Data JPA | [POM gốc](backend/pom.xml) |
-| Xác thực & Phân quyền | Spring Security + JJWT 0.13.0 tại Auth/Gateway/Sales STOMP; AuthZ `X-User-*` tại Catalog & Sales | [POM Gateway](backend/gateway/pom.xml) |
-| API docs | springdoc-openapi 3.1.0 trong Auth và Sales | [POM Sales](backend/services/sales-service/pom.xml) |
-| CSDL | PostgreSQL `16-alpine` | [Docker Compose](docker-compose.yml) |
-| Quản trị CSDL | pgAdmin 4, image đang dùng tag `latest` | [Docker Compose](docker-compose.yml) |
-| Build Java | Maven; wrapper Auth khai báo 3.10.0 | [Maven Wrapper](backend/services/auth-service/.mvn/wrapper/maven-wrapper.properties) |
-| Hạ tầng | Docker Engine/Desktop, Compose v2; hỗ trợ Gateway container qua `docker-compose.full.yml` | [Docker Compose Full](docker-compose.full.yml) |
-| Đồng bộ realtime | WebSocket STOMP (`/ws-pos` qua Gateway `:8088`) + fallback polling | [WebSocket Manager](frontend/src/lib/websocket.ts) |
+### 3.2. Giao tiếp, bảo mật và xử lý lỗi
 
-### 3.3. Địa chỉ cục bộ
+- Frontend chuyển REST request qua [Next.js rewrites](frontend/next.config.mjs) tới Gateway. Gateway bỏ prefix `/catalog` hoặc `/sales` trước khi chuyển tiếp tới API tương ứng.
+- [Gateway JWT filter](backend/gateway/src/main/java/com/smartpos/gateway/filter/JwtAuthenticationFilter.java) kiểm tra Bearer JWT cho route được bảo vệ, loại các header định danh/nội bộ được xử lý bởi filter khỏi request bên ngoài và gắn `X-User-Id`, `X-User-Role`, `X-User-Name`, `X-User-Permissions` từ token. Catalog/Sales kiểm tra quyền nghiệp vụ. Các cổng nội bộ cần được giới hạn truy cập khi triển khai.
+- Sales gọi `POST /api/inventory/deduct` trực tiếp tới Catalog bằng [InventoryClient](backend/services/sales-service/src/main/java/com/smartpos/sales_service/client/InventoryClient.java). [Feign interceptor](backend/services/sales-service/src/main/java/com/smartpos/sales_service/client/FeignTraceAndInternalInterceptor.java) truyền correlation ID, ngữ cảnh người dùng và `X-Internal-Secret`.
+- Sales phát `/topic/orders`, `/topic/kds`, `/topic/tables/{tableNumber}` **sau khi transaction commit**. [STOMP interceptor](backend/services/sales-service/src/main/java/com/smartpos/sales_service/security/StompAuthChannelInterceptor.java) kiểm tra JWT/quyền cho topic nhân viên; topic theo bàn cho phép ẩn danh. Frontend dùng [WebSocket manager](frontend/src/lib/websocket.ts); POS/KDS tải lại dữ liệu khi có sự kiện và polling dự phòng 60 giây.
+- [Gateway config](backend/gateway/src/main/resources/application.yml) đặt connect timeout 5 giây, response timeout 15 giây. Circuit breaker `catalogMenuCB` áp dụng cho **GET menu**, không bao phủ toàn bộ API hoặc lời gọi Feign. Rate limit hiện lưu trong bộ nhớ từng Gateway instance: mặc định 15 request đăng nhập/phút và 30 request tạo đơn/phút.
+- `X-Correlation-Id` hỗ trợ đối chiếu log qua các service; đây chưa phải hệ thống distributed tracing đầy đủ.
 
-| Thành phần | Địa chỉ |
-| --- | --- |
-| Đăng nhập | http://localhost:3000/login |
-| Khách gọi món bàn 01 | http://localhost:3000/menu?table=01 |
-| Menu chỉ xem | http://localhost:3000/menu |
-| POS / KDS / quản trị | http://localhost:3000/pos · http://localhost:3000/kds · http://localhost:3000/admin |
-| API Gateway (Single Entry Point) | http://localhost:8088 · WebSocket `ws://localhost:8088/ws-pos` |
-| Gateway Healthcheck | http://localhost:8088/actuator/health |
-| Auth / Catalog / Sales API (nội bộ) | http://localhost:8081/api/auth · http://localhost:8082/api · http://localhost:8083/api |
-| Healthcheck 3 microservices | `:8081/actuator/health` · `:8082/actuator/health` · `:8083/api/sales/health` |
-| Swagger Auth / Sales | http://localhost:8081/swagger-ui/index.html · http://localhost:8083/swagger-ui/index.html |
-| pgAdmin | http://localhost:5050 |
-| PostgreSQL từ máy chủ | `localhost:5433` |
+### 3.3. Luồng đơn hàng và nhất quán dữ liệu
 
-Các URL chỉ hoạt động sau khi dịch vụ khởi động thành công. **Chưa có Public URL hoặc video demo được xác nhận trong README.**
+1. Khách tạo đơn qua Gateway; Sales lưu đơn và các dòng món trong database Sales.
+2. Sau commit, Sales phát sự kiện STOMP để POS/KDS tải lại dữ liệu.
+3. Bếp cập nhật trạng thái **từng dòng món**. Bước này không tự trừ nguyên liệu.
+4. Khi checkout/hoàn tất đơn, Sales gọi Catalog trừ BOM, xử lý điểm/voucher và lưu trạng thái đơn. Checkout đặt thanh toán `PAID`, đơn `COMPLETED` và các dòng món `SERVED`.
+5. Catalog tính nguyên liệu cần, khóa các dòng nguyên liệu, kiểm tra trùng mã đơn và tồn kho trước khi trừ; ghi lịch sử `SALE_DEDUCT`. Món không có công thức có thể không phát sinh lượng trừ, nên demo BOM cần chuẩn bị công thức thực tế.
+6. Sales có optimistic locking bằng `@Version`. Khi Catalog báo lỗi, Sales chuyển thành lỗi nghiệp vụ; trường hợp thông báo đã trừ kho được xem là đã xử lý để tiếp tục hoàn tất.
+
+**Giới hạn:** transaction JPA tại Sales không rollback được transaction đã commit ở Catalog. Nếu Catalog trừ xong nhưng Sales commit thất bại vẫn cần cơ chế khôi phục/đối soát. Chống trừ lặp hiện dựa vào mã đơn và nhận diện thông báo lỗi; chưa có Saga, transactional outbox hoặc giao dịch phân tán hoàn chỉnh. Thời điểm trừ kho hiện tại khác thiết kế ban đầu “bắt đầu chế biến → trừ BOM”.
+
+### 3.4. Công nghệ khai báo
+
+| Thành phần        | Phiên bản/công nghệ                                                | Nguồn                                                                                           |
+| ----------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Backend           | Java 21, Spring Boot 4.1.1, Spring Cloud 2025.1.3                  | [Parent POM](backend/pom.xml)                                                                   |
+| Gateway           | Spring Cloud Gateway Server WebFlux, Resilience4j                  | [Gateway POM](backend/gateway/pom.xml)                                                          |
+| Giao tiếp/backend | OpenFeign, Spring Data JPA, WebSocket/STOMP                        | [Sales POM](backend/services/sales-service/pom.xml)                                             |
+| Xác thực          | Spring Security, JJWT 0.13.0                                       | [Auth POM](backend/services/auth-service/pom.xml)                                               |
+| API docs          | springdoc-openapi 3.1.0 tại Auth/Sales                             | [Sales POM](backend/services/sales-service/pom.xml)                                             |
+| Frontend          | Next.js ^16.3.5, React ^19.2.8, TypeScript ^6.0.3, Tailwind ^4.3.3 | [package.json](frontend/package.json)                                                           |
+| Database          | PostgreSQL 16-alpine, pgAdmin 4                                    | [Compose](docker-compose.yml)                                                                   |
+| Kiểm thử          | JUnit/Mockito, H2, JaCoCo, Node test runner, Playwright            | [Backend POM](backend/pom.xml), [E2E package](e2e/package.json)                                 |
+| Môi trường CI     | JDK 21, Node.js 22; Maven wrapper khai báo 3.10.0                  | [Workflow](.github/workflows/e2e.yml), [Wrapper](backend/.mvn/wrapper/maven-wrapper.properties) |
+
+Đây là phiên bản trong repository, không phải xác nhận dependency đã resolve/build trên mọi máy. Dùng lockfile khi cài npm; nếu build lỗi dependency, kiểm tra log và tính tương thích của bộ phiên bản.
 
 ## 4. Cấu trúc mã nguồn
 
 ```text
 Smart-POS/
 ├── backend/
-│   ├── pom.xml
-│   ├── shared/                         # Module dùng chung
-│   ├── gateway/                        # API Gateway (Spring Cloud Gateway WebFlux, :8088)
+│   ├── pom.xml, mvnw, mvnw.cmd
+│   ├── shared/
+│   ├── gateway/
 │   └── services/
-│       ├── auth-service/               # Tài khoản, vai trò, JWT (:8081)
-│       ├── catalog-inventory-service/  # Thực đơn, BOM, kho, nhập hàng (:8082)
-│       └── sales-service/              # Đơn hàng, KDS, thanh toán, STOMP WS (:8083)
-├── frontend/
-│   ├── src/app/                        # Các trang Next.js
-│   ├── src/components/                 # Thành phần giao diện
-│   ├── src/lib/                        # API client, WebSocket client, AuthContext
-│   └── tests/                          # Unit tests frontend
-├── database/dbdiagram                  # Thiết kế dữ liệu
-├── init-scripts/                       # SQL tạo schema và seed
-├── docs/                               # Báo cáo, sơ đồ, đặc tả, wireframe
-├── .env.example                        # Mẫu biến môi trường (DB, Auth, Services, Gateway, Frontend)
-├── docker-compose.yml                  # PostgreSQL và pgAdmin
-└── docker-compose.full.yml             # PostgreSQL, pgAdmin và Gateway container
+│       ├── auth-service/
+│       ├── catalog-inventory-service/
+│       └── sales-service/
+├── frontend/                 # Next.js và unit tests
+├── e2e/                      # Playwright, fixtures, page objects, script chạy local
+├── init-scripts/             # SQL 01–05: tạo DB, seed, migration Sales/Auth
+├── database/dbdiagram       # Thiết kế dữ liệu
+├── docs/
+│   ├── academic/            # Báo cáo học phần
+│   ├── architecture/        # Đặc tả, sơ đồ, wireframe
+│   ├── services/            # Tài liệu từng service
+│   └── testing/             # Kế hoạch và báo cáo kiểm thử
+├── .github/workflows/e2e.yml
+├── .env.example
+├── docker-compose.yml       # PostgreSQL + pgAdmin
+├── docker-compose.full.yml  # PostgreSQL + pgAdmin + Gateway
+└── docker-compose.e2e.yml   # PostgreSQL riêng cho E2E, cổng 5434
 ```
 
 ## 5. Thiết lập môi trường
 
-**Giới hạn hiện tại:** `docker compose up -d` mới chạy PostgreSQL và pgAdmin, chưa chạy frontend/backend. Đây là hướng dẫn chạy phát triển theo cấu hình mã nguồn; chưa xác nhận bằng một lần cài mới hoàn chỉnh. Trở ngại đã biết nằm ở mục 9.
+### 5.1. Chuẩn bị
 
-### 5.1. Chuẩn bị và lấy mã nguồn
-
-Cài Git, Docker Desktop/Engine có Compose v2, Node.js 24 LTS, JDK 25 và Maven. Bật Docker trước khi chạy CSDL. Lệnh minh họa dùng PowerShell:
+Cài Git, Docker Desktop/Engine với Compose v2, JDK 21 và Node.js 22 theo môi trường CI. Có thể dùng Maven cài sẵn hoặc wrapper tại backend. Các lệnh dưới chạy bằng PowerShell ở thư mục gốc repository.
 
 ```powershell
 git clone https://github.com/poromvp/Smart-POS.git
 cd Smart-POS
-```
-
-Nếu đã có mã nguồn, sử dụng thư mục hiện tại và bỏ qua bước clone.
-
-### 5.2. Biến môi trường
-
-Tham khảo [.env.example](.env.example). Mẫu hiện thiếu `POSTGRES_USER`, `POSTGRES_PASSWORD`, `PGADMIN_EMAIL`, `PGADMIN_PASSWORD`; tên database Auth chưa khớp SQL khởi tạo. Tạo bản cục bộ nếu chưa có:
-
-```powershell
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Điền/đồng bộ nội dung sau trong `.env`. Đây là **giá trị ví dụ cho máy demo**, không lấy từ môi trường riêng của thành viên:
+Nếu đã có checkout thì bỏ qua bước clone. [.env.example](.env.example) đã có biến PostgreSQL, pgAdmin, Auth, JWT, internal secret, URL service và Gateway. Đồng bộ thông tin đăng nhập DB giữa Docker và backend; các giá trị mặc định chỉ phục vụ phát triển cục bộ.
 
-```dotenv
-POSTGRES_USER=pos_admin
-POSTGRES_PASSWORD=local_demo_db_password
-PGADMIN_EMAIL=admin@example.com
-PGADMIN_PASSWORD=local_demo_pgadmin_password
+**Lưu ý `PORT`:** mẫu env đặt `PORT=8088`; Gateway và Sales đều đọc biến này. Nếu nạp nguyên mẫu cho Sales mà không đổi lại, Sales sẽ chiếm cổng Gateway. Trong terminal Sales phải đặt `PORT=8083`, terminal Gateway đặt `PORT=8088` như bên dưới.
 
-AUTH_SERVER_PORT=8081
-AUTH_DB_NAME=pos_identity_db
-AUTH_DB_USER=pos_admin
-AUTH_DB_PASSWORD=local_demo_db_password
-AUTH_DB_PORT=5433
-JWT_SECRET=REPLACE_WITH_GENERATED_BASE64_SECRET
-JWT_ACCESS_TOKEN_EXPIRATION=900000
-JWT_REFRESH_TOKEN_EXPIRATION_DAYS=7
-JWT_REFRESH_COOKIE_NAME=refreshToken
-
-SALES_DB_URL=jdbc:postgresql://127.0.0.1:5433/pos_sales_db
-CORS_ALLOWED_ORIGINS=http://localhost:3000
-```
-
-Sinh chuỗi Base64 ngẫu nhiên rồi thay giá trị `JWT_SECRET` bằng kết quả:
+Backend chạy ngoài Docker không tự đọc `.env`. Trong **mỗi terminal backend**, nạp biến trước khi chạy:
 
 ```powershell
-$jwtBytes = New-Object byte[] 64
-$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-$rng.GetBytes($jwtBytes)
-[Convert]::ToBase64String($jwtBytes)
-$rng.Dispose()
-```
-
-Docker Compose tự đọc `.env` ở thư mục gốc. Backend chạy ngoài Docker **không tự đọc file này**; truyền cùng giá trị qua Environment Variables của IDE hoặc nạp vào từng terminal trước khi chạy Maven:
-
-```powershell
-# Chạy tại thư mục gốc; dùng mẫu KEY=VALUE ở trên, không có dấu nháy/comment cuối dòng.
 Get-Content .env | ForEach-Object {
     if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
         [Environment]::SetEnvironmentVariable($matches[1], $matches[2].Trim(), 'Process')
@@ -213,7 +181,9 @@ Get-Content .env | ForEach-Object {
 }
 ```
 
-### 5.3. Khởi tạo CSDL và kiểm tra dữ liệu
+Đoạn nạp trên dùng cho định dạng đơn giản `KEY=VALUE`, không có nháy hoặc comment cuối dòng. Auth/Gateway/Sales phải dùng chung `JWT_SECRET`; Sales/Catalog phải dùng chung `INTERNAL_SERVICE_SECRET`.
+
+### 5.2. Database và migration
 
 ```powershell
 docker compose up -d
@@ -221,67 +191,61 @@ docker compose ps
 docker compose logs postgres
 ```
 
-Khi volume PostgreSQL còn trống, container tự chạy:
+Compose mặc định chỉ chạy PostgreSQL và pgAdmin, **chưa khởi động frontend/backend**. PostgreSQL hiện map cả cổng host 5433 và 5432; cần bảo đảm hai cổng này không bị ứng dụng khác chiếm.
 
-1. [01-init-all-databases.sql](init-scripts/01-init-all-databases.sql): tạo `pos_identity_db`, `pos_catalog_inventory_db`, `pos_sales_db` và các bảng.
-2. [02-seed-data.sql](init-scripts/02-seed-data.sql): nạp danh mục, món ăn, biến thể và tùy chọn vào Catalog.
+Khi volume còn trống, PostgreSQL chạy lần lượt:
 
-Catalog có thêm [DataInitializer](backend/services/catalog-inventory-service/src/main/java/com/smartpos/cataloginventory/config/DataInitializer.java) chạy khi ứng dụng khởi động để nạp dữ liệu theo điều kiện. Có script chưa phải bằng chứng đã seed thành công.
+1. [01-init-all-databases.sql](init-scripts/01-init-all-databases.sql): tạo ba database và schema ban đầu.
+2. [02-seed-data.sql](init-scripts/02-seed-data.sql): seed danh mục/thực đơn.
+3. [03-migration-sales-order-items.sql](init-scripts/03-migration-sales-order-items.sql): cập nhật dữ liệu dòng món.
+4. [04-migration-sales-kds-and-version.sql](init-scripts/04-migration-sales-kds-and-version.sql): trạng thái KDS và version.
+5. [05-migration-identity-db.sql](init-scripts/05-migration-identity-db.sql): `users.role_id`, `roles.is_system`, refresh token.
 
-Mở pgAdmin, đăng nhập bằng `PGADMIN_EMAIL`/`PGADMIN_PASSWORD`, đăng ký server với host **`postgres`**, port **`5432`**, maintenance database **`postgres`**, username/password theo `POSTGRES_*`. DBeaver trên máy chủ dùng **`localhost:5433`**.
+Auth, Catalog và Sales có initializer bổ sung dữ liệu khi khởi động theo điều kiện trong code. Vì vậy không dùng số bản ghi của riêng SQL seed để kết luận dữ liệu hiện có.
 
-Trong Query Tool của `pos_catalog_inventory_db`, kiểm đếm trước khi chụp minh chứng:
+**Volume đã tồn tại không tự chạy lại các script mới.** Sao lưu và áp dụng migration phù hợp cho database cũ. Auth/Sales hiện mặc định `ddl-auto=update` (có biến `JPA_DDL_AUTO`); Catalog cũng cấu hình `update`. Hibernate update không thay thế quy trình migration có kiểm soát.
 
-```sql
-SELECT 'categories' AS table_name, COUNT(*) AS row_count FROM categories
-UNION ALL SELECT 'products', COUNT(*) FROM products
-UNION ALL SELECT 'modifier_groups', COUNT(*) FROM modifier_groups
-UNION ALL SELECT 'modifier_options', COUNT(*) FROM modifier_options
-UNION ALL SELECT 'ingredients', COUNT(*) FROM ingredients
-UNION ALL SELECT 'suppliers', COUNT(*) FROM suppliers;
-```
+pgAdmin: `http://localhost:5050`, đăng nhập theo `PGADMIN_EMAIL`/`PGADMIN_PASSWORD`; đăng ký server host `postgres`, port `5432`, user/password theo `POSTGRES_*`. DBeaver trên máy host dùng `localhost:5433`.
 
-SQL seed hiện chỉ có **3 danh mục, 6 món, 4 nhóm tùy chọn**; chưa đáp ứng yêu cầu 10–20 bản ghi thực tế cho mỗi bảng danh mục. Cần bổ sung và kiểm đếm dữ liệu thật trước nghiệm thu.
+### 5.3. Backend
 
-Script trong `docker-entrypoint-initdb.d` chỉ chạy khi khởi tạo volume mới; restart không tự áp dụng SQL sửa đổi. Với volume đã dùng, cần migration phù hợp và sao lưu trước khi đổi schema.
-
-### 5.4. Chạy backend
-
-Từ thư mục gốc, chuẩn bị parent POM và module dùng chung:
+Chuẩn bị parent POM và shared:
 
 ```powershell
-mvn -f backend/pom.xml -N install
-mvn -f backend/pom.xml -pl shared -am install -DskipTests
+.\backend\mvnw.cmd -f backend/pom.xml -N install
+.\backend\mvnw.cmd -f backend/pom.xml -pl shared -am install -DskipTests
 ```
 
-Mở terminal riêng cho từng dịch vụ tại thư mục gốc, nạp biến theo mục 5.2, rồi chạy:
+Mở bốn terminal riêng ở thư mục gốc, nạp env như mục 5.1 rồi chạy lệnh tương ứng:
 
 ```powershell
-# Terminal Catalog
-mvn -f backend/services/catalog-inventory-service/pom.xml spring-boot:run
-```
-
-```powershell
-# Terminal Sales
-mvn -f backend/services/sales-service/pom.xml spring-boot:run
-```
-
-**Auth có trở ngại schema cần xử lý trước:** SQL ban đầu dùng `user_roles`, entity hiện yêu cầu `users.role_id`; entity Role yêu cầu thêm `is_system`. Auth dùng `ddl-auto: validate`, nên database tạo bằng SQL hiện tại chưa bảo đảm qua kiểm tra schema. Cần migration đồng bộ entity trước khi dùng lệnh sau; không coi đổi sang `update` là minh chứng migration hoàn chỉnh.
-
-```powershell
-# Terminal Auth, sau khi đồng bộ schema; dev bật seed quản trị.
+# Auth
 $env:SPRING_PROFILES_ACTIVE = 'dev'
-mvn -f backend/services/auth-service/pom.xml spring-boot:run
+.\backend\mvnw.cmd -f backend/services/auth-service/pom.xml spring-boot:run
 ```
 
 ```powershell
-# Terminal API Gateway (cổng 8088)
-mvn -f backend/gateway/pom.xml spring-boot:run
+# Catalog & Inventory
+.\backend\mvnw.cmd -f backend/services/catalog-inventory-service/pom.xml spring-boot:run
 ```
 
-Kiểm tra log, kết nối CSDL và API từng dịch vụ. Nếu Maven không resolve dependency, kiểm tra version khai báo và repository; không tự thay version mà không cập nhật cấu hình liên quan.
+```powershell
+# Sales
+$env:PORT = '8083'
+.\backend\mvnw.cmd -f backend/services/sales-service/pom.xml spring-boot:run
+```
 
-### 5.5. Chạy frontend
+```powershell
+# Gateway
+$env:PORT = '8088'
+.\backend\mvnw.cmd -f backend/gateway/pom.xml spring-boot:run
+```
+
+Có thể thay wrapper bằng `mvn` nếu Maven đã cài. Auth mặc định profile `dev`; initializer hiện dùng biểu thức `dev | !test`, **không giới hạn chỉ profile dev**, nên cần rà lại chính sách seed trước khi triển khai ngoài môi trường học tập.
+
+Tùy chọn chạy Gateway trong Docker bằng [docker-compose.full.yml](docker-compose.full.yml): file này vẫn chỉ có DB, pgAdmin và Gateway; ba service nghiệp vụ chạy trên host qua `host.docker.internal`. Không chạy thêm Gateway local cùng cổng hoặc đồng thời hai bộ Compose có cùng container name.
+
+### 5.4. Frontend và địa chỉ demo
 
 ```powershell
 cd frontend
@@ -289,142 +253,157 @@ npm ci
 npm run dev
 ```
 
-Mặc định frontend gọi `/api/auth`, `/api/catalog`, `/api/sales`, `/uploads` qua Next.js rewrites tới **API Gateway (`http://localhost:8088`, biến `API_GATEWAY_URL`)** và kết nối WebSocket STOMP tới **`ws://localhost:8088/ws-pos` (`NEXT_PUBLIC_WS_URL`)**. Khi cần đổi endpoint, tạo `.env.local` trong thư mục frontend rồi khởi động lại Next.js. URL gọi trực tiếp phải có hậu tố `/api` và Gateway/backend phải cho phép origin tương ứng.
+Mặc định Next.js chuyển API tới `http://localhost:8088`; WebSocket tới `ws://localhost:8088/ws-pos`. Nếu cần ghi đè, tạo `frontend/.env.local` với `API_GATEWAY_URL` và `NEXT_PUBLIC_WS_URL`, sau đó khởi động lại frontend.
 
-Để quét QR trên điện thoại cùng mạng, chạy `npm run dev -- --hostname 0.0.0.0`, dùng IP LAN của máy thay `localhost` trong URL QR. Cập nhật `allowedDevOrigins` trong [cấu hình Next.js](frontend/next.config.mjs) nếu IP khác cấu hình hiện có. `/menu` không có tham số bàn chỉ cho xem; ví dụ đặt món là `/menu?table=01`.
+| Thành phần                    | Địa chỉ                                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Đăng nhập                     | http://localhost:3000/login                                                                                              |
+| Gọi món bàn 01 / chỉ xem menu | http://localhost:3000/menu?table=01 · http://localhost:3000/menu                                                         |
+| POS / KDS / Admin / phục vụ   | http://localhost:3000/pos · http://localhost:3000/kds · http://localhost:3000/admin · http://localhost:3000/order-taking |
+| Gateway                       | http://localhost:8088                                                                                                    |
+| Health                        | `http://localhost:8088/actuator/health`; các service tại cổng `8081`, `8082`, `8083` cũng có `/actuator/health`          |
+| Sales health riêng            | http://localhost:8083/api/sales/health                                                                                   |
+| Swagger Auth / Sales          | http://localhost:8081/swagger-ui/index.html · http://localhost:8083/swagger-ui/index.html                                |
+
+Các địa chỉ chỉ hoạt động khi ứng dụng khởi động thành công. Để quét QR trên điện thoại cùng mạng, chạy frontend với `npm run dev -- --hostname 0.0.0.0`, dùng IP LAN trong URL QR và WebSocket, đồng thời cập nhật `allowedDevOrigins` trong [Next.js config](frontend/next.config.mjs). `localhost` trên điện thoại không trỏ về máy chạy backend.
 
 ## 6. Tài khoản kiểm thử
 
-### 6.1. Tài khoản giao diện hiện có
+[LoginForm](frontend/src/components/auth/LoginForm.tsx) hiện dùng **username/password thật qua Auth API**, không còn đăng nhập bằng bảng email mô phỏng.
 
-Nguồn: [LoginForm](frontend/src/components/auth/LoginForm.tsx). Những tài khoản này được kiểm tra **tại frontend**, lưu vai trò demo trong trình duyệt; chưa chứng minh đăng nhập JWT hoặc phân quyền backend.
+Theo [Auth initializer](backend/services/auth-service/src/main/java/com/smartpos/auth_service/config/DataInitializer.java), các tài khoản sau được tạo nếu username chưa tồn tại:
 
-| Vai trò demo | Email | Mật khẩu | Trang sau đăng nhập |
-| --- | --- | --- | --- |
-| Đầu bếp | `chef@smartpos.vn` | `123456` | `/kds` |
-| Thu ngân | `cashier@smartpos.vn` | `123456` | `/pos` |
-| Quản lý | `manager@smartpos.vn` | `123456` | `/admin` |
-| Phục vụ | `waiter@smartpos.vn` | `123456` | `/order-taking` |
-| Khách tại bàn | Không đăng nhập; mở `/menu?table=01` | Không áp dụng | `/menu` và `/cart` |
+| Vai trò         | Username                              | Mật khẩu seed mặc định                       |
+| --------------- | ------------------------------------- | -------------------------------------------- |
+| ADMIN           | `admin`, `admin02`                    | `12345678`                                   |
+| MANAGER         | `manager01`, `manager02`              | `12345678`                                   |
+| CHEF            | `chef01`, `chef02`, `chef03`          | `12345678`                                   |
+| CASHIER         | `cashier01`, `cashier02`, `cashier03` | `12345678`                                   |
+| WAITER          | `waiter01`, `waiter02`, `waiter03`    | `12345678`                                   |
+| PART_TIME       | `parttime01`                          | `12345678`                                   |
+| CASHIER bị khóa | `locked_staff`                        | `12345678` — dùng kiểm thử từ chối đăng nhập |
 
-### 6.2. Tài khoản backend và khoảng thiếu
+`SEED_ADMIN_USERNAME` thay username quản trị chính; `SEED_ADMIN_PASSWORD` được dùng làm mật khẩu chung cho các tài khoản **mới tạo** trong initializer. Đổi biến này không đặt lại mật khẩu tài khoản đã tồn tại. Bảng mô tả seed, không xác nhận dữ liệu trong database riêng của từng máy.
 
-Auth có seed mặc định **`admin` / `12345678`**, chỉ tạo khi bật profile `dev`, schema hợp lệ và username chưa tồn tại. Có thể thay bằng `SEED_ADMIN_USERNAME`/`SEED_ADMIN_PASSWORD`. Tài khoản này dùng với Auth API, **không phải** tài khoản màn hình demo; chưa xác nhận có trong CSDL đang chạy.
-
-Yêu cầu lần 2 là **ít nhất 2–3 cặp username/password cho từng vai trò**. Hiện mới có một tài khoản mô phỏng mỗi vai trò giao diện và một Admin có điều kiện khởi tạo. Nhóm cần seed tài khoản thật, nối frontend với Auth, kiểm tra từng quyền và cập nhật bảng này. Với khách gọi món không cần tài khoản theo thiết kế lần 1, cần nêu rõ cơ chế truy cập QR và xác nhận cách nghiệm thu với GVHD.
+Khách tại bàn không cần tài khoản. Quyền truy cập các phân hệ được tính theo vai trò/quyền từ backend; role tùy chỉnh có thể có nhiều workspace.
 
 ## 7. API và kịch bản demo
 
-### 7.1. API cốt lõi
+### 7.1. API chính qua Gateway
 
-| Dịch vụ | Endpoint | Mục đích |
-| --- | --- | --- |
-| Auth :8081 | `POST /api/auth/login` | Đăng nhập backend |
-| Catalog :8082 | `GET /api/products/menu` | Đọc thực đơn từ CSDL |
-| Catalog :8082 | `GET /api/ingredients` | Đọc tồn nguyên liệu |
-| Catalog :8082 | `GET /api/recipes/product/{productId}` | Đọc định lượng món |
-| Catalog :8082 | `POST /api/inventory/deduct` | Trừ kho theo yêu cầu riêng |
-| Sales :8083 | `POST /api/orders` | Tạo đơn; controller trả HTTP 201 khi thành công |
-| Sales :8083 | `GET /api/orders/{id}` | Đọc chi tiết đơn |
-| Sales :8083 | `PATCH /api/orders/{id}/status` | Cập nhật trạng thái đơn |
-| Sales :8083 | `PATCH /api/orders/{id}/payment` | Cập nhật thanh toán; không đồng nghĩa có webhook ngân hàng |
+Các đường dẫn dưới gọi tại `http://localhost:8088`. Frontend gọi cùng đường dẫn qua Next.js proxy.
 
-Thu thập request, response JSON và HTTP status bằng Swagger/Postman khi dịch vụ chạy thật. Cần minh chứng 200/201 và lỗi nghiệp vụ 400/401/409; chọn request tương ứng với implementation. Catalog chưa khai báo dependency Swagger trong POM riêng, có thể trình bày API qua Postman.
+| Method và đường dẫn                                           | Chức năng                                             |
+| ------------------------------------------------------------- | ----------------------------------------------------- |
+| `POST /api/auth/login`                                        | Đăng nhập                                             |
+| `POST /api/auth/refresh`                                      | Làm mới access token bằng cookie                      |
+| `GET /api/auth/me`                                            | Lấy tài khoản và quyền hiện tại                       |
+| `GET /api/catalog/products/menu`                              | Đọc thực đơn công khai                                |
+| `GET /api/catalog/ingredients`                                | Đọc nguyên liệu, cần quyền                            |
+| `GET /api/catalog/recipes/product/{productId}`                | Đọc BOM                                               |
+| `POST /api/sales/orders`                                      | Tạo đơn, trả 201 khi thành công                       |
+| `GET /api/sales/orders/{id}`                                  | Chi tiết đơn, cần quyền                               |
+| `GET /api/sales/orders?tableNumber=01`                        | Tra cứu công khai theo bàn theo quy tắc Gateway/Sales |
+| `POST /api/sales/orders/{id}/items`                           | Thêm món vào đơn                                      |
+| `PATCH /api/sales/orders/{orderId}/items/{itemId}/kds-status` | Cập nhật trạng thái dòng món                          |
+| `PATCH /api/sales/orders/{id}/status`                         | Cập nhật trạng thái đơn                               |
+| `POST /api/sales/orders/{id}/checkout`                        | Thanh toán, hoàn tất, trừ BOM và xử lý điểm/voucher   |
+| `POST /api/sales/orders/{id}/complete`                        | Hoàn tất đơn; không đồng nghĩa đối soát ngân hàng     |
+| `PATCH /api/sales/orders/{id}/payment`                        | Cập nhật thông tin thanh toán                         |
+| `POST /api/sales/orders/{id}/cancel`                          | Hủy đơn theo quy tắc nghiệp vụ                        |
 
-### 7.2. Kịch bản 3–5 phút
+API trừ kho liên dịch vụ là `POST http://localhost:8082/api/inventory/deduct`, do Sales gọi với thông tin xác thực nội bộ. Tham khảo [OrderController](backend/services/sales-service/src/main/java/com/smartpos/sales_service/controller/OrderController.java) và [Gateway routes](backend/gateway/src/main/resources/application.yml) cho payload, quyền và đường dẫn đầy đủ.
 
-**Luồng ưu tiên kiểm chứng:** khách gọi món → lưu đơn → KDS nhận đơn → cập nhật sẵn sàng → đọc lại trạng thái từ CSDL/API.
+### 7.2. Demo 3–5 phút
 
-1. **Chuẩn bị:** Catalog, Sales và frontend chạy; menu có dữ liệu; mở phiên trình duyệt riêng cho khách và bếp.
-2. **Gọi món:** khách mở `/menu?table=01`, chọn món thật, số lượng/tùy chọn/ghi chú và gửi đơn. Ghi ID, mã đơn, tổng tiền và HTTP 201.
-3. **Đối chiếu lưu trữ:** mở `GET /api/orders/{id}` và Query Tool Sales để kiểm tra đơn, chi tiết món, số bàn.
-4. **Bếp xử lý:** đăng nhập `chef@smartpos.vn`, mở KDS; chờ chu kỳ polling khoảng 5 giây khi API hoạt động bình thường. Quan sát bộ đếm, bấm hoàn tất và kiểm tra API trả `READY`.
-5. **Đối chứng:** tải lại dữ liệu để xác nhận trạng thái được lưu. Kiểm tra riêng đơn nhiều món vì thao tác hoàn tất hiện cập nhật cấp đơn.
+1. Khởi động đủ ba service, Gateway, frontend và DB. Chuẩn bị món có BOM/biến thể/tùy chọn và đủ nguyên liệu; ghi tồn kho ban đầu.
+2. Mở ba phiên trình duyệt: khách tại bàn, `chef01` trên KDS, `cashier01` trên POS.
+3. Khách chọn món từ menu thật, gửi đơn; ghi mã đơn và kiểm tra response 201.
+4. KDS nhận sự kiện realtime. Bếp cập nhật một dòng món và đối chiếu các dòng còn lại để minh họa xử lý theo món.
+5. POS đọc đơn, chọn tiền mặt và checkout. Kiểm tra đơn `COMPLETED`, thanh toán `PAID`, tồn nguyên liệu giảm theo BOM và lịch sử `SALE_DEDUCT` có mã đơn tương ứng.
+6. Tải lại POS/KDS để xác nhận dữ liệu lưu; kiểm tra thêm tình huống thiếu nguyên liệu hoặc checkout lặp trên dữ liệu thử riêng.
 
-Đây là kịch bản cần chạy và ghi minh chứng, chưa phải kết quả E2E Pass. **Luồng đầy đủ theo thiết kế** còn phải nối: xác nhận đơn → bắt đầu chế biến và trừ BOM → phục vụ → thanh toán → hoàn tất đơn. Không dùng thanh toán mô phỏng hoặc gọi API trừ kho thủ công làm bằng chứng đã tự động hóa toàn bộ luồng.
+VietQR hiện có thao tác **“Xác nhận đã nhận chuyển khoản”** trong [PaymentQRModal](frontend/src/components/pos/PaymentQRModal.tsx); không trình bày thao tác này là webhook/đối soát ngân hàng tự động. Lưu video và log theo đúng commit demo.
 
-Phân công một thành viên thao tác, một thành viên giải thích luồng dữ liệu. Quay video dự phòng 2–3 phút sau khi chạy thành công, tải dạng Unlisted hoặc chia sẻ quyền xem và bổ sung URL vào hồ sơ.
+## 8. Kiểm thử
 
-## 8. Kiểm thử sơ bộ
-
-### 8.1. Lệnh kiểm tra có sẵn
-
-Từ thư mục frontend:
+### 8.1. Unit và integration
 
 ```powershell
-npm run lint
-npm test
-npm run build
+# Tại thư mục gốc
+.\backend\mvnw.cmd -f backend/pom.xml test
+npm --prefix frontend ci
+npm --prefix frontend test
+npm --prefix frontend run lint
+npm --prefix frontend run build
 ```
 
-`npm test` hiện chạy [kiểm thử bộ đếm KDS](frontend/tests/kds-timer.test.ts), không đại diện cho toàn bộ nghiệp vụ. Backend có thể kiểm tra bằng `mvn -f backend/pom.xml test` sau khi chuẩn bị dependency, biến môi trường và database kiểm thử riêng. Các test tải Spring context cần môi trường phù hợp.
+Backend có test Auth/RBAC, Gateway routing/filter/rate limit, Catalog/BOM/kho, Sales/checkout/concurrency, Feign và STOMP; có cấu hình H2 trong test. Kết quả với H2 không thay thế kiểm chứng PostgreSQL thực tế. Surefire/JaCoCo xuất báo cáo trong `target` của từng module.
 
-### 8.2. Bảng ca kiểm thử
+[Frontend test script](frontend/package.json) hiện chạy **8 file**: bộ đếm KDS, tính giá, xử lý bàn, WebSocket manager, token manager, API interceptor, điều hướng đăng nhập và logic RoleGate.
 
-**Chưa thực thi trong lần cập nhật tài liệu này.** Chỉ chuyển Pass/Fail khi có kết quả thực tế, ngày chạy, người chạy và ảnh/log tương ứng.
+### 8.2. E2E Playwright và CI
 
-| ID | Loại | Thao tác / dữ liệu | Kết quả mong đợi | Kết quả |
-| --- | --- | --- | --- | --- |
-| TC-01 | Luồng đúng | Đăng nhập Auth bằng tài khoản thật | HTTP 200, token và vai trò đúng | Chưa chạy |
-| TC-02 | Ngoại lệ | Sai mật khẩu Auth | HTTP 401, không cấp token | Chưa chạy |
-| TC-03 | Luồng đúng | Mở menu từ QR bàn hợp lệ | Đúng bàn và dữ liệu menu | Chưa chạy |
-| TC-04 | Biên | `/menu` không có bàn | Chỉ xem, không gửi đơn | Chưa chạy |
-| TC-05 | Luồng đúng | Gửi đơn → KDS hoàn tất | HTTP 201 khi tạo; lưu chi tiết và trạng thái `READY` | Chưa chạy |
-| TC-06 | Biên | Đơn rỗng / số lượng không hợp lệ | HTTP 400, không tạo dữ liệu lỗi | Chưa chạy |
-| TC-07 | Ngoại lệ | Tạo dữ liệu trùng thuộc tính duy nhất | HTTP 409 theo hợp đồng; không trùng bản ghi | Chưa chạy |
-| TC-08 | Ngoại lệ | Trừ kho khi thiếu nguyên liệu | Từ chối; tồn không âm, không ghi dở giao dịch | Chưa chạy |
-| TC-09 | Biên | Gửi lại yêu cầu trừ kho cùng nghiệp vụ | Không trừ hai lần | Chưa chạy |
-| TC-10 | Ngoại lệ | Mất kết nối khi gửi đơn / cập nhật KDS | Báo lỗi, không hiển thị thành công giả | Chưa chạy |
-| TC-11 | Biên | Tải lại KDS, đơn nhiều món | Bộ đếm đúng; không hoàn tất nhầm món khác | Chưa chạy |
-| TC-12 | Tích hợp | Chế biến → trừ BOM → thanh toán thật | Kho và trạng thái nhất quán; giao dịch chỉ ghi một lần | Bị chặn: chưa tích hợp đầy đủ |
+[E2E](e2e) có **27 ca khai báo trong 6 file spec**: Auth/RBAC; QR trên mobile; QR → KDS → POS → BOM; kho/BOM/nhập hàng; quản trị; Gateway/bảo mật/STOMP/concurrency. Playwright chạy một worker, project mobile QR và desktop Chromium; lưu trace, ảnh và video khi lỗi.
 
-## 9. Lỗi tồn đọng và đóng băng tính năng
+Chuẩn bị dependency:
 
-Bảng gồm khoảng thiếu và rủi ro thấy qua đọc mã nguồn; chưa phải tất cả lỗi đã tái hiện khi chạy. P0 chặn bàn giao/luồng chính; P1 cần hoàn thiện trước nghiệm thu chức năng liên quan.
+```powershell
+npm --prefix frontend ci
+npm --prefix e2e ci
+cd e2e
+npx playwright install chromium
+cd ..
+```
 
-| ID | Ưu tiên | Vấn đề / bằng chứng | Điều kiện đóng |
-| --- | --- | --- | --- |
-| GAP-01 | P0 | Compose chỉ có PostgreSQL và pgAdmin | Toàn hệ thống và seed khởi động từ bản clone sạch bằng một lệnh |
-| GAP-02 | P0 | Mẫu env thiếu biến Docker; schema Auth khác entity | Đồng bộ env, migration; Auth đăng nhập được từ DB mới |
-| GAP-03 | P0 | Frontend đăng nhập mô phỏng; thiếu tài khoản thật | Tích hợp JWT/RBAC, 2–3 tài khoản mỗi vai trò và test quyền |
-| GAP-04 | P0 | Sales chưa gọi trừ BOM khi chế biến | Chế biến–kho nhất quán, xử lý thiếu hàng và yêu cầu lặp |
-| GAP-05 | P0 | Thanh toán POS demo; VietQR chưa nối | Lưu thanh toán thật, xác nhận giao dịch theo phương án thống nhất |
-| GAP-06 | P1 | KDS polling; hoàn tất cập nhật cả đơn | Chốt trạng thái theo món/trạm; test nhiều món, tích hợp realtime |
-| GAP-07 | P1 | Sales tính tổng từ giá client gửi; cập nhật trạng thái trực tiếp | Kiểm tra giá từ Catalog và chuyển trạng thái hợp lệ phía backend |
-| GAP-08 | P1 | Seed chưa đủ; thiếu minh chứng test live | Bổ sung, kiểm đếm dữ liệu và lưu ảnh/log test |
-| GAP-09 | P1 | QR dùng tham số bàn, chưa chứng minh xác thực server | Chặn giả mạo bàn theo quy tắc nghiệp vụ đã chốt |
+Chạy trên stack E2E riêng bằng script có sẵn:
 
-**Kế hoạch đề xuất:**
+```powershell
+powershell -File e2e/scripts/run-local-e2e.ps1
+```
 
-- **Trước duyệt Tuần 09:** chốt phân công và tỷ lệ; sửa các mục chặn setup, hoàn thiện luồng xương sống; chạy test và thu ảnh UI/API/CSDL.
-- **Cuối Tuần 09:** đóng băng phạm vi sau khi nhóm xác nhận; ghi chức năng đạt/chưa đạt, người phụ trách và hạn xử lý từng lỗi. Không công bố hoàn tất khi còn P0 chưa giải quyết hoặc chưa thống nhất giảm phạm vi với GVHD.
-- **Tuần 10:** đóng gói và kiểm tra từ bản clone sạch; triển khai MVP nếu khả thi, chạy hồi quy và quay video dự phòng.
+**Hành vi script:** mặc định xóa/tạo lại volume của Compose E2E, dùng PostgreSQL cổng **5434**, build và khởi động các ứng dụng, chạy test rồi dừng các tiến trình do script tạo. Các cổng 3000/8081/8082/8083/8088 cần trống. Dùng `-KeepDb` nếu cần giữ DB E2E; không dùng database chứa dữ liệu cần bảo toàn cho bộ test này. Trước khi chạy, bỏ biến `PORT=8088` được nạp chung từ mẫu env để Sales khởi động đúng cổng mặc định; kiểm tra lại các biến DB còn kế thừa trong terminal.
 
-Ngày đóng băng và người phụ trách từng GAP cần nhóm chốt theo lịch học phần; đây chưa phải lịch cam kết chính thức.
+Khi đã có stack kiểm thử phù hợp đang chạy:
 
-## 10. Checklist hồ sơ và bàn giao
+```powershell
+npm --prefix e2e run typecheck
+npm --prefix e2e run test:e2e
+npm --prefix e2e run test:e2e:p0
+npm --prefix e2e run report
+```
 
-README hỗ trợ tra cứu và chạy thử; **không thay thế báo cáo tiến độ lần 2** về hiện thực hóa và kiểm thử. Không dùng wireframe lần 1 thay ảnh ứng dụng chạy thật.
+[GitHub Actions](.github/workflows/e2e.yml) có workflow build toàn stack, chạy Playwright với DB riêng và upload report/trace/log. Việc có workflow chưa xác nhận lượt CI mới nhất đã thành công.
 
-| Yêu cầu | Minh chứng / tình trạng cần hoàn thiện |
-| --- | --- |
-| Trang hành chính, phân công lập trình | Có danh sách 5 thành viên; cần xác nhận Lead và tỷ lệ tổng 100% |
-| CSDL thực tế và seed | Có SQL, initializer; cần ảnh quản trị DB, số bản ghi đạt yêu cầu |
-| Backend và hợp đồng API | Có controller; cần Swagger/Postman live, JSON, HTTP 200/201/400/401/409 |
-| UI thật và ít nhất một luồng E2E | Có mã UI, kịch bản; cần ảnh và kết quả xuyên suốt |
-| Test report | Có ca kiểm thử mục 8; cần Pass/Fail và bằng chứng |
-| Feature freeze, bug log | Có GAP và kế hoạch; cần owner, hạn xử lý và ngày đóng băng |
-| README và env mẫu | Có tổng quan, kiến trúc, công nghệ, setup và tài khoản hiện có; cần đồng bộ file env mẫu, tài khoản thật |
-| Container hóa một lệnh | Chưa đạt cho toàn hệ thống; Compose chỉ chạy hạ tầng DB |
-| Quyền repository | Để Public hoặc cấp quyền review cho GitHub `trandinhnghia`; cần kiểm tra thực tế |
-| Lịch sử đóng góp | Commit đều đặn theo thành viên/tuần; đối chiếu công việc thực tế, không dồn mã nguồn vào phút chót |
-| Public URL | Khuyến khích triển khai MVP; chưa có URL xác nhận |
-| Demo và video dự phòng | Demo 3–5 phút, video 2–3 phút; cần link và quyền xem |
+### 8.3. Tình trạng bằng chứng
 
-Tài liệu tham chiếu:
+- Lần cập nhật README này chỉ rà mã nguồn/cấu hình và báo cáo có sẵn, **không chạy lại test**.
+- Log cục bộ ngày 10/11/2026 ghi backend `BUILD SUCCESS`; frontend ghi **37 test pass, 0 fail**. Đây là kết quả lịch sử, không bảo đảm checkout ngày 13/11 có cùng kết quả.
+- Metadata E2E cục bộ `.last-run.json` ngày 13/11 ghi `passed`, danh sách lỗi rỗng. File này không ghi phạm vi ca chạy hoặc commit, nên không dùng riêng nó để khẳng định toàn bộ 27 ca đã pass.
+- [Báo cáo 99 test](docs/testing/bao-cao-danh-gia-kiem-thu.md) là tài liệu đã có; bộ test hiện đã mở rộng. Khi nghiệm thu cần đính kèm report đầy đủ, thời gian, môi trường và commit của lượt chạy thay vì coi 99 là tổng hiện tại.
 
-- [Báo cáo tiến độ lần 1](docs/DACN_08_Nhom2B_BC_01.docx): yêu cầu, BFD/BPMN, Use Case, Sequence, ERD, API và wireframe.
-- [Thiết kế dữ liệu](database/dbdiagram).
-- [Đặc tả tích hợp Sales–Catalog](docs/SALES_CATALOG_INTEGRATION_SPEC.md).
-- [Đánh giá Catalog–Inventory](docs/CATALOG_INVENTORY_EVALUATION.md), [báo cáo sửa lỗi](docs/CATALOG_INVENTORY_FIX_REPORT.md): tài liệu nội bộ, cần đối chiếu lại bằng kiểm thử hiện tại.
-- [Sơ đồ](docs/diagrams), [wireframe](docs/ui/wireframes): tài liệu thiết kế lần 1.
+## 9. Giới hạn và công việc còn lại
+
+| Nội dung                | Hiện trạng / việc cần làm                                                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Giá món từ client       | Sales vẫn dùng `basePrice`/`modifierTotal` từ request khi tạo/thêm món; cần kiểm tra giá từ Catalog phía server                         |
+| Truy cập QR theo bàn    | Có kiểm tra dạng tham số bàn và phân biệt route công khai; chưa có token ký/phiên bàn chống giả mạo quyền truy cập                      |
+| Thời điểm trừ BOM       | Đã tích hợp khi hoàn tất/checkout; cần thống nhất với yêu cầu ban đầu trừ lúc bắt đầu chế biến                                          |
+| Nhất quán Sales–Catalog | Có khóa, kiểm tra trùng, xử lý lỗi và optimistic locking; cần cơ chế khôi phục khi một DB commit còn DB kia thất bại                    |
+| Trạng thái đơn          | Có chặn sửa đơn đã hoàn tất/hủy; cần rà đầy đủ các chuyển trạng thái hợp lệ, không coi đây là state machine hoàn chỉnh                  |
+| Thanh toán ngân hàng    | Có lưu thanh toán và xác nhận chuyển khoản thủ công; chưa có xác minh giao dịch ngân hàng tự động                                       |
+| Vận hành                | Compose “full” chưa đóng gói cả ba service và frontend; rate limit nằm trong bộ nhớ từng Gateway; DB dùng chung instance                |
+| Cấu hình                | Mẫu `PORT=8088` cần ghi đè ở Sales; seed Auth không chỉ giới hạn profile dev; cần quản lý secret và giới hạn cổng nội bộ khi triển khai |
+| Nghiệm thu              | Cần báo cáo test gắn commit, kiểm đếm dữ liệu thật, video demo và xác nhận phân công/đóng góp                                           |
+
+Các nhận xét trên dựa trên mã nguồn; không phải tất cả đều đã được tái hiện bằng kiểm thử runtime trong lần cập nhật này.
+
+## 10. Tài liệu và bàn giao
+
+- [Báo cáo lần 1](docs/academic/DACN_08_Nhom2B_BC_01.docx), [yêu cầu học phần](docs/academic/smartpos_required.pdf).
+- [Thiết kế dữ liệu](database/dbdiagram), [sơ đồ](docs/architecture/diagrams), [wireframe](docs/architecture/ui/wireframes).
+- [Đặc tả Sales–Catalog](docs/architecture/SALES_CATALOG_INTEGRATION_SPEC.md); đọc cùng code hiện tại vì thời điểm trừ kho đã khác thiết kế ban đầu.
+- [Tài liệu Sales/frontend](docs/services/sales-service/bao-cao-kiem-tra-hoan-thanh-sales-va-frontend.md), [đánh giá Catalog](docs/services/catalog-inventory-service/CATALOG_INVENTORY_EVALUATION.md).
+- [Kế hoạch E2E](docs/testing/ke-hoach-e2e-test.md), [kế hoạch unit/integration](docs/testing/ke-hoach-unit-test-va-integration-test.md), [báo cáo kiểm thử](docs/testing/bao-cao-danh-gia-kiem-thu.md).
+
+Trước bàn giao, xác nhận phân công và tỷ lệ đóng góp tổng 100%; chạy lại từ checkout sạch; lưu kết quả test/UI/API/DB; chốt các giới hạn được chấp nhận và gắn link video/Public URL nếu có. README chưa xác nhận Public URL hoặc video demo đã được cung cấp.

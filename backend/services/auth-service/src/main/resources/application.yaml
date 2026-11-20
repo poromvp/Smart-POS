@@ -5,7 +5,7 @@ spring:
 
   # PostgreSQL datasource
   datasource:
-    url: jdbc:postgresql://localhost:${AUTH_DB_PORT:5433}/${AUTH_DB_NAME:pos_identity_db}
+    url: ${AUTH_DB_URL:jdbc:postgresql://${AUTH_DB_HOST:localhost}:${AUTH_DB_PORT:5433}/${AUTH_DB_NAME:pos_identity_db}}
     username: ${AUTH_DB_USER:${POSTGRES_USER:pos_admin}}
     password: ${AUTH_DB_PASSWORD:${POSTGRES_PASSWORD:pos_password123}}
     driver-class-name: org.postgresql.Driver

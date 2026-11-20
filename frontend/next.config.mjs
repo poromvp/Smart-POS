@@ -2,6 +2,7 @@
 const GATEWAY_URL = process.env.API_GATEWAY_URL || "http://localhost:8088";
 
 const nextConfig = {
+  output: "standalone",
   allowedDevOrigins: ["192.168.10.147"],
   images: {
     remotePatterns: [

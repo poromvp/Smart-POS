@@ -109,8 +109,9 @@ http://<ĐỊA_CHỈ_IP_CỦA_MÁY_CHỦ>
   docker compose -f docker-compose.prod.yml down
   ```
 
-* **Khi có code mới từ GitHub, cập nhật lại:**
+* **Khi có code tính năng mới từ GitHub, cập nhật lên server:**
   ```bash
-  git pull
-  ./deploy.sh
+  chmod +x update.sh
+  ./update.sh
   ```
+  *(Lệnh này sẽ tự động chạy `git pull` và chỉ build lại các dịch vụ có code thay đổi, tuyệt đối không làm mất dữ liệu đơn hàng hay món ăn trong database).*
